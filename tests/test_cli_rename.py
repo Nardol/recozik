@@ -176,3 +176,63 @@ def test_rename_from_log_invalid_format(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "JSONL" in result.stdout
+
+
+def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "music"
+    root.mkdir()
+    src = root / "interactive.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "batch.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "interactive.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - Option1",
+                        "score": 0.9,
+                        "recording_id": "id1",
+                        "artist": "Artist",
+                        "title": "Option1",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    },
+                    {
+                        "formatted": "Artist - Option2",
+                        "score": 0.8,
+                        "recording_id": "id2",
+                        "artist": "Artist",
+                        "title": "Option2",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    },
+                ],
+            }
+        ],
+    )
+
+    monkeypatch.setattr(cli, "typer", cli.typer)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--interactive",
+            "--apply",
+        ],
+        input="2\n",
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert (root / "Artist - Option2.mp3").exists()

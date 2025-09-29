@@ -487,6 +487,11 @@ def rename_from_log(
         "--dry-run/--apply",
         help="Affiche les renommages sans les exécuter (par défaut). Utilisez --apply pour appliquer.",
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="Propose un choix interactif quand plusieurs correspondances sont disponibles.",
+    ),
     on_conflict: str = typer.Option(
         "append",
         "--on-conflict",
@@ -572,7 +577,15 @@ def rename_from_log(
             typer.echo(f"Aucune proposition pour: {source_path}")
             continue
 
-        match_data = matches[0]
+        selected_match_index = 0
+        if interactive and len(matches) > 1:
+            selected_match_index = _prompt_match_selection(matches, source_path)
+            if selected_match_index is None:
+                skipped += 1
+                typer.echo(f"Aucune sélection faite pour {source_path.name}, passage.")
+                continue
+
+        match_data = matches[selected_match_index]
         target_base = _render_log_template(match_data, template_value, source_path)
         sanitized = _sanitize_filename(target_base)
         if not sanitized:
@@ -1132,6 +1145,34 @@ def _compute_backup_path(source: Path, root: Path, backup_root: Path) -> Path:
     except ValueError:
         relative = Path(source.name)
     return backup_root / relative
+
+
+def _prompt_match_selection(matches: list[dict], source_path: Path) -> Optional[int]:
+    typer.echo(f"Plusieurs propositions pour {source_path.name}:")
+    for idx, match in enumerate(matches, start=1):
+        formatter = Formatter()
+        artist = match.get("artist") or "Artiste inconnu"
+        title = match.get("title") or "Titre inconnu"
+        score = _format_score(match.get("score"))
+        typer.echo(f"  {idx}. {artist} - {title} (score {score})")
+
+    prompt = "Sélectionnez un numéro (ENTER pour annuler) : "
+    choice = typer.prompt(prompt, default="", show_default=False)
+
+    if not choice:
+        return None
+
+    try:
+        idx = int(choice)
+    except ValueError:
+        typer.echo("Sélection invalide, entrée ignorée.")
+        return None
+
+    if not (1 <= idx <= len(matches)):
+        typer.echo("Indice hors plage, entrée ignorée.")
+        return None
+
+    return idx - 1
 
 
 @config_app.command("path")
