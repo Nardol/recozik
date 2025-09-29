@@ -274,7 +274,7 @@ def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
             "--confirm",
             "--apply",
         ],
-        input="y\n",
+        input="o\n",
     )
 
     assert result.exit_code == 0

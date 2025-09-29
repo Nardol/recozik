@@ -19,6 +19,8 @@ from typer.completion import (
     shellingham as completion_shellingham,
 )
 
+import requests
+
 from .cache import LookupCache
 from .config import AppConfig, default_config_path, load_config, write_config
 from .fingerprint import (
@@ -38,6 +40,8 @@ app.add_typer(config_app, name="config")
 app.add_typer(completion_app, name="completion")
 
 DEFAULT_AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".opus"}
+_VALIDATION_TRACK_ID = "9ff43b6a-4f16-427c-93c2-92307ca505e0"
+_VALIDATION_ENDPOINT = "https://api.acoustid.org/v2/lookup"
 
 
 def _resolve_path(path: Path) -> Path:
@@ -179,13 +183,20 @@ def identify(
 
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
-        target = config_path or default_config_path()
         typer.echo("Aucune clé API AcoustID configurée.")
-        typer.echo(
-            "Utilisez `recozik config set-key` ou éditez le fichier "
-            f"{target} pour enregistrer votre clé."
-        )
-        raise typer.Exit(code=1)
+        if _prompt_yes_no("Souhaitez-vous l'enregistrer maintenant ?", default=True):
+            new_key = _configure_api_key_interactively(config, config_path)
+            if not new_key:
+                typer.echo("Aucune clé n'a été enregistrée. Opération annulée.")
+                raise typer.Exit(code=1)
+            key = new_key
+            try:
+                config = load_config(config_path)
+            except RuntimeError:
+                config = AppConfig(acoustid_api_key=key)
+        else:
+            typer.echo("Opération annulée.")
+            raise typer.Exit(code=1)
 
     try:
         fingerprint_result: FingerprintResult = compute_fingerprint(resolved_audio, fpcalc_path=resolved_fpcalc)
@@ -334,13 +345,20 @@ def identify_batch(
 
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
-        target = config_path or default_config_path()
         typer.echo("Aucune clé API AcoustID configurée.")
-        typer.echo(
-            "Utilisez `recozik config set-key` ou éditez le fichier "
-            f"{target} pour enregistrer votre clé."
-        )
-        raise typer.Exit(code=1)
+        if _prompt_yes_no("Souhaitez-vous l'enregistrer maintenant ?", default=True):
+            new_key = _configure_api_key_interactively(config, config_path)
+            if not new_key:
+                typer.echo("Aucune clé n'a été enregistrée. Opération annulée.")
+                raise typer.Exit(code=1)
+            key = new_key
+            try:
+                config = load_config(config_path)
+            except RuntimeError:
+                config = AppConfig(acoustid_api_key=key)
+        else:
+            typer.echo("Opération annulée.")
+            raise typer.Exit(code=1)
 
     template_value = _resolve_template(template, config)
     log_format_value = (log_format or config.log_format).lower()
@@ -628,7 +646,7 @@ def rename_from_log(
 
         if confirm:
             question = f"Renommer {source_path.name} -> {final_target.name} ?"
-            if not typer.confirm(question, default=True):
+            if not _prompt_yes_no(question, default=True):
                 skipped += 1
                 typer.echo(f"Renommage ignoré pour {source_path.name}")
                 continue
@@ -1218,6 +1236,91 @@ def _prompt_match_selection(matches: list[dict], source_path: Path) -> Optional[
     return idx - 1
 
 
+def _prompt_yes_no(message: str, *, default: bool = True) -> bool:
+    suffix = "[o/N]" if not default else "[O/n]"
+    prompt = f"{message} {suffix}"
+    default_char = "o" if default else "n"
+
+    while True:
+        response = typer.prompt(prompt, default=default_char, show_default=False)
+        if not response:
+            return default
+        normalized = response.strip().lower()
+        if normalized in {"o", "oui", "y", "yes"}:
+            return True
+        if normalized in {"n", "non", "no"}:
+            return False
+        typer.echo("Réponse invalide (o/n).")
+
+
+def _prompt_api_key() -> Optional[str]:
+    key = typer.prompt("Clé API AcoustID", show_default=False).strip()
+    if not key:
+        return None
+    confirmation = typer.prompt("Confirmez la clé", default=key, show_default=False).strip()
+    if confirmation != key:
+        typer.echo("Les clés ne correspondent pas.")
+        return None
+    return key
+
+
+def _validate_client_key(key: str, timeout: float = 5.0) -> tuple[bool, str]:
+    try:
+        response = requests.get(
+            _VALIDATION_ENDPOINT,
+            params={"client": key, "trackid": _VALIDATION_TRACK_ID, "json": 1},
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        return False, f"Impossible de contacter AcoustID ({exc})."
+
+    if response.status_code != 200:
+        return False, f"Réponse HTTP inattendue ({response.status_code})."
+
+    try:
+        data = response.json()
+    except ValueError:
+        return False, "Réponse JSON invalide reçue depuis AcoustID."
+
+    if data.get("status") != "ok":
+        error = data.get("message")
+        if not error and isinstance(data.get("error"), dict):
+            error = data["error"].get("message")
+        return False, error or "Clé refusée par AcoustID."
+
+    return True, ""
+
+
+def _configure_api_key_interactively(
+    existing: AppConfig,
+    config_path: Optional[Path],
+    *,
+    skip_validation: bool = False,
+) -> Optional[str]:
+    key = _prompt_api_key()
+    if not key:
+        return None
+
+    if not skip_validation:
+        valid, message = _validate_client_key(key)
+        if not valid:
+            typer.echo(f"Validation de la clé échouée: {message}")
+            return None
+
+    updated = AppConfig(
+        acoustid_api_key=key,
+        cache_enabled=existing.cache_enabled,
+        cache_ttl_hours=existing.cache_ttl_hours,
+        output_template=existing.output_template,
+        log_format=existing.log_format,
+        log_absolute_paths=existing.log_absolute_paths,
+    )
+
+    target = write_config(updated, config_path)
+    typer.echo(f"Clé AcoustID enregistrée dans {target}")
+    return key
+
+
 @config_app.command("path")
 def config_path(config_path: Optional[Path] = typer.Option(None, "--config-path", hidden=True)) -> None:
     """Affiche le chemin du fichier de configuration utilisé."""
@@ -1257,28 +1360,49 @@ def config_show(config_path: Optional[Path] = typer.Option(None, "--config-path"
 
 @config_app.command("set-key")
 def config_set_key(
-    api_key: Optional[str] = typer.Option(
+    api_key_arg: Optional[str] = typer.Argument(
+        None,
+        help="Clé API AcoustID à enregistrer.",
+    ),
+    api_key_opt: Optional[str] = typer.Option(
         None,
         "--api-key",
-        prompt="Clé API AcoustID",
-        hide_input=True,
-        confirmation_prompt=True,
-        help="Clé obtenue sur https://acoustid.org/api-key",
+        "-k",
+        help="Clé API AcoustID à enregistrer (alternative à l'argument).",
+    ),
+    skip_validation: bool = typer.Option(
+        False,
+        "--skip-validation/--validate",
+        help="Ignore la vérification en ligne (déconseillé).",
     ),
     config_path: Optional[Path] = typer.Option(None, "--config-path", hidden=True),
 ) -> None:
     """Enregistre la clé d'API AcoustID dans le fichier de configuration."""
-
-    key = (api_key or "").strip()
-    if not key:
-        typer.echo("Aucune clé API fournie.")
-        raise typer.Exit(code=1)
 
     target_path = config_path or default_config_path()
     try:
         existing = load_config(target_path)
     except RuntimeError:
         existing = AppConfig()
+
+    key = (api_key_opt or api_key_arg or "").strip()
+
+    if key:
+        confirmation = typer.prompt("Confirmez la clé", default=key)
+        if confirmation.strip() != key:
+            typer.echo("Les clés ne correspondent pas. Opération annulée.")
+            raise typer.Exit(code=1)
+    else:
+        key = _prompt_api_key()
+        if not key:
+            typer.echo("Aucune clé API fournie.")
+            raise typer.Exit(code=1)
+
+    if not skip_validation:
+        valid, message = _validate_client_key(key)
+        if not valid:
+            typer.echo(f"Validation de la clé échouée: {message}")
+            raise typer.Exit(code=1)
 
     updated = AppConfig(
         acoustid_api_key=key,

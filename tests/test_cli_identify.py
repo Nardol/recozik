@@ -6,6 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from recozik import cli
+from recozik.config import AppConfig, write_config
 from recozik.fingerprint import AcoustIDMatch, FingerprintResult, ReleaseInfo
 
 runner = CliRunner()
@@ -146,10 +147,12 @@ def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
             "--config-path",
             str(config_path),
         ],
+        input="n\n",
     )
 
     assert result.exit_code == 1
     assert "Aucune clé API AcoustID" in result.stdout
+    assert "Opération annulée." in result.stdout
 
 
 def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
@@ -192,3 +195,54 @@ def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "Artiste :: Titre" in result.stdout
+
+
+def test_identify_register_key_via_prompt(monkeypatch, tmp_path: Path) -> None:
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+    config_path = tmp_path / "config.toml"
+
+    def fake_compute(_audio_path, fpcalc_path=None):
+        return FingerprintResult(fingerprint="PROMPT", duration_seconds=120.0)
+
+    def fake_lookup(api_key, fingerprint_result, meta=None, timeout=None):
+        assert api_key == "token"
+        return [
+            AcoustIDMatch(
+                score=0.7,
+                recording_id="id",
+                title="Titre",
+                artist="Artiste",
+            )
+        ]
+
+    def fake_configure(existing, path, skip_validation=False):
+        updated = AppConfig(
+            acoustid_api_key="token",
+            cache_enabled=existing.cache_enabled,
+            cache_ttl_hours=existing.cache_ttl_hours,
+            output_template=existing.output_template,
+            log_format=existing.log_format,
+            log_absolute_paths=existing.log_absolute_paths,
+        )
+        write_config(updated, path)
+        return "token"
+
+    monkeypatch.setattr(cli, "compute_fingerprint", fake_compute)
+    monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "_configure_api_key_interactively", fake_configure)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+        ],
+        input="o\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Résultat 1" in result.stdout
