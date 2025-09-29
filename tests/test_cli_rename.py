@@ -216,8 +216,6 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
         ],
     )
 
-    monkeypatch.setattr(cli, "typer", cli.typer)
-
     result = runner.invoke(
         cli.app,
         [
@@ -236,3 +234,148 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert not src.exists()
     assert (root / "Artist - Option2.mp3").exists()
+
+
+def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
+    root = tmp_path / "music"
+    root.mkdir()
+    src = root / "confirm.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "batch.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "confirm.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - Confirm",
+                        "score": 0.95,
+                        "recording_id": "id",
+                        "artist": "Artist",
+                        "title": "Confirm",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    }
+                ],
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--confirm",
+            "--apply",
+        ],
+        input="y\n",
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert (root / "Artist - Confirm.mp3").exists()
+
+
+def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
+    root = tmp_path / "music"
+    root.mkdir()
+    src = root / "skip.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "batch.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "skip.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - Skip",
+                        "score": 0.9,
+                        "recording_id": "id",
+                        "artist": "Artist",
+                        "title": "Skip",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    }
+                ],
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--confirm",
+            "--apply",
+        ],
+        input="n\n",
+    )
+
+    assert result.exit_code == 0
+    assert src.exists()
+    assert "Renommage ignoré" in result.stdout
+
+
+def test_rename_from_log_export(tmp_path: Path) -> None:
+    root = tmp_path / "music"
+    root.mkdir()
+    src = root / "export.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "batch.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "export.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - Export",
+                        "score": 0.88,
+                        "recording_id": "id",
+                        "artist": "Artist",
+                        "title": "Export",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    }
+                ],
+            }
+        ],
+    )
+
+    export_file = tmp_path / "renames.json"
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--apply",
+            "--export",
+            str(export_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert export_file.exists()
+    payload = json.loads(export_file.read_text(encoding="utf-8"))
+    assert payload[0]["applied"] is True
+    assert payload[0]["target"].endswith("Artist - Export.mp3")

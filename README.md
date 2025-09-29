@@ -60,7 +60,7 @@ Vous pouvez vérifier la valeur et le chemin avec `uv run recozik config show`. 
   ```bash
   uv run recozik rename-from-log logs/recozik.jsonl --root repertoire --dry-run
   ```
-  Le mode `--dry-run` est activé par défaut pour prévisualiser les renommages. Ajoutez `--apply` pour exécuter, `--on-conflict append|skip|overwrite` pour choisir la stratégie, `--backup-dir sauvegardes/` pour conserver une copie et `--template` pour recalculer le nom final.
+  Le mode `--dry-run` est activé par défaut pour prévisualiser les renommages. Ajoutez `--apply` pour exécuter, `--on-conflict append|skip|overwrite` pour choisir la stratégie, `--backup-dir sauvegardes/` pour conserver une copie, `--template` pour recalculer le nom final, `--interactive` pour sélectionner la proposition conservée, `--confirm` pour valider chaque fichier et `--export renames.json` pour archiver la liste des renommages.
 - Gérer la configuration :
   ```bash
   uv run recozik config show
@@ -87,7 +87,7 @@ Vous pouvez vérifier la valeur et le chemin avec `uv run recozik config show`. 
 - Le cache local est partagé entre les commandes `identify` et `identify-batch`. Utilisez `--refresh` pour forcer ponctuellement une nouvelle requête AcoustID.
 - Les modèles (`--template`) acceptent les champs `{artist}`, `{title}`, `{album}`, `{score}`, `{recording_id}`, etc. Le CLI a priorité sur la configuration.
 - Les logs peuvent être produits en texte brut (lisible) ou en JSONL (parseable). Utilisez `--log-format` pour surcharger la valeur de configuration.
-- Le renommage exige un log JSONL (`identify-batch --log-format jsonl`). Les champs disponibles dans les modèles incluent `{artist}`, `{title}`, `{album}`, `{score}`, `{recording_id}`, `{release_group_id}`, `{release_id}`, `{ext}` et `{stem}`.
+- Le renommage exige un log JSONL (`identify-batch --log-format jsonl`). Les champs disponibles dans les modèles incluent `{artist}`, `{title}`, `{album}`, `{score}`, `{recording_id}`, `{release_group_id}`, `{release_id}`, `{ext}` et `{stem}`. Les options `--interactive`, `--confirm` et `--export` permettent respectivement de choisir la correspondance conservée, de valider chaque renommage et de conserver un récapitulatif JSON.
 
 ## Auto-complétion du shell
 - Installer le script pour votre shell (détection automatique sinon) :

@@ -489,8 +489,13 @@ def rename_from_log(
     ),
     interactive: bool = typer.Option(
         False,
-        "--interactive",
+        "--interactive/--no-interactive",
         help="Propose un choix interactif quand plusieurs correspondances sont disponibles.",
+    ),
+    confirm: bool = typer.Option(
+        False,
+        "--confirm/--no-confirm",
+        help="Demande une confirmation pour chaque fichier avant renommage.",
     ),
     on_conflict: str = typer.Option(
         "append",
@@ -501,6 +506,11 @@ def rename_from_log(
         None,
         "--backup-dir",
         help="Dossier dans lequel copier les originaux avant renommage (optionnel).",
+    ),
+    export_path: Optional[Path] = typer.Option(
+        None,
+        "--export",
+        help="Chemin d'un fichier JSON résumant les renommages planifiés.",
     ),
     config_path: Optional[Path] = typer.Option(
         None,
@@ -544,7 +554,8 @@ def rename_from_log(
     if backup_path:
         backup_path.mkdir(parents=True, exist_ok=True)
 
-    planned: list[tuple[Path, Path]] = []
+    planned: list[tuple[Path, Path, dict]] = []
+    export_entries: list[dict] = []
     occupied: set[Path] = set()
     renamed = 0
     skipped = 0
@@ -615,7 +626,14 @@ def rename_from_log(
             typer.echo(f"Collision non résolue, fichier ignoré: {source_path.name}")
             continue
 
-        planned.append((source_path, final_target))
+        if confirm:
+            question = f"Renommer {source_path.name} -> {final_target.name} ?"
+            if not typer.confirm(question, default=True):
+                skipped += 1
+                typer.echo(f"Renommage ignoré pour {source_path.name}")
+                continue
+
+        planned.append((source_path, final_target, match_data))
         occupied.add(final_target)
 
     if not planned:
@@ -624,11 +642,19 @@ def rename_from_log(
         )
         return
 
-    for source_path, target_path in planned:
+    for source_path, target_path, match_data in planned:
         action = "DRY-RUN" if dry_run else "RENOMME"
         typer.echo(f"{action}: {source_path} -> {target_path}")
 
         if dry_run:
+            export_entries.append(
+                {
+                    "source": str(source_path),
+                    "target": str(target_path),
+                    "applied": False,
+                    "match": match_data,
+                }
+            )
             continue
 
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -643,6 +669,14 @@ def rename_from_log(
 
         source_path.rename(target_path)
         renamed += 1
+        export_entries.append(
+            {
+                "source": str(source_path),
+                "target": str(target_path),
+                "applied": True,
+                "match": match_data,
+            }
+        )
 
     if dry_run:
         typer.echo(
@@ -652,6 +686,15 @@ def rename_from_log(
         typer.echo(
             f"Renommage terminé: {renamed} fichier(s), {skipped} ignoré(s), {errors} en erreur."
         )
+
+    if export_path and export_entries:
+        resolved_export = _resolve_path(export_path)
+        resolved_export.parent.mkdir(parents=True, exist_ok=True)
+        resolved_export.write_text(
+            json.dumps(export_entries, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        typer.echo(f"Résumé écrit dans {resolved_export}")
 @completion_app.command("install")
 def completion_install(
     shell: Optional[str] = typer.Option(
