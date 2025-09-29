@@ -1,3 +1,5 @@
+"""Tests for the AcoustID lookup helpers."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -13,6 +15,7 @@ from recozik.fingerprint import (
 
 
 def _sample_response() -> dict[str, Any]:
+    """Return a representative response payload from the API."""
     return {
         "status": "ok",
         "results": [
@@ -45,6 +48,7 @@ def _sample_response() -> dict[str, Any]:
 
 
 def test_lookup_recordings_parses_response(monkeypatch) -> None:
+    """Parse API payloads into `AcoustIDMatch` instances."""
     monkeypatch.setattr(
         "recozik.fingerprint.pyacoustid.lookup",
         lambda *_args, **_kwargs: _sample_response(),
@@ -67,5 +71,6 @@ def test_lookup_recordings_parses_response(monkeypatch) -> None:
 
 
 def test_lookup_recordings_requires_api_key() -> None:
+    """Require an API key before performing a lookup."""
     with pytest.raises(AcoustIDLookupError):
         lookup_recordings("", FingerprintResult(fingerprint="FP", duration_seconds=10))

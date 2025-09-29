@@ -1,3 +1,5 @@
+"""Tests for the track identification command."""
+
 from __future__ import annotations
 
 import json
@@ -13,34 +15,42 @@ runner = CliRunner()
 
 
 class DummyCache:
+    """Minimal in-memory implementation of the lookup cache API."""
+
     def __init__(self, *args, **kwargs) -> None:
+        """Store parameters and prepare an internal dictionary."""
         self.enabled = kwargs.get("enabled", True)
         self.store: dict[tuple[str, int], list[AcoustIDMatch]] = {}
 
     def _key(self, fingerprint: str, duration: float) -> tuple[str, int]:
-        return (fingerprint, int(round(duration)))
+        return (fingerprint, round(duration))
 
     def get(self, fingerprint: str, duration: float):
+        """Return cached matches if caching is enabled."""
         if not self.enabled:
             return None
         return self.store.get(self._key(fingerprint, duration))
 
     def set(self, fingerprint: str, duration: float, matches):
+        """Record matches in the fake cache when caching is enabled."""
         if not self.enabled:
             return
         self.store[self._key(fingerprint, duration)] = list(matches)
 
     def save(self):
+        """Pretend to persist the cache (no-op for the fake cache)."""
         pass
 
 
 def _fake_config(tmp_path: Path, api_key: str = "token") -> Path:
+    """Write a minimal configuration file for tests and return its path."""
     config_path = tmp_path / "config.toml"
-    config_path.write_text(f"[acoustid]\napi_key = \"{api_key}\"\n", encoding="utf-8")
+    config_path.write_text(f'[acoustid]\napi_key = "{api_key}"\n', encoding="utf-8")
     return config_path
 
 
 def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
+    """Return JSON payload when --json flag is provided."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
@@ -49,7 +59,7 @@ def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
     def fake_compute(_audio_path, fpcalc_path=None):
         return FingerprintResult(fingerprint="ABC", duration_seconds=123.0)
 
-    def fake_lookup(api_key, fingerprint_result, meta=None, timeout=None):  # noqa: D401
+    def fake_lookup(api_key, fingerprint_result, meta=None, timeout=None):
         assert api_key == "token"
         assert fingerprint_result.fingerprint == "ABC"
         return [
@@ -84,6 +94,7 @@ def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
+    """Render textual output with recording details."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
@@ -127,6 +138,7 @@ def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
+    """Abort when no API key is available and the user declines to configure it."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
@@ -156,6 +168,7 @@ def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
+    """Apply a custom output template passed on the CLI."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
     config_path = _fake_config(tmp_path)
@@ -198,6 +211,7 @@ def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_identify_register_key_via_prompt(monkeypatch, tmp_path: Path) -> None:
+    """Store a prompted API key and continue the identification flow."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
     config_path = tmp_path / "config.toml"

@@ -1,3 +1,5 @@
+"""Tests for the batch identification workflow."""
+
 from __future__ import annotations
 
 import json
@@ -12,30 +14,45 @@ runner = CliRunner()
 
 
 class DummyCache:
+    """In-memory stub of the lookup cache used in batch tests."""
+
     def __init__(self, *args, **kwargs) -> None:
+        """Initialise the fake cache with optional enabled flag."""
         self.enabled = kwargs.get("enabled", True)
         self.data: dict[tuple[str, int], list[AcoustIDMatch]] = {}
 
     def _key(self, fingerprint: str, duration: float) -> tuple[str, int]:
-        return (fingerprint, int(round(duration)))
+        return (fingerprint, round(duration))
 
     def get(self, fingerprint: str, duration: float):
+        """Return cached matches when caching is enabled."""
         if not self.enabled:
             return None
         return self.data.get(self._key(fingerprint, duration))
 
     def set(self, fingerprint: str, duration: float, matches):
+        """Store matches in the fake cache when caching is enabled."""
         if not self.enabled:
             return
         self.data[self._key(fingerprint, duration)] = list(matches)
 
     def save(self):
+        """Avoid writing anything to disk for the fake cache."""
         pass
 
 
 def _write_config(tmp_path: Path, template: str | None = None, log_format: str = "text") -> Path:
+    """Create a reusable configuration file tailored for batch tests."""
     config_path = tmp_path / "config.toml"
-    sections = ["[acoustid]", 'api_key = "token"', "", "[cache]", "enabled = true", "ttl_hours = 24", ""]
+    sections = [
+        "[acoustid]",
+        'api_key = "token"',
+        "",
+        "[cache]",
+        "enabled = true",
+        "ttl_hours = 24",
+        "",
+    ]
     sections += ["[output]"]
     if template:
         sections.append(f'template = "{template}"')
@@ -46,6 +63,7 @@ def _write_config(tmp_path: Path, template: str | None = None, log_format: str =
 
 
 def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
+    """Log formatted text entries for multiple audio files."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
     file_a = audio_dir / "track_a.mp3"
@@ -102,6 +120,7 @@ def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
+    """Emit JSONL records when log format is jsonl."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
     file_a = audio_dir / "song.mp3"
@@ -155,6 +174,7 @@ def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:
+    """Skip files without supported audio extensions."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
     keep_file = audio_dir / "keep.wav"
@@ -169,9 +189,7 @@ def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
-        lambda path, fpcalc_path=None: FingerprintResult(
-            fingerprint="KEEP", duration_seconds=60.0
-        ),
+        lambda path, fpcalc_path=None: FingerprintResult(fingerprint="KEEP", duration_seconds=60.0),
     )
     monkeypatch.setattr(
         cli,

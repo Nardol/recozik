@@ -9,6 +9,8 @@
 ## Build, Test, and Development Commands
 - `uv sync --all-groups` – Install runtime + dev dependency groups defined in `pyproject.toml`.
 - `uv run recozik …` – Execute CLI commands (e.g., `uv run recozik identify sample.flac`).
+- `uv run ruff check --fix` – Run Ruff with automatic fixes (must pass before committing).
+- `uv run ruff format` – Apply Ruff formatter to keep code style consistent.
 - `uv run pytest` – Run the full automated test suite.
 - `uv build` – Produce wheel + sdist for validation before releases.
 

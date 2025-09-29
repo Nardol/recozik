@@ -1,13 +1,13 @@
-"""Gestion d'un cache local pour les réponses AcoustID."""
+"""Local cache helpers for AcoustID lookup responses."""
 
 from __future__ import annotations
 
 import json
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Iterable, Optional
 
 import platformdirs
 
@@ -17,6 +17,7 @@ CACHE_FILENAME = "lookup-cache.json"
 
 
 def default_cache_path() -> Path:
+    """Return the default cache file location under the user cache directory."""
     cache_dir = Path(platformdirs.user_cache_dir("recozik", appauthor=False))
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir / CACHE_FILENAME
@@ -30,6 +31,7 @@ class CacheEntry:
     matches: list[AcoustIDMatch]
 
     def to_dict(self) -> dict:
+        """Serialize the cache entry into a JSON-friendly payload."""
         return {
             "fingerprint": self.fingerprint,
             "duration_seconds": self.duration_seconds,
@@ -38,7 +40,8 @@ class CacheEntry:
         }
 
     @classmethod
-    def from_dict(cls, payload: dict) -> "CacheEntry":
+    def from_dict(cls, payload: dict) -> CacheEntry:
+        """Build a cache entry instance from a serialized payload."""
         matches = [AcoustIDMatch.from_dict(item) for item in payload.get("matches", [])]
         return cls(
             fingerprint=payload["fingerprint"],
@@ -49,15 +52,16 @@ class CacheEntry:
 
 
 class LookupCache:
-    """Cache simple basé sur un fichier JSON."""
+    """Lightweight JSON-backed cache for AcoustID lookups."""
 
     def __init__(
         self,
-        path: Optional[Path] = None,
+        path: Path | None = None,
         *,
         enabled: bool = True,
         ttl: timedelta = timedelta(hours=24),
     ) -> None:
+        """Initialize the cache with desired file location and time-to-live."""
         self.path = path or default_cache_path()
         self.enabled = enabled
         self.ttl = ttl
@@ -82,10 +86,11 @@ class LookupCache:
 
     @staticmethod
     def _key(fingerprint: str, duration_seconds: float) -> str:
-        rounded = int(round(duration_seconds))
+        rounded: int = round(duration_seconds)
         return f"{fingerprint}:{rounded}"
 
-    def get(self, fingerprint: str, duration_seconds: float) -> Optional[list[AcoustIDMatch]]:
+    def get(self, fingerprint: str, duration_seconds: float) -> list[AcoustIDMatch] | None:
+        """Return cached matches matching the fingerprint and duration if fresh."""
         if not self.enabled:
             return None
         self._ensure_loaded()
@@ -104,6 +109,7 @@ class LookupCache:
         duration_seconds: float,
         matches: Iterable[AcoustIDMatch],
     ) -> None:
+        """Store new matches for the given fingerprint and duration."""
         if not self.enabled:
             return
         self._ensure_loaded()
@@ -117,6 +123,7 @@ class LookupCache:
         self._dirty = True
 
     def clear(self) -> None:
+        """Remove all cached entries and delete the cache file if present."""
         self._data.clear()
         self._dirty = True
         if self.path.exists():
@@ -126,6 +133,7 @@ class LookupCache:
                 pass
 
     def save(self) -> None:
+        """Persist the in-memory cache to disk when it has been modified."""
         if not self.enabled or not self._dirty:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)

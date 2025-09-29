@@ -1,11 +1,10 @@
-"""Gestion de la configuration utilisateur pour recozik."""
+"""User configuration helpers for recozik."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import platformdirs
 
@@ -21,16 +20,17 @@ CONFIG_FILE_NAME = "config.toml"
 
 @dataclass(slots=True)
 class AppConfig:
-    """Configuration applicative accessible par la CLI."""
+    """Application configuration exposed to the CLI."""
 
-    acoustid_api_key: Optional[str] = None
+    acoustid_api_key: str | None = None
     cache_enabled: bool = True
     cache_ttl_hours: int = 24
-    output_template: Optional[str] = None
+    output_template: str | None = None
     log_format: str = "text"
     log_absolute_paths: bool = False
 
     def to_toml_dict(self) -> dict:
+        """Return the configuration as a nested dictionary consumable by TOML writers."""
         data: dict[str, dict] = {
             "acoustid": {},
             "cache": {
@@ -54,8 +54,7 @@ class AppConfig:
 
 
 def default_config_path() -> Path:
-    """Retourne le chemin du fichier de configuration utilisateur."""
-
+    """Return the user configuration file path."""
     env_value = os.environ.get(CONFIG_ENV_VAR)
     if env_value:
         return Path(env_value).expanduser()
@@ -64,9 +63,8 @@ def default_config_path() -> Path:
     return config_dir / CONFIG_FILE_NAME
 
 
-def load_config(path: Optional[Path] = None) -> AppConfig:
-    """Lit le fichier de configuration et retourne un objet `AppConfig`."""
-
+def load_config(path: Path | None = None) -> AppConfig:
+    """Load configuration from disk and return an ``AppConfig`` instance."""
     path = path or default_config_path()
     if not path.exists():
         return AppConfig()
@@ -115,17 +113,15 @@ def load_config(path: Optional[Path] = None) -> AppConfig:
     )
 
 
-def ensure_config_dir(path: Optional[Path] = None) -> Path:
-    """S'assure que le dossier contenant la config existe et renvoie son chemin."""
-
+def ensure_config_dir(path: Path | None = None) -> Path:
+    """Make sure the configuration directory exists and return its path."""
     final_path = path or default_config_path()
     final_path.parent.mkdir(parents=True, exist_ok=True)
     return final_path
 
 
-def write_config(config: AppConfig, path: Optional[Path] = None) -> Path:
-    """Écrit la configuration au format TOML et retourne le chemin utilisé."""
-
+def write_config(config: AppConfig, path: Path | None = None) -> Path:
+    """Persist configuration to TOML and return the output path."""
     target = ensure_config_dir(path)
     data = config.to_toml_dict()
 
@@ -134,10 +130,10 @@ def write_config(config: AppConfig, path: Optional[Path] = None) -> Path:
     lines.append("[acoustid]")
     api_key = data["acoustid"].get("api_key")
     if api_key:
-        escaped = api_key.replace("\"", "\\\"")
+        escaped = api_key.replace('"', '\\"')
         lines.append(f'api_key = "{escaped}"')
     else:
-        lines.append("# api_key = \"votre_cle_api\"")
+        lines.append('# api_key = "votre_cle_api"')
     lines.append("")
 
     lines.append("[cache]")
@@ -148,14 +144,14 @@ def write_config(config: AppConfig, path: Optional[Path] = None) -> Path:
     lines.append("[output]")
     template = data["output"].get("template")
     if template:
-        escaped_template = template.replace("\"", "\\\"")
+        escaped_template = template.replace('"', '\\"')
         lines.append(f'template = "{escaped_template}"')
     else:
         lines.append('# template = "{artist} - {title}"')
     lines.append("")
 
     lines.append("[logging]")
-    lines.append(f"format = \"{data['logging']['format']}\"")
+    lines.append(f'format = "{data["logging"]["format"]}"')
     lines.append(f"absolute_paths = {str(data['logging']['absolute_paths']).lower()}")
     lines.append("")
 
@@ -164,10 +160,10 @@ def write_config(config: AppConfig, path: Optional[Path] = None) -> Path:
 
 
 __all__ = [
-    "AppConfig",
     "CONFIG_ENV_VAR",
+    "AppConfig",
     "default_config_path",
     "ensure_config_dir",
-    "write_config",
     "load_config",
+    "write_config",
 ]

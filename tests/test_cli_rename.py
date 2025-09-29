@@ -1,3 +1,5 @@
+"""Tests for the rename-from-log command."""
+
 from __future__ import annotations
 
 import json
@@ -11,12 +13,14 @@ runner = CliRunner()
 
 
 def _write_jsonl_log(path: Path, entries: list[dict]) -> None:
+    """Write JSONL entries to the provided path."""
     with path.open("w", encoding="utf-8") as handle:
         for entry in entries:
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def test_rename_from_log_apply(tmp_path: Path) -> None:
+    """Apply rename operations when --apply is provided."""
     root = tmp_path / "music"
     root.mkdir()
     src = root / "original.mp3"
@@ -63,6 +67,7 @@ def test_rename_from_log_apply(tmp_path: Path) -> None:
 
 
 def test_rename_from_log_dry_run(tmp_path: Path) -> None:
+    """Preview rename operations without touching files."""
     root = tmp_path / "music"
     root.mkdir()
     src = root / "track.wav"
@@ -108,6 +113,7 @@ def test_rename_from_log_dry_run(tmp_path: Path) -> None:
 
 
 def test_rename_from_log_conflict_append(tmp_path: Path) -> None:
+    """Append a numeric suffix when the target filename already exists."""
     root = tmp_path / "music"
     root.mkdir()
     (root / "song1.mp3").write_bytes(b"a")
@@ -169,6 +175,7 @@ def test_rename_from_log_conflict_append(tmp_path: Path) -> None:
 
 
 def test_rename_from_log_invalid_format(tmp_path: Path) -> None:
+    """Abort when the provided log file is not JSONL."""
     log_path = tmp_path / "plain.log"
     log_path.write_text("file: track.mp3\n", encoding="utf-8")
 
@@ -179,6 +186,7 @@ def test_rename_from_log_invalid_format(tmp_path: Path) -> None:
 
 
 def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
+    """Let the user choose a match interactively before renaming."""
     root = tmp_path / "music"
     root.mkdir()
     src = root / "interactive.mp3"
@@ -237,6 +245,7 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
+    """Proceed with renaming when confirmation is accepted."""
     root = tmp_path / "music"
     root.mkdir()
     src = root / "confirm.mp3"
@@ -283,6 +292,7 @@ def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
 
 
 def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
+    """Cancel renaming when the user declines confirmation."""
     root = tmp_path / "music"
     root.mkdir()
     src = root / "skip.mp3"
@@ -329,6 +339,7 @@ def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
 
 
 def test_rename_from_log_export(tmp_path: Path) -> None:
+    """Export the rename plan to JSON while applying changes."""
     root = tmp_path / "music"
     root.mkdir()
     src = root / "export.mp3"

@@ -22,6 +22,9 @@ test = [
     "pytest>=8.3",
     "pytest-mock>=3.14"
 ]
+dev = [
+    "ruff>=0.6.5"
+]
 
 [project.scripts]
 recozik = "recozik.cli:app"
@@ -32,3 +35,32 @@ build-backend = "uv_build"
 
 [tool.typer]
 short_help = "Analyse des fichiers audio et extraction d'empreintes"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "W",
+    "D",
+    "B",
+    "I",
+    "UP",
+    "N",
+    "S",
+    "RUF"
+]
+ignore = [
+    "S101",
+    "B008",
+    "D203",
+    "D213"
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["recozik"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]

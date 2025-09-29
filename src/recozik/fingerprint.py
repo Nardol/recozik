@@ -1,15 +1,15 @@
-"""Fonctions utilitaires pour générer des empreintes audio avec Chromaprint."""
+"""Utility functions to generate and look up audio fingerprints via Chromaprint."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import os
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Sequence
 
 try:
     import acoustid as pyacoustid
-except ImportError:  # pragma: no cover - compatibilité avec versions futures/anciennes
+except ImportError:  # pragma: no cover - compatibility with future or legacy versions
     import pyacoustid  # type: ignore[no-redef]
 
 _FPCALC_ERRORS: tuple[type[Exception], ...] = tuple(
@@ -24,26 +24,27 @@ _FPCALC_ERRORS: tuple[type[Exception], ...] = tuple(
 
 @dataclass(slots=True)
 class FingerprintResult:
-    """Représente l'empreinte générée par Chromaprint."""
+    """Represent the Chromaprint fingerprint output."""
 
     fingerprint: str
     duration_seconds: float
 
 
 class FingerprintError(RuntimeError):
-    """Erreur levée lorsqu'il est impossible de calculer l'empreinte."""
+    """Raised when the fingerprint cannot be computed."""
 
 
 @dataclass(slots=True)
 class ReleaseInfo:
-    """Informations synthétiques sur une sortie (album, single...)."""
+    """Compact metadata about a release (album, single, etc.)."""
 
-    title: Optional[str] = None
-    release_id: Optional[str] = None
-    date: Optional[str] = None
-    country: Optional[str] = None
+    title: str | None = None
+    release_id: str | None = None
+    date: str | None = None
+    country: str | None = None
 
-    def to_dict(self) -> dict[str, Optional[str]]:
+    def to_dict(self) -> dict[str, str | None]:
+        """Serialize the release metadata into a plain dictionary."""
         return {
             "title": self.title,
             "release_id": self.release_id,
@@ -54,17 +55,18 @@ class ReleaseInfo:
 
 @dataclass(slots=True)
 class AcoustIDMatch:
-    """Représente un enregistrement renvoyé par l'API AcoustID."""
+    """Represent a recording entry returned by the AcoustID API."""
 
     score: float
     recording_id: str
-    title: Optional[str]
-    artist: Optional[str]
-    release_group_id: Optional[str] = None
-    release_group_title: Optional[str] = None
+    title: str | None
+    artist: str | None
+    release_group_id: str | None = None
+    release_group_title: str | None = None
     releases: list[ReleaseInfo] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
+        """Serialize the match into a JSON-compatible dictionary."""
         return {
             "score": self.score,
             "recording_id": self.recording_id,
@@ -76,7 +78,8 @@ class AcoustIDMatch:
         }
 
     @classmethod
-    def from_dict(cls, payload: dict) -> "AcoustIDMatch":
+    def from_dict(cls, payload: dict) -> AcoustIDMatch:
+        """Create a match instance from a dictionary returned by the API."""
         releases = [
             ReleaseInfo(
                 title=item.get("title"),
@@ -104,27 +107,27 @@ class AcoustIDMatch:
 
 
 class AcoustIDLookupError(RuntimeError):
-    """Erreur levée lorsqu'un appel à l'API AcoustID échoue."""
+    """Raised when the AcoustID API request fails."""
 
 
 def compute_fingerprint(
     audio_path: Path,
     *,
-    fpcalc_path: Optional[Path] = None,
+    fpcalc_path: Path | None = None,
 ) -> FingerprintResult:
-    """Calcule l'empreinte Chromaprint du fichier audio fourni.
+    """Compute the Chromaprint fingerprint for the provided audio file.
 
     Args:
-        audio_path: chemin du fichier audio.
-        fpcalc_path: chemin explicite vers l'exécutable ``fpcalc`` si non présent dans ``PATH``.
+        audio_path: Path to the audio file that must be fingerprinted.
+        fpcalc_path: Explicit path to the ``fpcalc`` executable when it is outside ``PATH``.
 
     Returns:
-        FingerprintResult: empreinte et durée estimée du morceau.
+        FingerprintResult: Fingerprint string and estimated track duration.
 
     Raises:
-        FingerprintError: si le fichier n'existe pas ou si ``fpcalc`` échoue.
-    """
+        FingerprintError: Raised when the file is missing or ``fpcalc`` execution fails.
 
+    """
     if not audio_path.is_file():
         raise FingerprintError(f"Fichier audio introuvable: {audio_path}")
 
@@ -144,7 +147,8 @@ def compute_fingerprint(
     except Exception as exc:  # pragma: no cover - pyacoustid utilise divers types d'exceptions
         if _FPCALC_ERRORS and isinstance(exc, _FPCALC_ERRORS):  # type: ignore[arg-type]
             raise FingerprintError(
-                "L'outil fpcalc (Chromaprint) est introuvable. Installez-le ou précisez --fpcalc-path."
+                "L'outil fpcalc (Chromaprint) est introuvable. "
+                "Installez-le ou précisez --fpcalc-path."
             ) from exc
         raise FingerprintError(f"Échec du calcul d'empreinte: {exc}") from exc
     finally:
@@ -161,10 +165,10 @@ def _normalize_fingerprint_output(
     raw_first: object,
     raw_second: object,
 ) -> tuple[str, float]:
-    """Normalise la sortie de `pyacoustid.fingerprint_file`.
+    """Normalize ``pyacoustid.fingerprint_file`` output across versions.
 
-    Les versions récentes d'``acoustid`` renvoient ``(duration, fingerprint)``
-    alors que les anciennes renvoyaient ``(fingerprint, duration)``.
+    Recent ``acoustid`` releases return ``(duration, fingerprint)`` while older ones
+    returned ``(fingerprint, duration)``.
     """
 
     def _ensure_str(value: object) -> str:
@@ -179,13 +183,13 @@ def _normalize_fingerprint_output(
         fingerprint = _ensure_str(raw_first)
         duration = float(raw_second)
     else:
-        # Dernier recours : on suppose que le deuxième élément est la durée
+        # Fall back to assuming the second element stores the duration
         fingerprint = _ensure_str(raw_first)
         try:
             duration = float(raw_second)  # type: ignore[arg-type]
         except (TypeError, ValueError) as exc:
             raise FingerprintError(
-                "Réponse inattendue de l'outil fpcalc: impossible de déterminer la durée."
+                "Unexpected fpcalc output: unable to determine the track duration."
             ) from exc
 
     return fingerprint, duration
@@ -195,11 +199,10 @@ def lookup_recordings(
     api_key: str,
     fingerprint_result: FingerprintResult,
     *,
-    meta: Optional[Sequence[str]] = None,
-    timeout: Optional[float] = None,
+    meta: Sequence[str] | None = None,
+    timeout: float | None = None,
 ) -> list[AcoustIDMatch]:
-    """Interroge l'API AcoustID et retourne les meilleures correspondances."""
-
+    """Query the AcoustID API and return best matches."""
     if not api_key:
         raise AcoustIDLookupError("Aucune clé API fournie pour interroger AcoustID.")
 
@@ -215,7 +218,7 @@ def lookup_recordings(
         data = pyacoustid.lookup(
             api_key,
             fingerprint_result.fingerprint,
-            int(round(fingerprint_result.duration_seconds)),
+            round(fingerprint_result.duration_seconds),
             meta=list(meta_fields),
             timeout=timeout,
         )
@@ -263,7 +266,7 @@ def lookup_recordings(
     return matches
 
 
-def _format_artists(artists: Optional[Sequence[dict]]) -> Optional[str]:
+def _format_artists(artists: Sequence[dict] | None) -> str | None:
     if not artists:
         return None
 
@@ -279,7 +282,7 @@ def _format_artists(artists: Optional[Sequence[dict]]) -> Optional[str]:
     return text or None
 
 
-def _extract_release_group(recording: dict) -> tuple[Optional[str], Optional[str]]:
+def _extract_release_group(recording: dict) -> tuple[str | None, str | None]:
     releasegroups = recording.get("releasegroups") or []
     if not releasegroups:
         return None, None

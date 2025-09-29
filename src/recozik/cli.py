@@ -1,4 +1,4 @@
-"""Interface en ligne de commande pour recozik."""
+"""Command-line interface for recozik."""
 
 from __future__ import annotations
 
@@ -6,20 +6,23 @@ import json
 import os
 import shutil
 import subprocess
+from collections.abc import Iterable
 from datetime import timedelta
 from pathlib import Path
 from string import Formatter
-from typing import Iterable, Optional
 
 import click
+import requests
 import typer
 from typer.completion import (
     get_completion_script as generate_completion_script,
+)
+from typer.completion import (
     install as install_completion,
+)
+from typer.completion import (
     shellingham as completion_shellingham,
 )
-
-import requests
 
 from .cache import LookupCache
 from .config import AppConfig, default_config_path, load_config, write_config
@@ -32,9 +35,18 @@ from .fingerprint import (
     lookup_recordings,
 )
 
-app = typer.Typer(add_completion=False, help="Reconnaissance musicale basée sur les empreintes audio.")
-config_app = typer.Typer(add_completion=False, help="Gestion de la configuration locale.")
-completion_app = typer.Typer(add_completion=False, help="Outils d'auto-complétion du shell.")
+app = typer.Typer(
+    add_completion=False,
+    help="Reconnaissance musicale basée sur les empreintes audio.",
+)
+config_app = typer.Typer(
+    add_completion=False,
+    help="Gestion de la configuration locale.",
+)
+completion_app = typer.Typer(
+    add_completion=False,
+    help="Outils d'auto-complétion du shell.",
+)
 
 app.add_typer(config_app, name="config")
 app.add_typer(completion_app, name="completion")
@@ -45,21 +57,20 @@ _VALIDATION_ENDPOINT = "https://api.acoustid.org/v2/lookup"
 
 
 def _resolve_path(path: Path) -> Path:
-    """Normalise un chemin utilisateur en tenant compte de ``~``."""
+    """Normalize user-provided paths while expanding ``~``."""
     return path.expanduser().resolve()
 
 
 @app.callback()
 def main() -> None:
-    """Point d'entrée principal de l'application."""
+    """Top-level callback for the CLI application."""
 
 
-@app.command()
+@app.command(help="Affiche les métadonnées de base du fichier audio.")
 def inspect(
     audio_path: Path = typer.Argument(..., help="Chemin du fichier audio à analyser."),
 ) -> None:
-    """Affiche les métadonnées de base du fichier audio."""
-
+    """Display basic metadata for the provided audio file."""
     resolved = _resolve_path(audio_path)
     if not resolved.is_file():
         typer.echo(f"Fichier introuvable: {resolved}")
@@ -68,14 +79,17 @@ def inspect(
     try:
         import soundfile as sf
     except ImportError as exc:  # pragma: no cover - dépend de l'environnement d'exécution
-        typer.echo("La bibliothèque soundfile est absente; lancez `uv sync` pour installer les dépendances.")
+        typer.echo(
+            "La bibliothèque soundfile est absente; "
+            "lancez `uv sync` pour installer les dépendances."
+        )
         raise typer.Exit(code=1) from exc
 
     try:
         info = sf.info(str(resolved))
     except RuntimeError as exc:
         typer.echo(f"Impossible de lire le fichier audio: {exc}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     typer.echo(f"Fichier: {resolved}")
     typer.echo(f"Format: {info.format}, {info.subtype}")
@@ -85,15 +99,15 @@ def inspect(
     typer.echo(f"Durée estimée: {info.duration:.2f} s")
 
 
-@app.command()
+@app.command(help="Génère l'empreinte Chromaprint d'un fichier audio.")
 def fingerprint(
     audio_path: Path = typer.Argument(..., help="Chemin du fichier audio à fingerprint."),
-    fpcalc_path: Optional[Path] = typer.Option(
+    fpcalc_path: Path | None = typer.Option(
         None,
         "--fpcalc-path",
         help="Chemin explicite vers l'exécutable fpcalc si Chromaprint n'est pas dans PATH.",
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
@@ -102,11 +116,13 @@ def fingerprint(
     show_fingerprint: bool = typer.Option(
         False,
         "--show-fingerprint",
-        help="Affiche l'empreinte complète dans la console (longue et moins pratique pour les lecteurs d'écran).",
+        help=(
+            "Affiche l'empreinte complète dans la console "
+            "(longue et moins pratique pour les lecteurs d'écran)."
+        ),
     ),
 ) -> None:
-    """Génère l'empreinte Chromaprint d'un fichier audio."""
-
+    """Generate a Chromaprint fingerprint for an audio file."""
     resolved_audio = _resolve_path(audio_path)
     resolved_fpcalc = _resolve_path(fpcalc_path) if fpcalc_path else None
 
@@ -114,7 +130,7 @@ def fingerprint(
         result: FingerprintResult = compute_fingerprint(resolved_audio, fpcalc_path=resolved_fpcalc)
     except FingerprintError as exc:
         typer.echo(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     typer.echo(f"Durée estimée: {result.duration_seconds:.2f} s")
 
@@ -134,15 +150,15 @@ def fingerprint(
         typer.echo(result.fingerprint)
 
 
-@app.command()
+@app.command(help="Identifie un morceau via l'API AcoustID.")
 def identify(
     audio_path: Path = typer.Argument(..., help="Chemin du fichier audio à identifier."),
-    fpcalc_path: Optional[Path] = typer.Option(
+    fpcalc_path: Path | None = typer.Option(
         None,
         "--fpcalc-path",
         help="Chemin explicite vers l'exécutable fpcalc si Chromaprint n'est pas dans PATH.",
     ),
-    api_key: Optional[str] = typer.Option(
+    api_key: str | None = typer.Option(
         None,
         "--api-key",
         help="Clé API AcoustID à utiliser (prioritaire sur la configuration).",
@@ -151,9 +167,12 @@ def identify(
     json_output: bool = typer.Option(
         False,
         "--json",
-        help="Affiche les résultats au format JSON (utile pour automatiser ou consommer via lecteur d'écran).",
+        help=(
+            "Affiche les résultats au format JSON "
+            "(utile pour automatiser ou consommer via lecteur d'écran)."
+        ),
     ),
-    template: Optional[str] = typer.Option(
+    template: str | None = typer.Option(
         None,
         "--template",
         help="Modèle d'affichage (placeholders: {artist}, {title}, {album}, {score}, ...).",
@@ -163,15 +182,14 @@ def identify(
         "--refresh",
         help="Ignore le cache local et force un nouvel appel à l'API.",
     ),
-    config_path: Optional[Path] = typer.Option(
+    config_path: Path | None = typer.Option(
         None,
         "--config-path",
         hidden=True,
         help="Chemin personnalisé du fichier de configuration (tests).",
     ),
 ) -> None:
-    """Identifie un morceau via l'API AcoustID."""
-
+    """Identify a track with the AcoustID API."""
     resolved_audio = _resolve_path(audio_path)
     resolved_fpcalc = _resolve_path(fpcalc_path) if fpcalc_path else None
 
@@ -179,7 +197,7 @@ def identify(
         config = load_config(config_path)
     except RuntimeError as exc:
         typer.echo(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
@@ -199,10 +217,13 @@ def identify(
             raise typer.Exit(code=1)
 
     try:
-        fingerprint_result: FingerprintResult = compute_fingerprint(resolved_audio, fpcalc_path=resolved_fpcalc)
+        fingerprint_result: FingerprintResult = compute_fingerprint(
+            resolved_audio,
+            fpcalc_path=resolved_fpcalc,
+        )
     except FingerprintError as exc:
         typer.echo(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     cache = LookupCache(
         enabled=config.cache_enabled,
@@ -218,7 +239,7 @@ def identify(
             matches = lookup_recordings(key, fingerprint_result)
         except AcoustIDLookupError as exc:
             typer.echo(str(exc))
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from exc
         if config.cache_enabled:
             cache.set(fingerprint_result.fingerprint, fingerprint_result.duration_seconds, matches)
             cache.save()
@@ -257,20 +278,29 @@ def identify(
     cache.save()
 
 
-@app.command("identify-batch")
+@app.command(
+    "identify-batch",
+    help="Identifie les fichiers audio d'un dossier et enregistre les résultats.",
+)
 def identify_batch(
     directory: Path = typer.Argument(..., help="Dossier contenant les fichiers audio."),
-    fpcalc_path: Optional[Path] = typer.Option(
+    fpcalc_path: Path | None = typer.Option(
         None,
         "--fpcalc-path",
         help="Chemin explicite vers l'exécutable fpcalc si Chromaprint n'est pas dans PATH.",
     ),
-    api_key: Optional[str] = typer.Option(
+    api_key: str | None = typer.Option(
         None,
         "--api-key",
         help="Clé API AcoustID à utiliser (prioritaire sur la configuration).",
     ),
-    limit: int = typer.Option(3, "--limit", min=1, max=10, help="Nombre de propositions à conserver."),
+    limit: int = typer.Option(
+        3,
+        "--limit",
+        min=1,
+        max=10,
+        help="Nombre de propositions à conserver.",
+    ),
     best_only: bool = typer.Option(
         False,
         "--best-only",
@@ -292,7 +322,7 @@ def identify_batch(
         "--extension",
         help="Extension de fichier à inclure (ex: mp3). Peut être répétée.",
     ),
-    log_file: Optional[Path] = typer.Option(
+    log_file: Path | None = typer.Option(
         None,
         "--log-file",
         "-o",
@@ -303,12 +333,12 @@ def identify_batch(
         "--append/--overwrite",
         help="Ajoute à la fin du log existant au lieu de recréer le fichier.",
     ),
-    log_format: Optional[str] = typer.Option(
+    log_format: str | None = typer.Option(
         None,
         "--log-format",
         help="Format du log: text ou jsonl.",
     ),
-    template: Optional[str] = typer.Option(
+    template: str | None = typer.Option(
         None,
         "--template",
         help="Modèle d'affichage des propositions ({artist}, {title}, {album}, {score}, ...).",
@@ -318,20 +348,19 @@ def identify_batch(
         "--refresh",
         help="Ignore le cache local et force un nouvel appel à l'API.",
     ),
-    absolute_paths: Optional[bool] = typer.Option(
+    absolute_paths: bool | None = typer.Option(
         None,
         "--absolute-paths/--relative-paths",
         help="Contrôle l'affichage des chemins dans le log (écrase la config).",
     ),
-    config_path: Optional[Path] = typer.Option(
+    config_path: Path | None = typer.Option(
         None,
         "--config-path",
         hidden=True,
         help="Chemin personnalisé du fichier de configuration (tests).",
     ),
 ) -> None:
-    """Identifie tous les fichiers audio d'un dossier et consigne les résultats."""
-
+    """Identify audio files in a directory and record the results."""
     resolved_dir = _resolve_path(directory)
     if not resolved_dir.is_dir():
         typer.echo(f"Dossier introuvable: {resolved_dir}")
@@ -341,7 +370,7 @@ def identify_batch(
         config = load_config(config_path)
     except RuntimeError as exc:
         typer.echo(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
@@ -399,7 +428,6 @@ def identify_batch(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
 
-    total = len(files)
     success = 0
     failures = 0
 
@@ -430,7 +458,10 @@ def identify_batch(
 
             matches = None
             if config.cache_enabled and not refresh:
-                matches = cache.get(fingerprint_result.fingerprint, fingerprint_result.duration_seconds)
+                matches = cache.get(
+                    fingerprint_result.fingerprint,
+                    fingerprint_result.duration_seconds,
+                )
 
             if matches is None:
                 try:
@@ -487,28 +518,37 @@ def identify_batch(
     )
 
 
-@app.command("rename-from-log")
+@app.command(
+    "rename-from-log",
+    help="Renomme les fichiers à partir d'un log JSONL produit par `identify-batch`.",
+)
 def rename_from_log(
     log_path: Path = typer.Argument(..., help="Log JSONL généré par `identify-batch`."),
-    root: Optional[Path] = typer.Option(
+    root: Path | None = typer.Option(
         None,
         "--root",
         help="Répertoire racine contenant les fichiers à renommer (défaut: dossier du log).",
     ),
-    template: Optional[str] = typer.Option(
+    template: str | None = typer.Option(
         None,
         "--template",
-        help="Modèle de renommage ({artist}, {title}, {album}, {score}, {recording_id}, {ext}, {stem}).",
+        help=(
+            "Modèle de renommage ({artist}, {title}, {album}, {score}, "
+            "{recording_id}, {ext}, {stem})."
+        ),
     ),
     dry_run: bool = typer.Option(
         True,
         "--dry-run/--apply",
-        help="Affiche les renommages sans les exécuter (par défaut). Utilisez --apply pour appliquer.",
+        help=(
+            "Affiche les renommages sans les exécuter (par défaut). "
+            "Utilisez --apply pour appliquer."
+        ),
     ),
     interactive: bool = typer.Option(
         False,
         "--interactive/--no-interactive",
-        help="Propose un choix interactif quand plusieurs correspondances sont disponibles.",
+        help=("Propose un choix interactif quand plusieurs correspondances sont disponibles."),
     ),
     confirm: bool = typer.Option(
         False,
@@ -520,25 +560,24 @@ def rename_from_log(
         "--on-conflict",
         help="Gestion des collisions: append (défaut), skip, overwrite.",
     ),
-    backup_dir: Optional[Path] = typer.Option(
+    backup_dir: Path | None = typer.Option(
         None,
         "--backup-dir",
         help="Dossier dans lequel copier les originaux avant renommage (optionnel).",
     ),
-    export_path: Optional[Path] = typer.Option(
+    export_path: Path | None = typer.Option(
         None,
         "--export",
         help="Chemin d'un fichier JSON résumant les renommages planifiés.",
     ),
-    config_path: Optional[Path] = typer.Option(
+    config_path: Path | None = typer.Option(
         None,
         "--config-path",
         hidden=True,
         help="Chemin personnalisé du fichier de configuration (tests).",
     ),
 ) -> None:
-    """Renomme les fichiers à partir d'un log `identify-batch` au format JSONL."""
-
+    """Rename files using a JSONL log generated by ``identify-batch``."""
     resolved_log = _resolve_path(log_path)
     if not resolved_log.is_file():
         typer.echo(f"Log introuvable: {resolved_log}")
@@ -550,7 +589,7 @@ def rename_from_log(
         config = load_config(config_path)
     except RuntimeError as exc:
         typer.echo(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     template_value = _resolve_template(template, config)
     conflict_strategy = on_conflict.lower()
@@ -562,7 +601,7 @@ def rename_from_log(
         entries = _load_jsonl_log(resolved_log)
     except ValueError as exc:
         typer.echo(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     if not entries:
         typer.echo("Aucune entrée dans le log.")
@@ -655,9 +694,7 @@ def rename_from_log(
         occupied.add(final_target)
 
     if not planned:
-        typer.echo(
-            f"Aucun renommage à effectuer ({skipped} ignoré(s), {errors} en erreur)."
-        )
+        typer.echo(f"Aucun renommage à effectuer ({skipped} ignoré(s), {errors} en erreur).")
         return
 
     for source_path, target_path, match_data in planned:
@@ -698,7 +735,10 @@ def rename_from_log(
 
     if dry_run:
         typer.echo(
-            f"Dry-run terminé: {len(planned)} renommage(s) potentiel(s), {skipped} ignoré(s), {errors} en erreur. Utilisez --apply pour exécuter."
+            "Dry-run terminé: "
+            f"{len(planned)} renommage(s) potentiel(s), "
+            f"{skipped} ignoré(s), {errors} en erreur. "
+            "Utilisez --apply pour exécuter."
         )
     else:
         typer.echo(
@@ -713,9 +753,14 @@ def rename_from_log(
             encoding="utf-8",
         )
         typer.echo(f"Résumé écrit dans {resolved_export}")
-@completion_app.command("install")
+
+
+@completion_app.command(
+    "install",
+    help="Installe le script d'auto-complétion pour le shell courant.",
+)
 def completion_install(
-    shell: Optional[str] = typer.Option(
+    shell: str | None = typer.Option(
         None,
         "--shell",
         "-s",
@@ -731,15 +776,14 @@ def completion_install(
         "--no-write",
         help="Génère le script sur la sortie standard sans créer/modifier de fichier.",
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
         help="Écrit le script de complétion dans un fichier spécifique (chemin absolu ou relatif).",
     ),
 ) -> None:
-    """Installe le script d'auto-complétion pour le shell courant."""
-
+    """Install the shell completion script for the current shell."""
     target_shell = _normalize_shell(shell)
 
     if sum(bool(flag) for flag in (print_command, no_write, output is not None)) > 1:
@@ -749,9 +793,7 @@ def completion_install(
     if no_write:
         detected_shell = _detect_shell(target_shell)
         if not detected_shell:
-            typer.echo(
-                "Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh)."
-            )
+            typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
             raise typer.Exit(code=1)
 
         script = generate_completion_script(
@@ -765,9 +807,7 @@ def completion_install(
     if output is not None:
         detected_shell = _detect_shell(target_shell)
         if not detected_shell:
-            typer.echo(
-                "Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh)."
-            )
+            typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
             raise typer.Exit(code=1)
 
         script = generate_completion_script(
@@ -783,9 +823,7 @@ def completion_install(
         return
 
     try:
-        detected_shell, script_path = install_completion(
-            shell=target_shell, prog_name="recozik"
-        )
+        detected_shell, script_path = install_completion(shell=target_shell, prog_name="recozik")
     except click.exceptions.Exit as exc:
         typer.echo("Shell non pris en charge pour l'auto-complétion.")
         raise typer.Exit(code=1) from exc
@@ -806,17 +844,19 @@ def completion_install(
     typer.echo(_completion_hint(detected_shell, script_path))
 
 
-@completion_app.command("show")
+@completion_app.command(
+    "show",
+    help="Affiche le script d'auto-complétion généré.",
+)
 def completion_show(
-    shell: Optional[str] = typer.Option(
+    shell: str | None = typer.Option(
         None,
         "--shell",
         "-s",
         help="Shell cible (bash, zsh, fish, powershell/pwsh). Détection automatique sinon.",
     ),
 ) -> None:
-    """Affiche le script d'auto-complétion généré."""
-
+    """Display the generated shell-completion script."""
     detected_shell = _detect_shell(shell)
     if not detected_shell:
         typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
@@ -830,17 +870,19 @@ def completion_show(
     typer.echo(script)
 
 
-@completion_app.command("uninstall")
+@completion_app.command(
+    "uninstall",
+    help="Supprime le script d'auto-complétion installé par recozik.",
+)
 def completion_uninstall(
-    shell: Optional[str] = typer.Option(
+    shell: str | None = typer.Option(
         None,
         "--shell",
         "-s",
         help="Shell cible (bash, zsh, fish, powershell/pwsh). Détection automatique sinon.",
     ),
 ) -> None:
-    """Supprime le script d'auto-complétion installé par recozik."""
-
+    """Remove the shell-completion script installed by recozik."""
     detected_shell = _detect_shell(shell)
     if not detected_shell:
         typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
@@ -856,7 +898,7 @@ def completion_uninstall(
     typer.echo(_completion_uninstall_hint(detected_shell))
 
 
-def _normalize_shell(shell: Optional[str]) -> Optional[str]:
+def _normalize_shell(shell: str | None) -> str | None:
     if shell is None:
         return None
 
@@ -868,7 +910,7 @@ def _normalize_shell(shell: Optional[str]) -> Optional[str]:
     return normalized
 
 
-def _detect_shell(shell: Optional[str]) -> Optional[str]:
+def _detect_shell(shell: str | None) -> str | None:
     normalized = _normalize_shell(shell)
     if normalized:
         return normalized
@@ -893,20 +935,20 @@ def _completion_hint(shell: str, script_path: Path) -> str:
     if command:
         if shell in {"bash", "zsh"}:
             return (
-                f"Exécutez `{command}` ou ajoutez cette ligne à votre fichier de profil (ex. ~/.bashrc, ~/.zshrc)."
+                f"Exécutez `{command}` ou ajoutez cette ligne à votre fichier "
+                "de profil (ex. ~/.bashrc, ~/.zshrc)."
             )
         if shell == "fish":
-            return (
-                f"Relancez `fish` ou exécutez `{command}` pour activer la complétion."
-            )
+            return f"Relancez `fish` ou exécutez `{command}` pour activer la complétion."
         if shell in {"powershell", "pwsh"}:
             return (
-                f"Ajoutez `{command}` à votre `$PROFILE` (PowerShell) pour charger automatiquement la complétion."
+                f"Ajoutez `{command}` à votre `$PROFILE` (PowerShell) "
+                "pour charger automatiquement la complétion."
             )
     return "La complétion est installée. Rechargez votre terminal pour l'utiliser."
 
 
-def _completion_source_command(shell: str, script_path: Path) -> Optional[str]:
+def _completion_source_command(shell: str, script_path: Path) -> str | None:
     if shell in {"bash", "zsh", "fish"}:
         return f"source {script_path}"
     if shell in {"powershell", "pwsh"}:
@@ -914,7 +956,7 @@ def _completion_source_command(shell: str, script_path: Path) -> Optional[str]:
     return None
 
 
-def _completion_script_path(shell: str) -> Optional[Path]:
+def _completion_script_path(shell: str) -> Path | None:
     if shell == "bash":
         return Path.home() / ".bash_completions" / "recozik.sh"
     if shell == "zsh":
@@ -926,19 +968,20 @@ def _completion_script_path(shell: str) -> Optional[Path]:
     return None
 
 
-def _powershell_profile_path(shell: str) -> Optional[Path]:
+def _powershell_profile_path(shell: str) -> Path | None:
     shell_bin = "pwsh" if shell == "pwsh" else "powershell"
     try:
-        result = subprocess.run(
-            [shell_bin, "-NoProfile", "-Command", "echo", "$profile"],
+        command = [shell_bin, "-NoProfile", "-Command", "echo", "$profile"]
+        result = subprocess.run(  # noqa: S603 - arguments forcés en liste contrôlée
+            command,
             check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
+            text=True,
         )
     except FileNotFoundError:  # pragma: no cover - dépend de l'environnement
         return None
 
-    output = result.stdout.decode().strip()
+    output = result.stdout.strip()
     if not output:
         return None
     return Path(output)
@@ -947,11 +990,13 @@ def _powershell_profile_path(shell: str) -> Optional[Path]:
 def _completion_uninstall_hint(shell: str) -> str:
     if shell == "bash":
         return (
-            "Si besoin, supprimez la ligne `source ~/.bash_completions/recozik.sh` de votre ~/.bashrc."
+            "Si besoin, supprimez la ligne `source ~/.bash_completions/recozik.sh` "
+            "de votre ~/.bashrc."
         )
     if shell == "zsh":
         return (
-            "Vérifiez votre ~/.zshrc et retirez la ligne ajoutant ~/.zfunc si vous ne l'utilisez plus."
+            "Vérifiez votre ~/.zshrc et retirez la ligne ajoutant ~/.zfunc "
+            "si vous ne l'utilisez plus."
         )
     if shell == "fish":
         return "Redémarrez fish pour prendre en compte la suppression."
@@ -967,7 +1012,7 @@ class _SafeDict(dict):
         return ""
 
 
-def _resolve_template(template: Optional[str], config: AppConfig) -> str:
+def _resolve_template(template: str | None, config: AppConfig) -> str:
     if template:
         return template
     if config.output_template:
@@ -1010,8 +1055,8 @@ def _normalize_extensions(values: Iterable[str]) -> set[str]:
         entry = value.strip().lower()
         if not entry:
             continue
-        if not entry.startswith('.'):
-            entry = f'.{entry}'
+        if not entry.startswith("."):
+            entry = f".{entry}"
         normalized.add(entry)
     return normalized
 
@@ -1059,9 +1104,9 @@ def _write_log_entry(
     log_format: str,
     path_display: str,
     matches: Iterable[AcoustIDMatch],
-    error: Optional[str],
+    error: str | None,
     template: str,
-    fingerprint: Optional[FingerprintResult],
+    fingerprint: FingerprintResult | None,
 ) -> None:
     if log_format == "jsonl":
         entry = {
@@ -1111,12 +1156,11 @@ def _load_jsonl_log(path: Path) -> list[dict]:
                 payload = json.loads(stripped)
             except json.JSONDecodeError as exc:
                 raise ValueError(
-                    "Le log doit être au format JSONL (réexécutez `identify-batch` avec --log-format jsonl)."
+                    "Le log doit être au format JSONL "
+                    "(réexécutez `identify-batch` avec --log-format jsonl)."
                 ) from exc
             if not isinstance(payload, dict):
-                raise ValueError(
-                    f"Entrée invalide au format JSONL (ligne {line_number})."
-                )
+                raise ValueError(f"Entrée invalide au format JSONL (ligne {line_number}).")
             entries.append(payload)
     return entries
 
@@ -1171,7 +1215,7 @@ def _resolve_conflict_path(
     strategy: str,
     occupied: set[Path],
     dry_run: bool,
-) -> Optional[Path]:
+) -> Path | None:
     candidate = target_path
     directory = candidate.parent
 
@@ -1179,10 +1223,7 @@ def _resolve_conflict_path(
         base = candidate.stem
         suffix = candidate.suffix
         counter = 1
-        while (
-            (candidate.exists() and candidate != source_path)
-            or candidate in occupied
-        ):
+        while (candidate.exists() and candidate != source_path) or candidate in occupied:
             candidate = directory / f"{base}-{counter}{suffix}"
             counter += 1
         return candidate
@@ -1208,10 +1249,9 @@ def _compute_backup_path(source: Path, root: Path, backup_root: Path) -> Path:
     return backup_root / relative
 
 
-def _prompt_match_selection(matches: list[dict], source_path: Path) -> Optional[int]:
+def _prompt_match_selection(matches: list[dict], source_path: Path) -> int | None:
     typer.echo(f"Plusieurs propositions pour {source_path.name}:")
     for idx, match in enumerate(matches, start=1):
-        formatter = Formatter()
         artist = match.get("artist") or "Artiste inconnu"
         title = match.get("title") or "Titre inconnu"
         score = _format_score(match.get("score"))
@@ -1253,7 +1293,7 @@ def _prompt_yes_no(message: str, *, default: bool = True) -> bool:
         typer.echo("Réponse invalide (o/n).")
 
 
-def _prompt_api_key() -> Optional[str]:
+def _prompt_api_key() -> str | None:
     key = typer.prompt("Clé API AcoustID", show_default=False).strip()
     if not key:
         return None
@@ -1293,10 +1333,10 @@ def _validate_client_key(key: str, timeout: float = 5.0) -> tuple[bool, str]:
 
 def _configure_api_key_interactively(
     existing: AppConfig,
-    config_path: Optional[Path],
+    config_path: Path | None,
     *,
     skip_validation: bool = False,
-) -> Optional[str]:
+) -> str | None:
     key = _prompt_api_key()
     if not key:
         return None
@@ -1321,24 +1361,32 @@ def _configure_api_key_interactively(
     return key
 
 
-@config_app.command("path")
-def config_path(config_path: Optional[Path] = typer.Option(None, "--config-path", hidden=True)) -> None:
-    """Affiche le chemin du fichier de configuration utilisé."""
-
+@config_app.command(
+    "path",
+    help="Affiche le chemin du fichier de configuration actuellement utilisé.",
+)
+def config_path(
+    config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
+) -> None:
+    """Print the configuration file path in use."""
     target = config_path or default_config_path()
     typer.echo(str(target))
 
 
-@config_app.command("show")
-def config_show(config_path: Optional[Path] = typer.Option(None, "--config-path", hidden=True)) -> None:
-    """Affiche les informations principales de la configuration."""
-
+@config_app.command(
+    "show",
+    help="Affiche les principaux paramètres de configuration.",
+)
+def config_show(
+    config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
+) -> None:
+    """Show the key configuration settings."""
     target = config_path or default_config_path()
     try:
         config = load_config(target)
     except RuntimeError as exc:
         typer.echo(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     key = config.acoustid_api_key
     if key:
@@ -1346,25 +1394,26 @@ def config_show(config_path: Optional[Path] = typer.Option(None, "--config-path"
         typer.echo(f"Clé AcoustID: {masked}")
     else:
         typer.echo("Clé AcoustID: non configurée")
-        typer.echo(
-            "Créez ou mettez à jour votre clé avec `recozik config set-key`."
-        )
-    typer.echo(f"Cache activé: {'oui' if config.cache_enabled else 'non'} (TTL: {config.cache_ttl_hours} h)")
+        typer.echo("Créez ou mettez à jour votre clé avec `recozik config set-key`.")
+    cache_state = "oui" if config.cache_enabled else "non"
+    typer.echo(f"Cache activé: {cache_state} (TTL: {config.cache_ttl_hours} h)")
     template = config.output_template or "{artist} - {title}"
     typer.echo(f"Template par défaut: {template}")
-    typer.echo(
-        f"Format du log: {config.log_format} (chemins {'absolus' if config.log_absolute_paths else 'relatifs'})"
-    )
+    path_mode = "absolus" if config.log_absolute_paths else "relatifs"
+    typer.echo(f"Format du log: {config.log_format} (chemins {path_mode})")
     typer.echo(f"Fichier: {target}")
 
 
-@config_app.command("set-key")
+@config_app.command(
+    "set-key",
+    help="Enregistre une clé API AcoustID dans la configuration.",
+)
 def config_set_key(
-    api_key_arg: Optional[str] = typer.Argument(
+    api_key_arg: str | None = typer.Argument(
         None,
         help="Clé API AcoustID à enregistrer.",
     ),
-    api_key_opt: Optional[str] = typer.Option(
+    api_key_opt: str | None = typer.Option(
         None,
         "--api-key",
         "-k",
@@ -1375,10 +1424,9 @@ def config_set_key(
         "--skip-validation/--validate",
         help="Ignore la vérification en ligne (déconseillé).",
     ),
-    config_path: Optional[Path] = typer.Option(None, "--config-path", hidden=True),
+    config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
 ) -> None:
-    """Enregistre la clé d'API AcoustID dans le fichier de configuration."""
-
+    """Persist the AcoustID API key into the configuration file."""
     target_path = config_path or default_config_path()
     try:
         existing = load_config(target_path)

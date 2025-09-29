@@ -1,3 +1,5 @@
+"""Tests for configuration file helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,6 +8,7 @@ from recozik.config import AppConfig, load_config, write_config
 
 
 def test_write_and_load_config(tmp_path: Path) -> None:
+    """Persist a configuration object and load it back."""
     target = tmp_path / "config.toml"
 
     config = AppConfig(
@@ -30,6 +33,7 @@ def test_write_and_load_config(tmp_path: Path) -> None:
 
 
 def test_load_config_missing_returns_default(tmp_path: Path) -> None:
+    """Return defaults when the config file is absent."""
     target = tmp_path / "absent.toml"
 
     config = load_config(target)
