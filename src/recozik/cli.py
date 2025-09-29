@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from datetime import timedelta
 from pathlib import Path
@@ -467,6 +468,177 @@ def identify_batch(
         f"Traitement terminé: {success} fichier(s) identifiés, {failures} en échec. Log: {log_path}"
     )
 
+
+@app.command("rename-from-log")
+def rename_from_log(
+    log_path: Path = typer.Argument(..., help="Log JSONL généré par `identify-batch`."),
+    root: Optional[Path] = typer.Option(
+        None,
+        "--root",
+        help="Répertoire racine contenant les fichiers à renommer (défaut: dossier du log).",
+    ),
+    template: Optional[str] = typer.Option(
+        None,
+        "--template",
+        help="Modèle de renommage ({artist}, {title}, {album}, {score}, {recording_id}, {ext}, {stem}).",
+    ),
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run/--apply",
+        help="Affiche les renommages sans les exécuter (par défaut). Utilisez --apply pour appliquer.",
+    ),
+    on_conflict: str = typer.Option(
+        "append",
+        "--on-conflict",
+        help="Gestion des collisions: append (défaut), skip, overwrite.",
+    ),
+    backup_dir: Optional[Path] = typer.Option(
+        None,
+        "--backup-dir",
+        help="Dossier dans lequel copier les originaux avant renommage (optionnel).",
+    ),
+    config_path: Optional[Path] = typer.Option(
+        None,
+        "--config-path",
+        hidden=True,
+        help="Chemin personnalisé du fichier de configuration (tests).",
+    ),
+) -> None:
+    """Renomme les fichiers à partir d'un log `identify-batch` au format JSONL."""
+
+    resolved_log = _resolve_path(log_path)
+    if not resolved_log.is_file():
+        typer.echo(f"Log introuvable: {resolved_log}")
+        raise typer.Exit(code=1)
+
+    root_path = _resolve_path(root) if root else resolved_log.parent
+
+    try:
+        config = load_config(config_path)
+    except RuntimeError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+
+    template_value = _resolve_template(template, config)
+    conflict_strategy = on_conflict.lower()
+    if conflict_strategy not in {"append", "skip", "overwrite"}:
+        typer.echo("Valeur --on-conflict invalide. Choisissez append, skip ou overwrite.")
+        raise typer.Exit(code=1)
+
+    try:
+        entries = _load_jsonl_log(resolved_log)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+
+    if not entries:
+        typer.echo("Aucune entrée dans le log.")
+        return
+
+    backup_path = _resolve_path(backup_dir) if backup_dir else None
+    if backup_path:
+        backup_path.mkdir(parents=True, exist_ok=True)
+
+    planned: list[tuple[Path, Path]] = []
+    occupied: set[Path] = set()
+    renamed = 0
+    skipped = 0
+    errors = 0
+
+    for entry in entries:
+        raw_path = entry.get("path")
+        if not raw_path:
+            errors += 1
+            typer.echo("Entrée sans chemin: ignorée.")
+            continue
+
+        source_path = Path(raw_path)
+        if not source_path.is_absolute():
+            source_path = (root_path / source_path).resolve()
+
+        if not source_path.exists():
+            errors += 1
+            typer.echo(f"Fichier introuvable, ignoré: {source_path}")
+            continue
+
+        if entry.get("error"):
+            skipped += 1
+            typer.echo(f"Entrée en erreur, ignorée: {source_path} ({entry['error']})")
+            continue
+
+        matches = entry.get("matches") or []
+        if not matches:
+            skipped += 1
+            typer.echo(f"Aucune proposition pour: {source_path}")
+            continue
+
+        match_data = matches[0]
+        target_base = _render_log_template(match_data, template_value, source_path)
+        sanitized = _sanitize_filename(target_base)
+        if not sanitized:
+            sanitized = source_path.stem
+
+        ext = source_path.suffix
+        new_name = sanitized
+        if ext and not new_name.lower().endswith(ext.lower()):
+            new_name = f"{new_name}{ext}"
+
+        target_path = source_path.with_name(new_name)
+        if target_path == source_path:
+            skipped += 1
+            typer.echo(f"Déjà au bon nom: {source_path.name}")
+            continue
+
+        final_target = _resolve_conflict_path(
+            target_path,
+            source_path,
+            conflict_strategy,
+            occupied,
+            dry_run,
+        )
+
+        if final_target is None:
+            skipped += 1
+            typer.echo(f"Collision non résolue, fichier ignoré: {source_path.name}")
+            continue
+
+        planned.append((source_path, final_target))
+        occupied.add(final_target)
+
+    if not planned:
+        typer.echo(
+            f"Aucun renommage à effectuer ({skipped} ignoré(s), {errors} en erreur)."
+        )
+        return
+
+    for source_path, target_path in planned:
+        action = "DRY-RUN" if dry_run else "RENOMME"
+        typer.echo(f"{action}: {source_path} -> {target_path}")
+
+        if dry_run:
+            continue
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if backup_path:
+            backup_file = _compute_backup_path(source_path, root_path, backup_path)
+            backup_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, backup_file)
+
+        if target_path.exists() and conflict_strategy == "overwrite":
+            target_path.unlink()
+
+        source_path.rename(target_path)
+        renamed += 1
+
+    if dry_run:
+        typer.echo(
+            f"Dry-run terminé: {len(planned)} renommage(s) potentiel(s), {skipped} ignoré(s), {errors} en erreur. Utilisez --apply pour exécuter."
+        )
+    else:
+        typer.echo(
+            f"Renommage terminé: {renamed} fichier(s), {skipped} ignoré(s), {errors} en erreur."
+        )
 @completion_app.command("install")
 def completion_install(
     shell: Optional[str] = typer.Option(
@@ -832,6 +1004,8 @@ def _write_log_entry(
                     "title": match.title,
                     "album": match.release_group_title
                     or (match.releases[0].title if match.releases else None),
+                    "release_group_id": match.release_group_id,
+                    "release_id": match.releases[0].release_id if match.releases else None,
                 }
                 for idx, match in enumerate(matches, start=1)
             ],
@@ -850,6 +1024,114 @@ def _write_log_entry(
         formatted = _format_match_template(match, template)
         handle.write(f"  {idx}. {formatted} (score {match.score:.2f})\n")
     handle.write("\n")
+
+
+def _load_jsonl_log(path: Path) -> list[dict]:
+    entries: list[dict] = []
+    with path.open(encoding="utf-8") as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            try:
+                payload = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "Le log doit être au format JSONL (réexécutez `identify-batch` avec --log-format jsonl)."
+                ) from exc
+            if not isinstance(payload, dict):
+                raise ValueError(
+                    f"Entrée invalide au format JSONL (ligne {line_number})."
+                )
+            entries.append(payload)
+    return entries
+
+
+def _render_log_template(match: dict, template: str, source_path: Path) -> str:
+    context = {
+        "artist": match.get("artist") or "Artiste inconnu",
+        "title": match.get("title") or "Titre inconnu",
+        "album": match.get("album") or "",
+        "score": _format_score(match.get("score")),
+        "recording_id": match.get("recording_id") or "",
+        "release_group_id": match.get("release_group_id") or "",
+        "release_id": match.get("release_id") or "",
+        "ext": source_path.suffix,
+        "stem": source_path.stem,
+    }
+
+    formatted = match.get("formatted")
+    formatter = Formatter()
+    try:
+        return formatter.vformat(template, (), _SafeDict(context))
+    except Exception:
+        if formatted:
+            return formatted
+        return formatter.vformat("{artist} - {title}", (), _SafeDict(context))
+
+
+def _format_score(value: object) -> str:
+    if isinstance(value, (int, float)):
+        return f"{float(value):.2f}"
+    return str(value or "")
+
+
+INVALID_FILENAME_CHARS = set('<>:"/\\|?*')
+
+
+def _sanitize_filename(name: str) -> str:
+    sanitized_chars: list[str] = []
+    for char in name:
+        if char in INVALID_FILENAME_CHARS or ord(char) < 32 or char in {"/", "\\"}:
+            sanitized_chars.append("_")
+        else:
+            sanitized_chars.append(char)
+    sanitized = "".join(sanitized_chars)
+    sanitized = sanitized.strip().strip(". ")
+    return sanitized
+
+
+def _resolve_conflict_path(
+    target_path: Path,
+    source_path: Path,
+    strategy: str,
+    occupied: set[Path],
+    dry_run: bool,
+) -> Optional[Path]:
+    candidate = target_path
+    directory = candidate.parent
+
+    if strategy == "append":
+        base = candidate.stem
+        suffix = candidate.suffix
+        counter = 1
+        while (
+            (candidate.exists() and candidate != source_path)
+            or candidate in occupied
+        ):
+            candidate = directory / f"{base}-{counter}{suffix}"
+            counter += 1
+        return candidate
+
+    if strategy == "skip":
+        if (candidate.exists() and candidate != source_path) or candidate in occupied:
+            return None
+        return candidate
+
+    if strategy == "overwrite":
+        if candidate in occupied and candidate != source_path:
+            return None
+        return candidate
+
+    return None
+
+
+def _compute_backup_path(source: Path, root: Path, backup_root: Path) -> Path:
+    try:
+        relative = source.relative_to(root)
+    except ValueError:
+        relative = Path(source.name)
+    return backup_root / relative
 
 
 @config_app.command("path")
