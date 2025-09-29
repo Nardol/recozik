@@ -12,6 +12,8 @@
 - `uv run ruff check --fix` – Run Ruff with automatic fixes (must pass before committing).
 - `uv run ruff format` – Apply Ruff formatter to keep code style consistent.
 - `uv run pytest` – Run the full automated test suite.
+
+> **Permission reminder:** Always request elevated permissions before running any `uv` command (`uv run …`, `uv sync …`, etc.).
 - `uv build` – Produce wheel + sdist for validation before releases.
 
 ## Coding Style & Naming Conventions
@@ -35,4 +37,3 @@
 ## Agent-Specific Tips
 - Always run `git status` before exiting to ensure a clean tree.
 - If GPG signing blocks commits, rerun with elevated permissions (`with_escalated_permissions: true`).
-- Clean the uv cache (`rm -f ~/.cache/uv/sdists-v9/.git`) if CLI commands fail with permission errors.
