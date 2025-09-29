@@ -1,0 +1,31 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+node_modules/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment file
+.env
+
+# Data files
+*.db
+*.log
+*.sql
+*.txt
+*.{mp3,wav,ogg,flac,aac,m4a,wma,aiff,alac,opus,amr}
+*.flac
+
+# Version file
+src/mama_freeze/_version.py
+
+# Windows specific version info file
+version_info.txt
+
+# Coverage database
+.coverage
