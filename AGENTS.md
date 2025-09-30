@@ -37,3 +37,4 @@
 ## Agent-Specific Tips
 - Always run `git status` before exiting to ensure a clean tree.
 - If GPG signing blocks commits, rerun with elevated permissions (`with_escalated_permissions: true`).
+- Request the user's approval before running any `uv …` command and rerun with `with_escalated_permissions: true` once granted (it unlocks workspace access, not sudo).
