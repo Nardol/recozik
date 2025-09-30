@@ -621,6 +621,14 @@ def rename_from_log(
         "--metadata-fallback/--no-metadata-fallback",
         help="Utilise les métadonnées du fichier pour renommer lorsqu'aucune proposition n'est disponible.",
     ),
+    metadata_fallback_confirm: bool = typer.Option(
+        True,
+        "--metadata-fallback-confirm/--metadata-fallback-no-confirm",
+        help=(
+            "Demande une confirmation lorsqu'un renommage repose uniquement sur les métadonnées intégrées. "
+            "Utilisez --metadata-fallback-no-confirm pour automatiser."
+        ),
+    ),
     config_path: Path | None = typer.Option(
         None,
         "--config-path",
@@ -750,6 +758,7 @@ def rename_from_log(
                 continue
 
         match_data = matches[selected_match_index]
+        is_metadata_match = match_data.get("source") == "metadata"
         target_base = _render_log_template(match_data, template_value, source_path)
         sanitized = _sanitize_filename(target_base)
         if not sanitized:
@@ -779,7 +788,22 @@ def rename_from_log(
             typer.echo(f"Collision non résolue, fichier ignoré: {source_path.name}")
             continue
 
-        if confirm:
+        metadata_confirmation_done = False
+
+        if is_metadata_match and metadata_fallback_confirm:
+            question = (
+                "Confirmer le renommage basé sur les métadonnées: "
+                f"{source_path.name} -> {final_target.name} ?"
+            )
+            if not _prompt_yes_no(question, default=True):
+                skipped += 1
+                typer.echo(
+                    f"Renommage par métadonnées ignoré pour {source_path.name}"
+                )
+                continue
+            metadata_confirmation_done = True
+
+        if confirm and not metadata_confirmation_done:
             question = f"Renommer {source_path.name} -> {final_target.name} ?"
             if not _prompt_yes_no(question, default=True):
                 skipped += 1

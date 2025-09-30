@@ -343,12 +343,100 @@ def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
             "--metadata-fallback",
             "--apply",
         ],
+        input="o\n",
     )
 
     assert result.exit_code == 0
     assert "utilisation des métadonnées" in result.stdout
+    assert "Confirmer le renommage basé sur les métadonnées" in result.stdout
     assert not src.exists()
     assert (root / "Tagged Artist - Tagged Title.mp3").exists()
+
+
+def test_rename_from_log_metadata_fallback_auto_confirm(tmp_path: Path) -> None:
+    """Allow automation by disabling the metadata confirmation prompt."""
+    root = tmp_path / "auto"
+    root.mkdir()
+    src = root / "auto.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "auto.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "auto.mp3",
+                "matches": [],
+                "metadata": {
+                    "artist": "Auto Artist",
+                    "title": "Auto Title",
+                },
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--metadata-fallback",
+            "--metadata-fallback-no-confirm",
+            "--apply",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "utilisation des métadonnées" in result.stdout
+    assert "Confirmer le renommage basé sur les métadonnées" not in result.stdout
+    assert not src.exists()
+    assert (root / "Auto Artist - Auto Title.mp3").exists()
+
+
+def test_rename_from_log_metadata_fallback_reject(tmp_path: Path) -> None:
+    """Skip renaming when the user refuses the metadata fallback."""
+    root = tmp_path / "reject"
+    root.mkdir()
+    src = root / "reject.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "reject.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "reject.mp3",
+                "matches": [],
+                "metadata": {
+                    "artist": "Reject Artist",
+                    "title": "Reject Title",
+                },
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--metadata-fallback",
+            "--apply",
+        ],
+        input="n\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Renommage par métadonnées ignoré" in result.stdout
+    assert src.exists()
 
 
 def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
