@@ -1,0 +1,30 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":enableVulnerabilityAlertsWithLabel('security')"
+  ],
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "configMigration": true,
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 0,
+  "lockFileMaintenance": {
+    "enabled": true,
+g    "automerge": true
+  },
+  "pyenv": {
+    "enabled": false
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
+    }
+  ],
+  "timezone": "Europe/Paris"
+}
