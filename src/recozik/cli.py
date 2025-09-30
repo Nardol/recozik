@@ -456,6 +456,7 @@ def identify_batch(
     mode = "a" if append else "w"
 
     success = 0
+    unmatched = 0
     failures = 0
 
     with log_path.open(mode, encoding="utf-8") as handle:
@@ -479,6 +480,7 @@ def identify_batch(
                     str(exc),
                     template_value,
                     None,
+                    status="error",
                     metadata=None,
                 )
                 failures += 1
@@ -503,6 +505,7 @@ def identify_batch(
                         str(exc),
                         template_value,
                         fingerprint_result,
+                        status="error",
                         metadata=None,
                     )
                     failures += 1
@@ -525,16 +528,18 @@ def identify_batch(
                     log_format_value,
                     relative_display,
                     [],
-                    "Aucune correspondance.",
+                    None,
                     template_value,
                     fingerprint_result,
+                    status="unmatched",
+                    note="Aucune correspondance.",
                     metadata=metadata_payload,
                 )
                 if metadata_payload:
                     typer.echo(
                         f"Aucune correspondance pour {relative_display}, métadonnées locales enregistrées."
                     )
-                failures += 1
+                unmatched += 1
                 continue
 
             selected = matches[:effective_limit]
@@ -552,7 +557,10 @@ def identify_batch(
 
     cache.save()
     typer.echo(
-        f"Traitement terminé: {success} fichier(s) identifiés, {failures} en échec. Log: {log_path}"
+        "Traitement terminé: "
+        f"{success} fichier(s) identifiés, "
+        f"{unmatched} non reconnu(s), "
+        f"{failures} en erreur. Log: {log_path}"
     )
 
 
@@ -681,13 +689,47 @@ def rename_from_log(
             typer.echo(f"Fichier introuvable, ignoré: {source_path}")
             continue
 
-        if entry.get("error"):
-            skipped += 1
-            typer.echo(f"Entrée en erreur, ignorée: {source_path} ({entry['error']})")
-            continue
+        status = entry.get("status")
+        error_message = entry.get("error")
+        note = entry.get("note")
 
         matches = entry.get("matches") or []
         metadata_entry = _coerce_metadata_dict(entry.get("metadata"))
+
+        if status == "unmatched" and not matches:
+            if use_metadata_fallback and metadata_entry:
+                typer.echo(
+                    f"Aucune correspondance AcoustID pour {source_path}, utilisation des métadonnées intégrées."
+                )
+                matches = [_build_metadata_match(metadata_entry)]
+            else:
+                skipped += 1
+                context = f" ({note})" if note else ""
+                typer.echo(
+                    f"Aucune proposition pour: {source_path}{context}"
+                )
+                continue
+
+        if error_message:
+            if matches:
+                skipped += 1
+                typer.echo(
+                    f"Entrée en erreur, ignorée: {source_path} ({error_message})"
+                )
+                continue
+            if use_metadata_fallback and metadata_entry:
+                typer.echo(
+                    f"Aucune correspondance AcoustID pour {source_path}, utilisation des métadonnées intégrées."
+                )
+                matches = [_build_metadata_match(metadata_entry)]
+                error_message = None
+            else:
+                skipped += 1
+                typer.echo(
+                    f"Entrée en erreur, ignorée: {source_path} ({error_message})"
+                )
+                continue
+
         if not matches:
             if use_metadata_fallback and metadata_entry:
                 typer.echo(
@@ -1162,6 +1204,8 @@ def _write_log_entry(
     template: str,
     fingerprint: FingerprintResult | None,
     *,
+    status: str = "ok",
+    note: str | None = None,
     metadata: dict[str, str] | None = None,
 ) -> None:
     if log_format == "jsonl":
@@ -1169,6 +1213,8 @@ def _write_log_entry(
             "path": path_display,
             "duration_seconds": fingerprint.duration_seconds if fingerprint else None,
             "error": error,
+            "status": status,
+            "note": note,
             "matches": [
                 {
                     "rank": idx,
@@ -1192,6 +1238,10 @@ def _write_log_entry(
     handle.write(f"file: {path_display}\n")
     if fingerprint:
         handle.write(f"  duration: {fingerprint.duration_seconds:.2f}s\n")
+    if status and status != "ok":
+        handle.write(f"  status: {status}\n")
+    if note:
+        handle.write(f"  note: {note}\n")
     if metadata:
         handle.write("  metadata:\n")
         for key in ("artist", "title", "album"):
