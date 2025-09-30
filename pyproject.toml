@@ -50,7 +50,8 @@ test = [
     "pytest-mock>=3.14"
 ]
 dev = [
-    "ruff>=0.6.5"
+    "pre-commit>=4.3",
+    "ruff>=0.6.5",
 ]
 
 [project.scripts]
