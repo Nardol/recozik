@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosures
+    url: https://github.com/Nardol/recozik/security/policy
+    about: Please report security vulnerabilities using the private disclosure process described in SECURITY.md.

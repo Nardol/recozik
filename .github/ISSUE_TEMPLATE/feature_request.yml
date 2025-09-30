@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your idea! Help us understand the use case and why it benefits users.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Proposed feature
+      description: Describe the change or capability you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem to solve
+      description: Explain the workflow or pain point this feature addresses.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Are there existing commands or tools that almost solve the problem?
+  - type: input
+    id: context
+    attributes:
+      label: Additional context
+      description: Link related issues or share references that might help.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and discussions
+          required: true

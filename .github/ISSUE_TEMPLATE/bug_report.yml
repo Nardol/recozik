@@ -1,0 +1,55 @@
+name: Bug report
+description: Report an issue with recozik
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve recozik! Please provide details below so we can reproduce the problem.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear and concise description of the bug.
+      placeholder: The command I ran, the output I expected, and what happened instead...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Share the exact commands, options, and files (if possible) that show the issue.
+      placeholder: |
+        1. uv run recozik ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant CLI output or attach screenshots.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `recozik --version` (or commit hash if running from source).
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment details
+      description: Operating system, Python version, shell.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have included relevant logs and reproduction steps
+          required: true

@@ -26,6 +26,10 @@ Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.or
 | `recozik completion ...` | Manage shell completion scripts for Bash, Zsh, Fish, or PowerShell. |
 | `recozik config ...` | Persist and inspect local configuration (AcoustID key, cache, templates…). |
 
+## Project status
+
+Recozik is currently in a public alpha phase. Interfaces and outputs may change without notice until the 1.0 release. Track changes in [CHANGELOG.md](CHANGELOG.md) and in the GitHub Releases page.
+
 ## Prerequisites
 
 - Python 3.10, 3.11, or 3.12 (Chromaprint/librosa does not yet support 3.13).
@@ -35,6 +39,14 @@ Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.or
 - Optional build tooling (`msgfmt`) if you modify translations.
 
 ## Installation
+
+### From PyPI (after the first public release)
+
+```bash
+pip install recozik
+```
+
+### From source with uv
 
 The project uses [uv](https://docs.astral.sh/uv/) to manage environments:
 
@@ -61,6 +73,7 @@ The command above creates a project-local virtual environment and installs runti
    ```
 
 The config file supports additional settings (cache TTL, output templates, logging mode). See the [sample layout](#development-workflow) below.
+Never commit the generated `config.toml` or share your personal AcoustID key; treat it like any other secret credential.
 
 ## Usage examples
 
@@ -170,6 +183,7 @@ A pytest fixture (`tests/conftest.py`) forces the English locale during tests, s
 - Use imperative, signed-off commit messages (`git commit -s`).
 - When adding user-facing strings, wrap them with `_()` from `recozik.i18n` and update the translation catalogues.
 - See [TRANSLATION.md](TRANSLATION.md) for localisation details.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, the [Code of Conduct](CODE_OF_CONDUCT.md), and the [security policy](SECURITY.md) before opening an issue or pull request.
 
 Issues and pull requests are welcome—thank you for helping to improve Recozik!
 
