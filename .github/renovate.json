@@ -11,7 +11,7 @@
   "prConcurrentLimit": 0,
   "lockFileMaintenance": {
     "enabled": true,
-g    "automerge": true
+    "automerge": true
   },
   "pyenv": {
     "enabled": false

@@ -16,15 +16,15 @@ Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.or
 
 ## Project summary
 
-| Command | Purpose |
-| --- | --- |
-| `recozik inspect` | Print basic metadata about an audio file. |
-| `recozik fingerprint` | Generate Chromaprint / `fpcalc` fingerprints. |
-| `recozik identify` | Look up a single file against the AcoustID API. |
-| `recozik identify-batch` | Process an entire directory tree, cache results, and emit text or JSONL logs. |
-| `recozik rename-from-log` | Apply suggestions produced by the batch command and organise your library. |
-| `recozik completion ...` | Manage shell completion scripts for Bash, Zsh, Fish, or PowerShell. |
-| `recozik config ...` | Persist and inspect local configuration (AcoustID key, cache, templates…). |
+| Command                   | Purpose                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `recozik inspect`         | Print basic metadata about an audio file.                                     |
+| `recozik fingerprint`     | Generate Chromaprint / `fpcalc` fingerprints.                                 |
+| `recozik identify`        | Look up a single file against the AcoustID API.                               |
+| `recozik identify-batch`  | Process an entire directory tree, cache results, and emit text or JSONL logs. |
+| `recozik rename-from-log` | Apply suggestions produced by the batch command and organise your library.    |
+| `recozik completion ...`  | Manage shell completion scripts for Bash, Zsh, Fish, or PowerShell.           |
+| `recozik config ...`      | Persist and inspect local configuration (AcoustID key, cache, templates…).    |
 
 ## Project status
 
@@ -78,38 +78,49 @@ Never commit the generated `config.toml` or share your personal AcoustID key; tr
 ## Usage examples
 
 Inspect a file:
+
 ```bash
 uv run recozik inspect path/to/file.wav
 ```
 
 Generate a fingerprint and export it as JSON:
+
 ```bash
 uv run recozik fingerprint path/to/file.wav --output fingerprint.json
 ```
+
 Use `--show-fingerprint` to print the raw fingerprint (note: very long string).
 
 Identify a single track via AcoustID:
+
 ```bash
 uv run recozik identify path/to/file.wav --limit 5 --json
 ```
 
 Batch-identify a folder and write results to JSONL:
+
 ```bash
 uv run recozik identify-batch music/ --recursive --log-format jsonl --log-file logs/recozik.jsonl
 ```
+
 Useful options: `--pattern`, `--ext`, `--best-only`, `--refresh`, `--template "{artist} - {title}"`.
 
 Rename files using a previous batch log (dry-run by default):
+
 ```bash
 uv run recozik rename-from-log logs/recozik.jsonl --root music/ --apply
 ```
+
 Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use embedded tags when AcoustID fails, and `--backup-dir` to keep a copy of originals.
 
 Install shell completion:
+
 ```bash
 uv run recozik completion install --shell bash
 ```
+
 Or inspect the generated script without installing it:
+
 ```bash
 uv run recozik completion install --shell zsh --no-write
 ```
@@ -119,12 +130,14 @@ uv run recozik completion install --shell zsh --no-write
 Recozik uses GNU gettext. English msgids live in the code; translations ship in `src/recozik/locales/`.
 
 Locale precedence:
+
 1. CLI option `--locale` (highest priority)
 2. Environment variable `RECOZIK_LOCALE`
 3. Config value `[general].locale` in `config.toml`
 4. System locale (falls back to English when no catalogue matches)
 
 Updating translations:
+
 1. Modify the relevant `.po` file (e.g. `src/recozik/locales/fr/LC_MESSAGES/recozik.po`).
 2. Run `python scripts/compile_translations.py` to regenerate `.mo` binaries.
 3. Execute tests in English (default) and in the target locale if you added coverage.
@@ -145,6 +158,7 @@ uv build                        # build wheel + sdist for release validation
 ```
 
 Sample configuration (`config.toml`):
+
 ```toml
 [acoustid]
 api_key = "your_api_key"

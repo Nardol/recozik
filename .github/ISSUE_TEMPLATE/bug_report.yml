@@ -1,3 +1,4 @@
+---
 name: Bug report
 description: Report an issue with recozik
 labels: [bug]
@@ -5,20 +6,25 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping us improve recozik! Please provide details below so we can reproduce the problem.
+        Thanks for helping us improve recozik!
+        Please provide details below so we can reproduce the problem.
   - type: textarea
     id: description
     attributes:
       label: What happened?
       description: Clear and concise description of the bug.
-      placeholder: The command I ran, the output I expected, and what happened instead...
+      placeholder: >
+        The command I ran, the output I expected, and what happened
+        instead...
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
       label: Steps to reproduce
-      description: Share the exact commands, options, and files (if possible) that show the issue.
+      description: >
+        Share the exact commands, options, and files (if possible) that show
+        the issue.
       placeholder: |
         1. uv run recozik ...
         2. ...
@@ -34,7 +40,9 @@ body:
     id: version
     attributes:
       label: Version
-      description: Output of `recozik --version` (or commit hash if running from source).
+      description: >
+        Output of `recozik --version` (or commit hash if running from
+        source).
     validations:
       required: true
   - type: input

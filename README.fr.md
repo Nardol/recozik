@@ -16,15 +16,15 @@ Application en ligne de commande conçue pour calculer des empreintes [Chromapri
 
 ## Présentation
 
-| Commande | Rôle |
-| --- | --- |
-| `recozik inspect` | Affiche les métadonnées de base d'un fichier audio. |
-| `recozik fingerprint` | Génère les empreintes Chromaprint via `fpcalc`. |
-| `recozik identify` | Identifie un fichier unique auprès du service AcoustID. |
-| `recozik identify-batch` | Traite un répertoire entier, met en cache les résultats et exporte un log texte ou JSONL. |
-| `recozik rename-from-log` | Applique les propositions issues du log pour organiser la bibliothèque. |
-| `recozik completion …` | Gère les scripts de complétion shell (Bash, Zsh, Fish, PowerShell). |
-| `recozik config …` | Persiste et consulte la configuration locale (clé API, cache, modèles, etc.). |
+| Commande                  | Rôle                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `recozik inspect`         | Affiche les métadonnées de base d'un fichier audio.                                       |
+| `recozik fingerprint`     | Génère les empreintes Chromaprint via `fpcalc`.                                           |
+| `recozik identify`        | Identifie un fichier unique auprès du service AcoustID.                                   |
+| `recozik identify-batch`  | Traite un répertoire entier, met en cache les résultats et exporte un log texte ou JSONL. |
+| `recozik rename-from-log` | Applique les propositions issues du log pour organiser la bibliothèque.                   |
+| `recozik completion …`    | Gère les scripts de complétion shell (Bash, Zsh, Fish, PowerShell).                       |
+| `recozik config …`        | Persiste et consulte la configuration locale (clé API, cache, modèles, etc.).             |
 
 ## Prérequis
 
@@ -65,34 +65,43 @@ Le fichier peut contenir d'autres options (TTL du cache, modèle d'affichage, mo
 ## Exemples d'utilisation
 
 Inspection rapide :
+
 ```bash
 uv run recozik inspect chemin/vers/fichier.wav
 ```
 
 Extraction de l'empreinte :
+
 ```bash
 uv run recozik fingerprint chemin/vers/fichier.wav --output empreinte.json
 ```
+
 Ajouter `--show-fingerprint` affiche l'empreinte brute dans la console (très longue).
 
 Identification ponctuelle :
+
 ```bash
 uv run recozik identify chemin/vers/fichier.wav --limit 5 --json
 ```
 
 Traitement d'un dossier complet :
+
 ```bash
 uv run recozik identify-batch musique/ --recursive --log-format jsonl --log-file logs/recozik.jsonl
 ```
+
 Options utiles : `--pattern`, `--ext`, `--best-only`, `--refresh`, `--template "{artist} - {title}"`.
 
 Renommage à partir d'un log JSONL :
+
 ```bash
 uv run recozik rename-from-log logs/recozik.jsonl --root musique/ --apply
 ```
+
 Ajouter `--interactive` pour choisir la proposition à la volée, `--metadata-fallback` pour se rabattre sur les tags embarqués, `--backup-dir` pour conserver une copie.
 
 Completions shell :
+
 ```bash
 uv run recozik completion install --shell bash
 uv run recozik completion install --shell zsh --no-write   # affiche uniquement le script
@@ -103,12 +112,14 @@ uv run recozik completion install --shell zsh --no-write   # affiche uniquement 
 Le code source utilise des msgids en anglais. Les traductions vivent dans `src/recozik/locales/<lang>/LC_MESSAGES/`.
 
 Ordre de priorité des locales :
+
 1. Option CLI `--locale`
 2. Variable d'environnement `RECOZIK_LOCALE`
 3. Clé `[general].locale` dans `config.toml`
 4. Locale système (retombe sur l'anglais si aucun catalogue n'est disponible)
 
 Mettre à jour ou ajouter une langue :
+
 1. Modifier le `.po` correspondant.
 2. Recompiler avec `python scripts/compile_translations.py` (utilise `msgfmt` si présent, sinon un fallback Python).
 3. Lancer les tests en anglais (`uv run pytest`) et, si besoin, dans la locale ciblée (`RECOZIK_LOCALE=fr_FR uv run pytest`).
@@ -129,6 +140,7 @@ uv build
 ```
 
 Exemple de `config.toml` :
+
 ```toml
 [acoustid]
 api_key = "votre_cle"

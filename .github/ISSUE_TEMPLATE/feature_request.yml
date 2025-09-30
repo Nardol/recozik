@@ -1,3 +1,4 @@
+---
 name: Feature request
 description: Suggest an improvement or a new capability
 labels: [enhancement]
@@ -5,7 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for your idea! Help us understand the use case and why it benefits users.
+        Thanks for your idea!
+        Help us understand the use case and why it benefits users.
   - type: textarea
     id: summary
     attributes:
@@ -24,7 +26,9 @@ body:
     id: alternatives
     attributes:
       label: Alternatives considered
-      description: Are there existing commands or tools that almost solve the problem?
+      description: >
+        Are there existing commands or tools that almost solve the
+        problem?
   - type: input
     id: context
     attributes:
