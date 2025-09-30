@@ -1,10 +1,36 @@
 [project]
 name = "recozik"
 version = "0.1.0"
-description = "CLI pour analyser les empreintes audio et identifier des morceaux"
+description = "Terminal-first CLI for audio fingerprinting and AcoustID lookup"
 readme = "README.md"
+license = { file = "LICENSE" }
 authors = [
     { name = "Patrick ZAJDA", email = "patrick@zajda.fr" }
+]
+keywords = [
+    "audio",
+    "fingerprinting",
+    "acoustid",
+    "cli",
+    "music",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Natural Language :: French",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Utilities",
 ]
 requires-python = ">=3.10,<3.13"
 dependencies = [
@@ -30,12 +56,18 @@ dev = [
 [project.scripts]
 recozik = "recozik.cli:app"
 
+[project.urls]
+Homepage = "https://github.com/Nardol/recozik"
+Documentation = "https://github.com/Nardol/recozik#readme"
+Issues = "https://github.com/Nardol/recozik/issues"
+Changelog = "https://github.com/Nardol/recozik/releases"
+
 [build-system]
 requires = ["uv_build>=0.8.22,<0.9.0"]
 build-backend = "uv_build"
 
 [tool.typer]
-short_help = "Analyse des fichiers audio et extraction d'empreintes"
+short_help = "Music recognition based on audio fingerprints."
 
 [tool.ruff]
 line-length = 100
@@ -65,3 +97,10 @@ known-first-party = ["recozik"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
+
+[tool.uv.build-backend]
+source-include = [
+    "src/recozik/locales/**/*.po",
+    "src/recozik/locales/**/*.mo",
+]
+data = { purelib = "src/recozik/locales" }
