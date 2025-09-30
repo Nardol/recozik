@@ -18,6 +18,7 @@ def test_write_and_load_config(tmp_path: Path) -> None:
         output_template="{artist} - {title} ({score:.2f})",
         log_format="jsonl",
         log_absolute_paths=True,
+        metadata_fallback_enabled=False,
     )
 
     write_config(config, target)
@@ -30,6 +31,7 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     assert loaded.output_template == "{artist} - {title} ({score:.2f})"
     assert loaded.log_format == "jsonl"
     assert loaded.log_absolute_paths is True
+    assert loaded.metadata_fallback_enabled is False
 
 
 def test_load_config_missing_returns_default(tmp_path: Path) -> None:
@@ -44,3 +46,4 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
     assert config.output_template is None
     assert config.log_format == "text"
     assert config.log_absolute_paths is False
+    assert config.metadata_fallback_enabled is True

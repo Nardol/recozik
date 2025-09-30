@@ -28,6 +28,7 @@ class AppConfig:
     output_template: str | None = None
     log_format: str = "text"
     log_absolute_paths: bool = False
+    metadata_fallback_enabled: bool = True
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
@@ -41,6 +42,9 @@ class AppConfig:
             "logging": {
                 "format": self.log_format,
                 "absolute_paths": self.log_absolute_paths,
+            },
+            "metadata": {
+                "fallback": self.metadata_fallback_enabled,
             },
         }
 
@@ -103,6 +107,9 @@ def load_config(path: Path | None = None) -> AppConfig:
         log_format = "text"
     log_absolute_paths = bool(logging_section.get("absolute_paths", False))
 
+    metadata_section = data.get("metadata", {}) or {}
+    metadata_fallback = bool(metadata_section.get("fallback", True))
+
     return AppConfig(
         acoustid_api_key=api_key,
         cache_enabled=cache_enabled,
@@ -110,6 +117,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         output_template=template,
         log_format=log_format,
         log_absolute_paths=log_absolute_paths,
+        metadata_fallback_enabled=metadata_fallback,
     )
 
 
@@ -148,6 +156,10 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
         lines.append(f'template = "{escaped_template}"')
     else:
         lines.append('# template = "{artist} - {title}"')
+    lines.append("")
+
+    lines.append("[metadata]")
+    lines.append(f"fallback = {str(data['metadata']['fallback']).lower()}")
     lines.append("")
 
     lines.append("[logging]")

@@ -308,6 +308,49 @@ def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
 
 
 
+def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
+    """Rename using metadata when no matches are provided."""
+    root = tmp_path / "metadata"
+    root.mkdir()
+    src = root / "meta.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "meta.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "meta.mp3",
+                "matches": [],
+                "metadata": {
+                    "artist": "Tagged Artist",
+                    "title": "Tagged Title",
+                    "album": "Tagged Album",
+                },
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--metadata-fallback",
+            "--apply",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "utilisation des métadonnées" in result.stdout
+    assert not src.exists()
+    assert (root / "Tagged Artist - Tagged Title.mp3").exists()
+
+
 def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
     """Proceed with renaming when confirmation is accepted."""
     root = tmp_path / "music"

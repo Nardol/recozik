@@ -41,7 +41,12 @@ class DummyCache:
         pass
 
 
-def _write_config(tmp_path: Path, template: str | None = None, log_format: str = "text") -> Path:
+def _write_config(
+    tmp_path: Path,
+    template: str | None = None,
+    log_format: str = "text",
+    metadata_fallback: bool = True,
+) -> Path:
     """Create a reusable configuration file tailored for batch tests."""
     config_path = tmp_path / "config.toml"
     sections = [
@@ -121,6 +126,7 @@ def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
 
 def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
     """Emit JSONL records when log format is jsonl."""
+
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
     file_a = audio_dir / "song.mp3"
@@ -171,6 +177,53 @@ def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
     payload = json.loads(lines[0])
     assert payload["path"] == "song.mp3"
     assert payload["matches"][0]["formatted"].startswith("Artist -")
+
+
+def test_identify_batch_metadata_fallback(monkeypatch, tmp_path: Path) -> None:
+    """Record embedded metadata when AcoustID returns no matches."""
+    audio_dir = tmp_path / "music"
+    audio_dir.mkdir()
+    file_a = audio_dir / "unmatched.flac"
+    file_a.write_bytes(b"a")
+
+    config_path = _write_config(tmp_path, log_format="jsonl")
+    log_path = tmp_path / "fallback.jsonl"
+
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="MISS", duration_seconds=200.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        cli,
+        "_extract_audio_metadata",
+        lambda _path: {"title": "Tag Title", "artist": "Tag Artist"},
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify-batch",
+            str(audio_dir),
+            "--config-path",
+            str(config_path),
+            "--log-file",
+            str(log_path),
+            "--log-format",
+            "jsonl",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "métadonnées locales enregistrées" in result.stdout
+
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload["metadata"]["artist"] == "Tag Artist"
+    assert payload["metadata"]["title"] == "Tag Title"
 
 
 def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:

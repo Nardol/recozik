@@ -366,6 +366,11 @@ def identify_batch(
         "--refresh",
         help="Ignore le cache local et force un nouvel appel à l'API.",
     ),
+    metadata_fallback: bool | None = typer.Option(
+        None,
+        "--metadata-fallback/--no-metadata-fallback",
+        help="Utilise les métadonnées embarquées lorsqu'AcoustID ne retourne aucune correspondance.",
+    ),
     absolute_paths: bool | None = typer.Option(
         None,
         "--absolute-paths/--relative-paths",
@@ -440,6 +445,10 @@ def identify_batch(
         ttl=timedelta(hours=max(config.cache_ttl_hours, 1)),
     )
 
+    use_metadata_fallback = (
+        config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
+    )
+
     effective_limit = 1 if best_only else limit
 
     log_path = _resolve_path(log_file) if log_file else Path.cwd() / "recozik-batch.log"
@@ -470,6 +479,7 @@ def identify_batch(
                     str(exc),
                     template_value,
                     None,
+                    metadata=None,
                 )
                 failures += 1
                 continue
@@ -493,6 +503,7 @@ def identify_batch(
                         str(exc),
                         template_value,
                         fingerprint_result,
+                        metadata=None,
                     )
                     failures += 1
                     continue
@@ -506,6 +517,9 @@ def identify_batch(
                 matches = list(matches)
 
             if not matches:
+                metadata_payload = (
+                    _extract_audio_metadata(file_path) if use_metadata_fallback else None
+                )
                 _write_log_entry(
                     handle,
                     log_format_value,
@@ -514,7 +528,12 @@ def identify_batch(
                     "Aucune correspondance.",
                     template_value,
                     fingerprint_result,
+                    metadata=metadata_payload,
                 )
+                if metadata_payload:
+                    typer.echo(
+                        f"Aucune correspondance pour {relative_display}, métadonnées locales enregistrées."
+                    )
                 failures += 1
                 continue
 
@@ -527,6 +546,7 @@ def identify_batch(
                 None,
                 template_value,
                 fingerprint_result,
+                metadata=None,
             )
             success += 1
 
@@ -588,6 +608,11 @@ def rename_from_log(
         "--export",
         help="Chemin d'un fichier JSON résumant les renommages planifiés.",
     ),
+    metadata_fallback: bool | None = typer.Option(
+        None,
+        "--metadata-fallback/--no-metadata-fallback",
+        help="Utilise les métadonnées du fichier pour renommer lorsqu'aucune proposition n'est disponible.",
+    ),
     config_path: Path | None = typer.Option(
         None,
         "--config-path",
@@ -614,6 +639,10 @@ def rename_from_log(
     if conflict_strategy not in {"append", "skip", "overwrite"}:
         typer.echo("Valeur --on-conflict invalide. Choisissez append, skip ou overwrite.")
         raise typer.Exit(code=1)
+
+    use_metadata_fallback = (
+        config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
+    )
 
     try:
         entries = _load_jsonl_log(resolved_log)
@@ -658,10 +687,17 @@ def rename_from_log(
             continue
 
         matches = entry.get("matches") or []
+        metadata_entry = _coerce_metadata_dict(entry.get("metadata"))
         if not matches:
-            skipped += 1
-            typer.echo(f"Aucune proposition pour: {source_path}")
-            continue
+            if use_metadata_fallback and metadata_entry:
+                typer.echo(
+                    f"Aucune correspondance AcoustID pour {source_path}, utilisation des métadonnées intégrées."
+                )
+                matches = [_build_metadata_match(metadata_entry)]
+            else:
+                skipped += 1
+                typer.echo(f"Aucune proposition pour: {source_path}")
+                continue
 
         selected_match_index = 0
         if interactive and len(matches) > 1:
@@ -1125,6 +1161,8 @@ def _write_log_entry(
     error: str | None,
     template: str,
     fingerprint: FingerprintResult | None,
+    *,
+    metadata: dict[str, str] | None = None,
 ) -> None:
     if log_format == "jsonl":
         entry = {
@@ -1146,6 +1184,7 @@ def _write_log_entry(
                 }
                 for idx, match in enumerate(matches, start=1)
             ],
+            "metadata": metadata or None,
         }
         handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return
@@ -1153,6 +1192,12 @@ def _write_log_entry(
     handle.write(f"file: {path_display}\n")
     if fingerprint:
         handle.write(f"  duration: {fingerprint.duration_seconds:.2f}s\n")
+    if metadata:
+        handle.write("  metadata:\n")
+        for key in ("artist", "title", "album"):
+            value = metadata.get(key)
+            if value:
+                handle.write(f"    {key}: {value}\n")
     if error:
         handle.write(f"  error: {error}\n\n")
         return
@@ -1253,6 +1298,46 @@ def _extract_audio_metadata(path: Path) -> dict[str, str] | None:
             metadata[key] = value
 
     return metadata or None
+
+
+
+def _coerce_metadata_dict(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+
+    result: dict[str, str] = {}
+    for key in ("artist", "title", "album"):
+        raw = value.get(key)
+        if raw is None:
+            continue
+        if isinstance(raw, str):
+            candidate = raw.strip()
+        else:
+            try:
+                candidate = str(raw).strip()
+            except Exception:  # pragma: no cover - conversion prudente
+                continue
+        if candidate:
+            result[key] = candidate
+    return result
+
+
+
+def _build_metadata_match(metadata: dict[str, str]) -> dict[str, object]:
+    artist_value = metadata.get("artist") or "Artiste inconnu"
+    title_value = metadata.get("title") or "Titre inconnu"
+    formatted = f"{artist_value} - {title_value}"
+    return {
+        "score": None,
+        "recording_id": None,
+        "artist": metadata.get("artist"),
+        "title": metadata.get("title"),
+        "album": metadata.get("album"),
+        "release_group_id": None,
+        "release_id": None,
+        "formatted": formatted,
+        "source": "metadata",
+    }
 
 
 INVALID_FILENAME_CHARS = set('<>:"/\\|?*')
