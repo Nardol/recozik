@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from datetime import timedelta
 from pathlib import Path
 from string import Formatter
+from typing import Any
 
 import click
 import requests
@@ -34,6 +35,11 @@ from .fingerprint import (
     compute_fingerprint,
     lookup_recordings,
 )
+
+try:  # pragma: no cover - dépend de l'environnement
+    import mutagen  # type: ignore[import-not-found]  # noqa: F401
+except ImportError:  # pragma: no cover - dépend de l'environnement
+    mutagen = None  # type: ignore[assignment]
 
 app = typer.Typer(
     add_completion=False,
@@ -97,6 +103,18 @@ def inspect(
     typer.echo(f"Fréquence d'échantillonnage: {info.samplerate} Hz")
     typer.echo(f"Nombre d'images: {info.frames}")
     typer.echo(f"Durée estimée: {info.duration:.2f} s")
+
+    metadata = _extract_audio_metadata(resolved)
+    if metadata:
+        typer.echo("Métadonnées (tags):")
+        if artist := metadata.get("artist"):
+            typer.echo(f"  Artiste: {artist}")
+        if title := metadata.get("title"):
+            typer.echo(f"  Titre: {title}")
+        if album := metadata.get("album"):
+            typer.echo(f"  Album: {album}")
+    elif mutagen is None:  # pragma: no cover - dépend des installations
+        typer.echo("Métadonnées non disponibles (bibliothèque mutagen absente).")
 
 
 @app.command(help="Génère l'empreinte Chromaprint d'un fichier audio.")
@@ -1192,6 +1210,49 @@ def _format_score(value: object) -> str:
     if isinstance(value, (int, float)):
         return f"{float(value):.2f}"
     return str(value or "")
+
+
+def _extract_audio_metadata(path: Path) -> dict[str, str] | None:
+    if mutagen is None:  # pragma: no cover - dépend des installations
+        return None
+
+    try:
+        audio = mutagen.File(path, easy=True)  # type: ignore[attr-defined]
+    except Exception:  # pragma: no cover - sécurité supplémentaire
+        return None
+
+    if audio is None:
+        return None
+
+    tags = getattr(audio, "tags", None)
+    if not tags:
+        return None
+
+    def _first_value(tag_value: Any) -> str | None:
+        if tag_value is None:
+            return None
+        if isinstance(tag_value, str):
+            candidate = tag_value.strip()
+            return candidate or None
+        if isinstance(tag_value, (list, tuple, set)):
+            for item in tag_value:
+                candidate = _first_value(item)
+                if candidate:
+                    return candidate
+            return None
+        try:
+            candidate = str(tag_value).strip()
+        except Exception:  # pragma: no cover - conversion prudente
+            return None
+        return candidate or None
+
+    metadata: dict[str, str] = {}
+    for key in ("artist", "title", "album"):
+        value = _first_value(tags.get(key))  # type: ignore[arg-type]
+        if value:
+            metadata[key] = value
+
+    return metadata or None
 
 
 INVALID_FILENAME_CHARS = set('<>:"/\\|?*')
