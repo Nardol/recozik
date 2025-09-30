@@ -26,5 +26,6 @@
       "pinDigests": true
     }
   ],
+  "ignoreDeps": ["python"],
   "timezone": "Europe/Paris"
 }
