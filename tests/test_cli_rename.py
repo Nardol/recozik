@@ -187,6 +187,7 @@ def test_rename_from_log_invalid_format(tmp_path: Path) -> None:
 
 def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
     """Let the user choose a match interactively before renaming."""
+
     root = tmp_path / "music"
     root.mkdir()
     src = root / "interactive.mp3"
@@ -242,6 +243,69 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert not src.exists()
     assert (root / "Artist - Option2.mp3").exists()
+
+
+def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
+    """Retry selection until a valid input is provided."""
+
+    root = tmp_path / "retry"
+    root.mkdir()
+    src = root / "retry.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "retry.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "retry.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - First",
+                        "score": 0.9,
+                        "recording_id": "id1",
+                        "artist": "Artist",
+                        "title": "First",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    },
+                    {
+                        "formatted": "Artist - Second",
+                        "score": 0.85,
+                        "recording_id": "id2",
+                        "artist": "Artist",
+                        "title": "Second",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    },
+                ],
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--interactive",
+            "--apply",
+        ],
+        input="0\nabc\n2\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Indice hors plage" in result.stdout
+    assert "Sélection invalide" in result.stdout
+    assert not src.exists()
+    assert (root / "Artist - Second.mp3").exists()
+
 
 
 def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:

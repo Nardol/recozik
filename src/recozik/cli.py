@@ -1258,22 +1258,22 @@ def _prompt_match_selection(matches: list[dict], source_path: Path) -> int | Non
         typer.echo(f"  {idx}. {artist} - {title} (score {score})")
 
     prompt = "Sélectionnez un numéro (ENTER pour annuler) : "
-    choice = typer.prompt(prompt, default="", show_default=False)
 
-    if not choice:
-        return None
+    while True:
+        choice = typer.prompt(prompt, default="", show_default=False).strip()
+        if not choice:
+            return None
 
-    try:
-        idx = int(choice)
-    except ValueError:
-        typer.echo("Sélection invalide, entrée ignorée.")
-        return None
+        try:
+            idx = int(choice)
+        except ValueError:
+            typer.echo("Sélection invalide, veuillez réessayer.")
+            continue
 
-    if not (1 <= idx <= len(matches)):
-        typer.echo("Indice hors plage, entrée ignorée.")
-        return None
+        if 1 <= idx <= len(matches):
+            return idx - 1
 
-    return idx - 1
+        typer.echo("Indice hors plage, veuillez réessayer.")
 
 
 def _prompt_yes_no(message: str, *, default: bool = True) -> bool:
