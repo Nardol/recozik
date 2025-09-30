@@ -43,6 +43,6 @@ def test_inspect_displays_metadata(monkeypatch, tmp_path: Path) -> None:
     result = runner.invoke(cli.app, ["inspect", str(audio_path)])
 
     assert result.exit_code == 0
-    assert "Artiste: Tagged Artist" in result.stdout
-    assert "Titre: Tagged Title" in result.stdout
+    assert "Artist: Tagged Artist" in result.stdout
+    assert "Title: Tagged Title" in result.stdout
     assert "Album: Tagged Album" in result.stdout

@@ -25,9 +25,9 @@ def test_completion_install(monkeypatch, tmp_path: Path) -> None:
     result = runner.invoke(cli.app, ["completion", "install", "--shell", "bash"])
 
     assert result.exit_code == 0
-    assert "Complétion installée pour bash." in result.stdout
+    assert "Completion installed for bash." in result.stdout
     assert str(script_path) in result.stdout
-    assert "Commande à ajouter" in result.stdout
+    assert "Command to add" in result.stdout
 
 
 def test_completion_show(monkeypatch) -> None:
@@ -62,7 +62,7 @@ def test_completion_uninstall(monkeypatch, tmp_path: Path) -> None:
     result = runner.invoke(cli.app, ["completion", "uninstall"])
 
     assert result.exit_code == 0
-    assert "Script de complétion supprimé" in result.stdout
+    assert "Completion script removed" in result.stdout
     assert not target_script.exists()
 
 
@@ -153,7 +153,7 @@ def test_completion_install_output(monkeypatch, tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert target.read_text() == "# out"
-    assert "Script de complétion écrit" in result.stdout
+    assert "Completion script written" in result.stdout
 
 
 def test_completion_install_conflicting_flags(tmp_path: Path) -> None:
@@ -171,4 +171,4 @@ def test_completion_install_conflicting_flags(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 1
-    assert "Choisissez une seule option" in result.stdout
+    assert "Use only one of" in result.stdout

@@ -8,7 +8,9 @@ from pathlib import Path
 
 import platformdirs
 
-try:  # pragma: no cover - import dépend de la version de Python
+from .i18n import _
+
+try:  # pragma: no cover - depends on the Python version
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
     import tomli as tomllib  # type: ignore[no-redef]
@@ -29,6 +31,7 @@ class AppConfig:
     log_format: str = "text"
     log_absolute_paths: bool = False
     metadata_fallback_enabled: bool = True
+    locale: str | None = None
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
@@ -46,6 +49,7 @@ class AppConfig:
             "metadata": {
                 "fallback": self.metadata_fallback_enabled,
             },
+            "general": {},
         }
 
         if self.acoustid_api_key:
@@ -53,6 +57,9 @@ class AppConfig:
 
         if self.output_template:
             data["output"]["template"] = self.output_template
+
+        if self.locale:
+            data["general"]["locale"] = self.locale
 
         return data
 
@@ -75,29 +82,31 @@ def load_config(path: Path | None = None) -> AppConfig:
 
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:  # pragma: no cover - dépend de l'environnement
-        raise RuntimeError(f"Impossible de lire la configuration: {exc}") from exc
+    except OSError as exc:  # pragma: no cover - depends on the environment
+        message = _("Unable to read the configuration file: {error}").format(error=exc)
+        raise RuntimeError(message) from exc
     except tomllib.TOMLDecodeError as exc:
-        raise RuntimeError(f"Configuration TOML invalide dans {path}: {exc}") from exc
+        message = _("Invalid TOML configuration in {path}: {error}").format(path=path, error=exc)
+        raise RuntimeError(message) from exc
 
     acoustid_section = data.get("acoustid", {}) or {}
     api_key = acoustid_section.get("api_key")
 
     if api_key is not None and not isinstance(api_key, str):
-        raise RuntimeError("Le champ acoustid.api_key doit être une chaîne de caractères.")
+        raise RuntimeError(_("The field acoustid.api_key must be a string."))
 
     cache_section = data.get("cache", {}) or {}
     cache_enabled = bool(cache_section.get("enabled", True))
     cache_ttl_raw = cache_section.get("ttl_hours", 24)
     try:
         cache_ttl_hours = int(cache_ttl_raw)
-    except (TypeError, ValueError) as exc:  # pragma: no cover - validation utilisateur
-        raise RuntimeError("Le champ cache.ttl_hours doit être un entier.") from exc
+    except (TypeError, ValueError) as exc:  # pragma: no cover - user validation
+        raise RuntimeError(_("The field cache.ttl_hours must be an integer.")) from exc
 
     output_section = data.get("output", {}) or {}
     template = output_section.get("template")
     if template is not None and not isinstance(template, str):
-        raise RuntimeError("Le champ output.template doit être une chaîne de caractères.")
+        raise RuntimeError(_("The field output.template must be a string."))
 
     logging_section = data.get("logging", {}) or {}
     log_format = logging_section.get("format", "text")
@@ -110,6 +119,11 @@ def load_config(path: Path | None = None) -> AppConfig:
     metadata_section = data.get("metadata", {}) or {}
     metadata_fallback = bool(metadata_section.get("fallback", True))
 
+    general_section = data.get("general", {}) or {}
+    locale_value = general_section.get("locale")
+    if locale_value is not None and not isinstance(locale_value, str):
+        raise RuntimeError(_("The field general.locale must be a string."))
+
     return AppConfig(
         acoustid_api_key=api_key,
         cache_enabled=cache_enabled,
@@ -118,6 +132,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         log_format=log_format,
         log_absolute_paths=log_absolute_paths,
         metadata_fallback_enabled=metadata_fallback,
+        locale=locale_value,
     )
 
 
@@ -141,7 +156,7 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
         escaped = api_key.replace('"', '\\"')
         lines.append(f'api_key = "{escaped}"')
     else:
-        lines.append('# api_key = "votre_cle_api"')
+        lines.append('# api_key = "your_api_key"')
     lines.append("")
 
     lines.append("[cache]")
@@ -165,6 +180,15 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append("[logging]")
     lines.append(f'format = "{data["logging"]["format"]}"')
     lines.append(f"absolute_paths = {str(data['logging']['absolute_paths']).lower()}")
+    lines.append("")
+
+    lines.append("[general]")
+    locale_setting = data["general"].get("locale")
+    if locale_setting:
+        escaped_locale = locale_setting.replace('"', '\\"')
+        lines.append(f'locale = "{escaped_locale}"')
+    else:
+        lines.append('# locale = "fr_FR"')
     lines.append("")
 
     target.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")

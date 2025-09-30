@@ -132,7 +132,7 @@ def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert "Résultat 1: score 0.75" in result.stdout
+    assert "Result 1: score 0.75" in result.stdout
     assert "Artiste Exemple - Autre titre" in result.stdout
     assert "Album: Album X (2018-05-01)" in result.stdout
 
@@ -163,8 +163,8 @@ def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 1
-    assert "Aucune clé API AcoustID" in result.stdout
-    assert "Opération annulée." in result.stdout
+    assert "No AcoustID API key configured." in result.stdout
+    assert "Operation cancelled." in result.stdout
 
 
 def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
@@ -256,6 +256,48 @@ def test_identify_register_key_via_prompt(monkeypatch, tmp_path: Path) -> None:
             str(config_path),
         ],
         input="o\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Result 1" in result.stdout
+
+
+def test_identify_respects_locale_env(monkeypatch, tmp_path: Path) -> None:
+    """Switch to French locale when RECOZIK_LOCALE is set."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+
+    config_path = _fake_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
+    )
+
+    monkeypatch.setattr(
+        cli,
+        "lookup_recordings",
+        lambda *_args, **_kwargs: [
+            AcoustIDMatch(
+                score=0.42,
+                recording_id="rec",
+                title="Titre",
+                artist="Artiste",
+            )
+        ],
+    )
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+        ],
+        env={"RECOZIK_LOCALE": "fr_FR"},
     )
 
     assert result.exit_code == 0

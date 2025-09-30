@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -35,23 +36,32 @@ from .fingerprint import (
     compute_fingerprint,
     lookup_recordings,
 )
+from .i18n import (
+    _,
+    detect_system_locale,
+    resolve_preferred_locale,
+    set_locale,
+)
 
-try:  # pragma: no cover - dépend de l'environnement
-    import mutagen  # type: ignore[import-not-found]  # noqa: F401
-except ImportError:  # pragma: no cover - dépend de l'environnement
+try:  # pragma: no cover - depends on the environment
+    import mutagen  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - depends on the environment
     mutagen = None  # type: ignore[assignment]
+
+_ENV_LOCALE_VAR = "RECOZIK_LOCALE"
+_LOGGER = logging.getLogger(__name__)
 
 app = typer.Typer(
     add_completion=False,
-    help="Reconnaissance musicale basée sur les empreintes audio.",
+    help=_("Music recognition based on audio fingerprints."),
 )
 config_app = typer.Typer(
     add_completion=False,
-    help="Gestion de la configuration locale.",
+    help=_("Manage local configuration."),
 )
 completion_app = typer.Typer(
     add_completion=False,
-    help="Outils d'auto-complétion du shell.",
+    help=_("Shell auto-completion helpers."),
 )
 
 app.add_typer(config_app, name="config")
@@ -67,80 +77,123 @@ def _resolve_path(path: Path) -> Path:
     return path.expanduser().resolve()
 
 
+def _apply_locale(
+    ctx: typer.Context | None,
+    *,
+    config: AppConfig | None = None,
+    override: str | None = None,
+) -> None:
+    """Install the locale following CLI/env/config precedence."""
+    ctx_locale = None
+    if ctx is not None:
+        ctx.ensure_object(dict)
+        if isinstance(ctx.obj, dict):
+            ctx_locale = ctx.obj.get("cli_locale")
+
+    env_locale = os.environ.get(_ENV_LOCALE_VAR)
+    config_locale = config.locale if config else None
+
+    final_locale = resolve_preferred_locale(
+        override,
+        ctx_locale,
+        env_locale,
+        config_locale,
+        detect_system_locale(),
+    )
+    set_locale(final_locale)
+
+
 @app.callback()
-def main() -> None:
+def main(
+    ctx: typer.Context,
+    locale_option: str | None = typer.Option(
+        None,
+        "--locale",
+        help=_("Override the locale for this invocation (examples: en, fr, fr_FR)."),
+    ),
+) -> None:
     """Top-level callback for the CLI application."""
+    ctx.ensure_object(dict)
+    ctx.obj["cli_locale"] = locale_option
+    if locale_option:
+        set_locale(locale_option)
 
 
-@app.command(help="Affiche les métadonnées de base du fichier audio.")
+@app.command(help=_("Display basic metadata extracted from an audio file."))
 def inspect(
-    audio_path: Path = typer.Argument(..., help="Chemin du fichier audio à analyser."),
+    ctx: typer.Context,
+    audio_path: Path = typer.Argument(
+        ...,
+        help=_("Path to the audio file to analyse."),
+    ),
 ) -> None:
     """Display basic metadata for the provided audio file."""
+    _apply_locale(ctx)
     resolved = _resolve_path(audio_path)
     if not resolved.is_file():
-        typer.echo(f"Fichier introuvable: {resolved}")
+        typer.echo(_("File not found: {path}").format(path=resolved))
         raise typer.Exit(code=1)
 
     try:
         import soundfile as sf
-    except ImportError as exc:  # pragma: no cover - dépend de l'environnement d'exécution
+    except ImportError as exc:  # pragma: no cover - depends on the runtime environment
         typer.echo(
-            "La bibliothèque soundfile est absente; "
-            "lancez `uv sync` pour installer les dépendances."
+            _("The soundfile library is missing; run `uv sync` to install project dependencies.")
         )
         raise typer.Exit(code=1) from exc
 
     try:
         info = sf.info(str(resolved))
     except RuntimeError as exc:
-        typer.echo(f"Impossible de lire le fichier audio: {exc}")
+        typer.echo(_("Unable to read the audio file: {error}").format(error=exc))
         raise typer.Exit(code=1) from exc
 
-    typer.echo(f"Fichier: {resolved}")
-    typer.echo(f"Format: {info.format}, {info.subtype}")
-    typer.echo(f"Canaux: {info.channels}")
-    typer.echo(f"Fréquence d'échantillonnage: {info.samplerate} Hz")
-    typer.echo(f"Nombre d'images: {info.frames}")
-    typer.echo(f"Durée estimée: {info.duration:.2f} s")
+    typer.echo(_("File: {path}").format(path=resolved))
+    typer.echo(_("Format: {format}, {subtype}").format(format=info.format, subtype=info.subtype))
+    typer.echo(_("Channels: {channels}").format(channels=info.channels))
+    typer.echo(_("Sample rate: {samplerate} Hz").format(samplerate=info.samplerate))
+    typer.echo(_("Frame count: {frames}").format(frames=info.frames))
+    typer.echo(_("Estimated duration: {duration:.2f} s").format(duration=info.duration))
 
     metadata = _extract_audio_metadata(resolved)
     if metadata:
-        typer.echo("Métadonnées (tags):")
+        typer.echo(_("Embedded metadata:"))
         if artist := metadata.get("artist"):
-            typer.echo(f"  Artiste: {artist}")
+            typer.echo(_("  Artist: {value}").format(value=artist))
         if title := metadata.get("title"):
-            typer.echo(f"  Titre: {title}")
+            typer.echo(_("  Title: {value}").format(value=title))
         if album := metadata.get("album"):
-            typer.echo(f"  Album: {album}")
-    elif mutagen is None:  # pragma: no cover - dépend des installations
-        typer.echo("Métadonnées non disponibles (bibliothèque mutagen absente).")
+            typer.echo(_("  Album: {value}").format(value=album))
+    elif mutagen is None:  # pragma: no cover - depends on installations
+        typer.echo(_("No metadata available (mutagen library missing)."))
 
 
-@app.command(help="Génère l'empreinte Chromaprint d'un fichier audio.")
+@app.command(help=_("Generate the Chromaprint fingerprint of an audio file."))
 def fingerprint(
-    audio_path: Path = typer.Argument(..., help="Chemin du fichier audio à fingerprint."),
+    ctx: typer.Context,
+    audio_path: Path = typer.Argument(
+        ...,
+        help=_("Path to the audio file to fingerprint."),
+    ),
     fpcalc_path: Path | None = typer.Option(
         None,
         "--fpcalc-path",
-        help="Chemin explicite vers l'exécutable fpcalc si Chromaprint n'est pas dans PATH.",
+        help=_("Explicit path to the fpcalc executable when Chromaprint is not on PATH."),
     ),
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Fichier dans lequel écrire l'empreinte au format JSON.",
+        help=_("File where the fingerprint should be written in JSON format."),
     ),
     show_fingerprint: bool = typer.Option(
         False,
         "--show-fingerprint",
-        help=(
-            "Affiche l'empreinte complète dans la console "
-            "(longue et moins pratique pour les lecteurs d'écran)."
-        ),
+        help=_("Show full fingerprint in console (long and less convenient for screen readers)."),
     ),
 ) -> None:
     """Generate a Chromaprint fingerprint for an audio file."""
+    _apply_locale(ctx)
     resolved_audio = _resolve_path(audio_path)
     resolved_fpcalc = _resolve_path(fpcalc_path) if fpcalc_path else None
 
@@ -150,7 +203,7 @@ def fingerprint(
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
 
-    typer.echo(f"Durée estimée: {result.duration_seconds:.2f} s")
+    typer.echo(_("Estimated duration: {duration:.2f} s").format(duration=result.duration_seconds))
 
     if output is not None:
         resolved_output = _resolve_path(output)
@@ -161,53 +214,61 @@ def fingerprint(
             "fpcalc_path": str(resolved_fpcalc) if resolved_fpcalc else None,
         }
         resolved_output.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
-        typer.echo(f"Empreinte sauvegardée dans {resolved_output}")
+        typer.echo(_("Fingerprint saved to {path}").format(path=resolved_output))
 
     if show_fingerprint:
-        typer.echo("Empreinte Chromaprint:")
+        typer.echo(_("Chromaprint fingerprint:"))
         typer.echo(result.fingerprint)
 
 
-@app.command(help="Identifie un morceau via l'API AcoustID.")
+@app.command(help=_("Identify a track using the AcoustID API."))
 def identify(
-    audio_path: Path = typer.Argument(..., help="Chemin du fichier audio à identifier."),
+    ctx: typer.Context,
+    audio_path: Path = typer.Argument(
+        ...,
+        help=_("Path to the audio file to identify."),
+    ),
     fpcalc_path: Path | None = typer.Option(
         None,
         "--fpcalc-path",
-        help="Chemin explicite vers l'exécutable fpcalc si Chromaprint n'est pas dans PATH.",
+        help=_("Explicit path to the fpcalc executable when Chromaprint is not on PATH."),
     ),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
-        help="Clé API AcoustID à utiliser (prioritaire sur la configuration).",
+        help=_("AcoustID API key to use (takes priority over the configuration file)."),
     ),
-    limit: int = typer.Option(3, "--limit", min=1, max=10, help="Nombre de résultats à afficher."),
+    limit: int = typer.Option(
+        3,
+        "--limit",
+        min=1,
+        max=10,
+        help=_("Number of results to display."),
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
-        help=(
-            "Affiche les résultats au format JSON "
-            "(utile pour automatiser ou consommer via lecteur d'écran)."
-        ),
+        help=_("Display the results as JSON (useful for scripting or screen readers)."),
     ),
     template: str | None = typer.Option(
         None,
         "--template",
-        help="Modèle d'affichage (placeholders: {artist}, {title}, {album}, {score}, ...).",
+        help=_("Output template (placeholders: {artist}, {title}, {album}, {score}, ...)."),
     ),
     refresh: bool = typer.Option(
         False,
         "--refresh",
-        help="Ignore le cache local et force un nouvel appel à l'API.",
+        help=_("Ignore the local cache and force a new API request."),
     ),
     config_path: Path | None = typer.Option(
         None,
         "--config-path",
         hidden=True,
-        help="Chemin personnalisé du fichier de configuration (tests).",
+        help=_("Custom configuration file path (tests)."),
     ),
 ) -> None:
     """Identify a track with the AcoustID API."""
+    _apply_locale(ctx)
     resolved_audio = _resolve_path(audio_path)
     resolved_fpcalc = _resolve_path(fpcalc_path) if fpcalc_path else None
 
@@ -217,21 +278,24 @@ def identify(
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
 
+    _apply_locale(ctx, config=config)
+
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
-        typer.echo("Aucune clé API AcoustID configurée.")
-        if _prompt_yes_no("Souhaitez-vous l'enregistrer maintenant ?", default=True):
+        typer.echo(_("No AcoustID API key configured."))
+        if _prompt_yes_no(_("Would you like to save it now?"), default=True):
             new_key = _configure_api_key_interactively(config, config_path)
             if not new_key:
-                typer.echo("Aucune clé n'a été enregistrée. Opération annulée.")
+                typer.echo(_("No key was stored. Operation cancelled."))
                 raise typer.Exit(code=1)
             key = new_key
             try:
                 config = load_config(config_path)
             except RuntimeError:
                 config = AppConfig(acoustid_api_key=key)
+            _apply_locale(ctx, config=config)
         else:
-            typer.echo("Opération annulée.")
+            typer.echo(_("Operation cancelled."))
             raise typer.Exit(code=1)
 
     try:
@@ -265,7 +329,7 @@ def identify(
         matches = list(matches)
 
     if not matches:
-        typer.echo("Aucune correspondance trouvée.")
+        typer.echo(_("No matches found."))
         cache.save()
         return
 
@@ -280,113 +344,122 @@ def identify(
     template_value = _resolve_template(template, config)
 
     for idx, match in enumerate(matches, start=1):
-        typer.echo(f"Résultat {idx}: score {match.score:.2f}")
+        typer.echo(_("Result {index}: score {score:.2f}").format(index=idx, score=match.score))
         typer.echo(f"  {_format_match_template(match, template_value)}")
         if match.release_group_title:
-            typer.echo(f"  Album: {match.release_group_title}")
+            typer.echo(_("  Album: {value}").format(value=match.release_group_title))
         elif match.releases:
             primary = match.releases[0]
-            album = primary.title or "Album inconnu"
+            album = primary.title or _("Unknown album")
             suffix = f" ({primary.date})" if primary.date else ""
-            typer.echo(f"  Album: {album}{suffix}")
-        typer.echo(f"  Recording ID: {match.recording_id}")
+            typer.echo(_("  Album: {value}{suffix}").format(value=album, suffix=suffix))
+        typer.echo(_("  Recording ID: {identifier}").format(identifier=match.recording_id))
         if match.release_group_id:
-            typer.echo(f"  Release Group ID: {match.release_group_id}")
+            typer.echo(
+                _("  Release Group ID: {identifier}").format(identifier=match.release_group_id)
+            )
 
     cache.save()
 
 
 @app.command(
     "identify-batch",
-    help="Identifie les fichiers audio d'un dossier et enregistre les résultats.",
+    help=_("Identify audio files in a directory and persist the results."),
 )
 def identify_batch(
-    directory: Path = typer.Argument(..., help="Dossier contenant les fichiers audio."),
+    ctx: typer.Context,
+    directory: Path = typer.Argument(
+        ...,
+        help=_("Directory containing the audio files."),
+    ),
     fpcalc_path: Path | None = typer.Option(
         None,
         "--fpcalc-path",
-        help="Chemin explicite vers l'exécutable fpcalc si Chromaprint n'est pas dans PATH.",
+        help=_("Explicit path to the fpcalc executable when Chromaprint is not on PATH."),
     ),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
-        help="Clé API AcoustID à utiliser (prioritaire sur la configuration).",
+        help=_("AcoustID API key to use (takes priority over the configuration file)."),
     ),
     limit: int = typer.Option(
         3,
         "--limit",
         min=1,
         max=10,
-        help="Nombre de propositions à conserver.",
+        help=_("Number of proposals to keep for each file."),
     ),
     best_only: bool = typer.Option(
         False,
         "--best-only",
-        help="Enregistre uniquement la meilleure proposition pour chaque fichier.",
+        help=_("Store only the best proposal for each file."),
     ),
     recursive: bool = typer.Option(
         False,
         "--recursive/--no-recursive",
-        help="Active la recherche récursive dans les sous-dossiers.",
+        help=_("Search recursively in sub-directories."),
     ),
     pattern: list[str] = typer.Option(
         [],
         "--pattern",
-        help="Motif glob à appliquer (peut être répété).",
+        help=_("Glob pattern to apply (can be repeated)."),
     ),
     extension: list[str] = typer.Option(
         [],
         "--ext",
         "--extension",
-        help="Extension de fichier à inclure (ex: mp3). Peut être répétée.",
+        help=_("File extension to include (e.g. mp3). Can be repeated."),
     ),
     log_file: Path | None = typer.Option(
         None,
         "--log-file",
         "-o",
-        help="Fichier de sortie du rapport (défaut: recozik-batch.log).",
+        help=_("Report output file (default: recozik-batch.log)."),
     ),
     append: bool = typer.Option(
         False,
         "--append/--overwrite",
-        help="Ajoute à la fin du log existant au lieu de recréer le fichier.",
+        help=_("Append to the existing log instead of recreating it."),
     ),
     log_format: str | None = typer.Option(
         None,
         "--log-format",
-        help="Format du log: text ou jsonl.",
+        help=_("Log format: text or jsonl."),
     ),
     template: str | None = typer.Option(
         None,
         "--template",
-        help="Modèle d'affichage des propositions ({artist}, {title}, {album}, {score}, ...).",
+        help=_("Template for proposals ({artist}, {title}, {album}, {score}, ...)."),
     ),
     refresh: bool = typer.Option(
         False,
         "--refresh",
-        help="Ignore le cache local et force un nouvel appel à l'API.",
+        help=_("Ignore the local cache and force a new API call."),
     ),
     metadata_fallback: bool | None = typer.Option(
         None,
         "--metadata-fallback/--no-metadata-fallback",
-        help="Utilise les métadonnées embarquées lorsqu'AcoustID ne retourne aucune correspondance.",
+        help=_(
+            "Use embedded metadata when AcoustID returns no match; follows configuration defaults."
+        ),
     ),
     absolute_paths: bool | None = typer.Option(
         None,
         "--absolute-paths/--relative-paths",
-        help="Contrôle l'affichage des chemins dans le log (écrase la config).",
+        help=_("Control how paths are written in the log (overrides configuration)."),
     ),
     config_path: Path | None = typer.Option(
         None,
         "--config-path",
         hidden=True,
-        help="Chemin personnalisé du fichier de configuration (tests).",
+        help=_("Custom configuration file path (tests)."),
     ),
 ) -> None:
     """Identify audio files in a directory and record the results."""
+    _apply_locale(ctx)
     resolved_dir = _resolve_path(directory)
     if not resolved_dir.is_dir():
-        typer.echo(f"Dossier introuvable: {resolved_dir}")
+        typer.echo(_("Directory not found: {path}").format(path=resolved_dir))
         raise typer.Exit(code=1)
 
     try:
@@ -395,27 +468,30 @@ def identify_batch(
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
 
+    _apply_locale(ctx, config=config)
+
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
-        typer.echo("Aucune clé API AcoustID configurée.")
-        if _prompt_yes_no("Souhaitez-vous l'enregistrer maintenant ?", default=True):
+        typer.echo(_("No AcoustID API key configured."))
+        if _prompt_yes_no(_("Would you like to save it now?"), default=True):
             new_key = _configure_api_key_interactively(config, config_path)
             if not new_key:
-                typer.echo("Aucune clé n'a été enregistrée. Opération annulée.")
+                typer.echo(_("No key was stored. Operation cancelled."))
                 raise typer.Exit(code=1)
             key = new_key
             try:
                 config = load_config(config_path)
             except RuntimeError:
                 config = AppConfig(acoustid_api_key=key)
+            _apply_locale(ctx, config=config)
         else:
-            typer.echo("Opération annulée.")
+            typer.echo(_("Operation cancelled."))
             raise typer.Exit(code=1)
 
     template_value = _resolve_template(template, config)
     log_format_value = (log_format or config.log_format).lower()
     if log_format_value not in {"text", "jsonl"}:
-        typer.echo("Format de log invalide. Utilisez 'text' ou 'jsonl'.")
+        typer.echo(_("Invalid log format. Use 'text' or 'jsonl'."))
         raise typer.Exit(code=1)
 
     use_absolute = config.log_absolute_paths if absolute_paths is None else absolute_paths
@@ -435,7 +511,7 @@ def identify_batch(
     files.sort()
 
     if not files:
-        typer.echo("Aucun fichier audio correspondant.")
+        typer.echo(_("No audio files matched the selection."))
         return
 
     resolved_fpcalc = _resolve_path(fpcalc_path) if fpcalc_path else None
@@ -532,12 +608,14 @@ def identify_batch(
                     template_value,
                     fingerprint_result,
                     status="unmatched",
-                    note="Aucune correspondance.",
+                    note=_("No match."),
                     metadata=metadata_payload,
                 )
                 if metadata_payload:
                     typer.echo(
-                        f"Aucune correspondance pour {relative_display}, métadonnées locales enregistrées."
+                        _("No match for {path}, embedded metadata recorded in the log.").format(
+                            path=relative_display
+                        )
                     )
                 unmatched += 1
                 continue
@@ -556,90 +634,89 @@ def identify_batch(
             success += 1
 
     cache.save()
+    typer.echo(_("Processing complete."))
     typer.echo(
-        "Traitement terminé: "
-        f"{success} fichier(s) identifiés, "
-        f"{unmatched} non reconnu(s), "
-        f"{failures} en erreur. Log: {log_path}"
+        _("Results: {identified} identified, {unmatched} unmatched, {failed} failures.").format(
+            identified=success,
+            unmatched=unmatched,
+            failed=failures,
+        )
     )
+    typer.echo(_("Log: {path}").format(path=log_path))
 
 
 @app.command(
     "rename-from-log",
-    help="Renomme les fichiers à partir d'un log JSONL produit par `identify-batch`.",
+    help=_("Rename files using a JSONL log produced by `identify-batch`."),
 )
 def rename_from_log(
-    log_path: Path = typer.Argument(..., help="Log JSONL généré par `identify-batch`."),
+    ctx: typer.Context,
+    log_path: Path = typer.Argument(
+        ...,
+        help=_("JSONL log generated by `identify-batch`."),
+    ),
     root: Path | None = typer.Option(
         None,
         "--root",
-        help="Répertoire racine contenant les fichiers à renommer (défaut: dossier du log).",
+        help=_("Root directory containing the files to rename (defaults to the log directory)."),
     ),
     template: str | None = typer.Option(
         None,
         "--template",
-        help=(
-            "Modèle de renommage ({artist}, {title}, {album}, {score}, "
-            "{recording_id}, {ext}, {stem})."
-        ),
+        help=_("Rename template ({artist}, {title}, {album}, {score}, ...)."),
     ),
     dry_run: bool = typer.Option(
         True,
         "--dry-run/--apply",
-        help=(
-            "Affiche les renommages sans les exécuter (par défaut). "
-            "Utilisez --apply pour appliquer."
-        ),
+        help=_("Preview rename operations only (default). Use --apply to commit changes."),
     ),
     interactive: bool = typer.Option(
         False,
         "--interactive/--no-interactive",
-        help=("Propose un choix interactif quand plusieurs correspondances sont disponibles."),
+        help=_("Offer an interactive choice when multiple matches are available."),
     ),
     confirm: bool = typer.Option(
         False,
         "--confirm/--no-confirm",
-        help="Demande une confirmation pour chaque fichier avant renommage.",
+        help=_("Ask for confirmation before renaming each file."),
     ),
     on_conflict: str = typer.Option(
         "append",
         "--on-conflict",
-        help="Gestion des collisions: append (défaut), skip, overwrite.",
+        help=_("Collision handling strategy: append (default), skip, overwrite."),
     ),
     backup_dir: Path | None = typer.Option(
         None,
         "--backup-dir",
-        help="Dossier dans lequel copier les originaux avant renommage (optionnel).",
+        help=_("Directory where originals are copied before renaming (optional)."),
     ),
     export_path: Path | None = typer.Option(
         None,
         "--export",
-        help="Chemin d'un fichier JSON résumant les renommages planifiés.",
+        help=_("Path to a JSON file summarising the planned renames."),
     ),
     metadata_fallback: bool | None = typer.Option(
         None,
         "--metadata-fallback/--no-metadata-fallback",
-        help="Utilise les métadonnées du fichier pour renommer lorsqu'aucune proposition n'est disponible.",
+        help=_("Use embedded metadata when no proposal is available."),
     ),
     metadata_fallback_confirm: bool = typer.Option(
         True,
         "--metadata-fallback-confirm/--metadata-fallback-no-confirm",
-        help=(
-            "Demande une confirmation lorsqu'un renommage repose uniquement sur les métadonnées intégrées. "
-            "Utilisez --metadata-fallback-no-confirm pour automatiser."
-        ),
+        help=_("Confirm renames based on embedded metadata (use --metadata-fallback-no-confirm)."),
     ),
     config_path: Path | None = typer.Option(
         None,
         "--config-path",
         hidden=True,
-        help="Chemin personnalisé du fichier de configuration (tests).",
+        help=_("Custom configuration file path (tests)."),
     ),
 ) -> None:
     """Rename files using a JSONL log generated by ``identify-batch``."""
+    _apply_locale(ctx)
     resolved_log = _resolve_path(log_path)
     if not resolved_log.is_file():
-        typer.echo(f"Log introuvable: {resolved_log}")
+        typer.echo(_("Log file not found: {path}").format(path=resolved_log))
         raise typer.Exit(code=1)
 
     root_path = _resolve_path(root) if root else resolved_log.parent
@@ -650,10 +727,12 @@ def rename_from_log(
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
 
+    _apply_locale(ctx, config=config)
+
     template_value = _resolve_template(template, config)
     conflict_strategy = on_conflict.lower()
     if conflict_strategy not in {"append", "skip", "overwrite"}:
-        typer.echo("Valeur --on-conflict invalide. Choisissez append, skip ou overwrite.")
+        typer.echo(_("Invalid --on-conflict value. Choose append, skip, or overwrite."))
         raise typer.Exit(code=1)
 
     use_metadata_fallback = (
@@ -667,7 +746,7 @@ def rename_from_log(
         raise typer.Exit(code=1) from exc
 
     if not entries:
-        typer.echo("Aucune entrée dans le log.")
+        typer.echo(_("No entries found in the log."))
         return
 
     backup_path = _resolve_path(backup_dir) if backup_dir else None
@@ -685,7 +764,7 @@ def rename_from_log(
         raw_path = entry.get("path")
         if not raw_path:
             errors += 1
-            typer.echo("Entrée sans chemin: ignorée.")
+            typer.echo(_("Entry without a path: skipped."))
             continue
 
         source_path = Path(raw_path)
@@ -694,7 +773,7 @@ def rename_from_log(
 
         if not source_path.exists():
             errors += 1
-            typer.echo(f"Fichier introuvable, ignoré: {source_path}")
+            typer.echo(_("File not found, skipped: {path}").format(path=source_path))
             continue
 
         status = entry.get("status")
@@ -707,14 +786,16 @@ def rename_from_log(
         if status == "unmatched" and not matches:
             if use_metadata_fallback and metadata_entry:
                 typer.echo(
-                    f"Aucune correspondance AcoustID pour {source_path}, utilisation des métadonnées intégrées."
+                    _("No AcoustID match for {path}, using embedded metadata.").format(
+                        path=source_path
+                    )
                 )
                 matches = [_build_metadata_match(metadata_entry)]
             else:
                 skipped += 1
                 context = f" ({note})" if note else ""
                 typer.echo(
-                    f"Aucune proposition pour: {source_path}{context}"
+                    _("No proposal for: {path}{context}").format(path=source_path, context=context)
                 )
                 continue
 
@@ -722,31 +803,39 @@ def rename_from_log(
             if matches:
                 skipped += 1
                 typer.echo(
-                    f"Entrée en erreur, ignorée: {source_path} ({error_message})"
+                    _("Entry with error, skipped: {path} ({error})").format(
+                        path=source_path, error=error_message
+                    )
                 )
                 continue
             if use_metadata_fallback and metadata_entry:
                 typer.echo(
-                    f"Aucune correspondance AcoustID pour {source_path}, utilisation des métadonnées intégrées."
+                    _("No AcoustID match for {path}, using embedded metadata.").format(
+                        path=source_path
+                    )
                 )
                 matches = [_build_metadata_match(metadata_entry)]
                 error_message = None
             else:
                 skipped += 1
                 typer.echo(
-                    f"Entrée en erreur, ignorée: {source_path} ({error_message})"
+                    _("Entry with error, skipped: {path} ({error})").format(
+                        path=source_path, error=error_message
+                    )
                 )
                 continue
 
         if not matches:
             if use_metadata_fallback and metadata_entry:
                 typer.echo(
-                    f"Aucune correspondance AcoustID pour {source_path}, utilisation des métadonnées intégrées."
+                    _("No AcoustID match for {path}, using embedded metadata.").format(
+                        path=source_path
+                    )
                 )
                 matches = [_build_metadata_match(metadata_entry)]
             else:
                 skipped += 1
-                typer.echo(f"Aucune proposition pour: {source_path}")
+                typer.echo(_("No proposal for: {path}").format(path=source_path))
                 continue
 
         selected_match_index = 0
@@ -754,7 +843,9 @@ def rename_from_log(
             selected_match_index = _prompt_match_selection(matches, source_path)
             if selected_match_index is None:
                 skipped += 1
-                typer.echo(f"Aucune sélection faite pour {source_path.name}, passage.")
+                typer.echo(
+                    _("No selection made for {name}; skipping.").format(name=source_path.name)
+                )
                 continue
 
         match_data = matches[selected_match_index]
@@ -772,7 +863,7 @@ def rename_from_log(
         target_path = source_path.with_name(new_name)
         if target_path == source_path:
             skipped += 1
-            typer.echo(f"Déjà au bon nom: {source_path.name}")
+            typer.echo(_("Already named correctly: {name}").format(name=source_path.name))
             continue
 
         final_target = _resolve_conflict_path(
@@ -785,41 +876,55 @@ def rename_from_log(
 
         if final_target is None:
             skipped += 1
-            typer.echo(f"Collision non résolue, fichier ignoré: {source_path.name}")
+            typer.echo(
+                _("Unresolved collision, file skipped: {name}").format(name=source_path.name)
+            )
             continue
 
         metadata_confirmation_done = False
 
         if is_metadata_match and metadata_fallback_confirm:
-            question = (
-                "Confirmer le renommage basé sur les métadonnées: "
-                f"{source_path.name} -> {final_target.name} ?"
+            question = _("Confirm rename based on embedded metadata: {source} -> {target}?").format(
+                source=source_path.name, target=final_target.name
             )
             if not _prompt_yes_no(question, default=True):
                 skipped += 1
                 typer.echo(
-                    f"Renommage par métadonnées ignoré pour {source_path.name}"
+                    _("Metadata-based rename skipped for {name}.").format(name=source_path.name)
                 )
                 continue
             metadata_confirmation_done = True
 
         if confirm and not metadata_confirmation_done:
-            question = f"Renommer {source_path.name} -> {final_target.name} ?"
+            question = _("Rename {source} -> {target}?").format(
+                source=source_path.name,
+                target=final_target.name,
+            )
             if not _prompt_yes_no(question, default=True):
                 skipped += 1
-                typer.echo(f"Renommage ignoré pour {source_path.name}")
+                typer.echo(_("Rename skipped for {name}").format(name=source_path.name))
                 continue
 
         planned.append((source_path, final_target, match_data))
         occupied.add(final_target)
 
     if not planned:
-        typer.echo(f"Aucun renommage à effectuer ({skipped} ignoré(s), {errors} en erreur).")
+        typer.echo(
+            _("No rename performed ({skipped} skipped, {errors} errors).").format(
+                skipped=skipped, errors=errors
+            )
+        )
         return
 
     for source_path, target_path, match_data in planned:
-        action = "DRY-RUN" if dry_run else "RENOMME"
-        typer.echo(f"{action}: {source_path} -> {target_path}")
+        action = "DRY-RUN" if dry_run else "RENAMED"
+        typer.echo(
+            _("{action}: {source} -> {target}").format(
+                action=action,
+                source=source_path,
+                target=target_path,
+            )
+        )
 
         if dry_run:
             export_entries.append(
@@ -855,14 +960,16 @@ def rename_from_log(
 
     if dry_run:
         typer.echo(
-            "Dry-run terminé: "
-            f"{len(planned)} renommage(s) potentiel(s), "
-            f"{skipped} ignoré(s), {errors} en erreur. "
-            "Utilisez --apply pour exécuter."
+            _(
+                "Dry-run complete: {planned} potential renames, {skipped} skipped, {errors} errors."
+            ).format(planned=len(planned), skipped=skipped, errors=errors)
         )
+        typer.echo(_("Use --apply to run the renames."))
     else:
         typer.echo(
-            f"Renommage terminé: {renamed} fichier(s), {skipped} ignoré(s), {errors} en erreur."
+            _("Renaming complete: {renamed} file(s), {skipped} skipped, {errors} errors.").format(
+                renamed=renamed, skipped=skipped, errors=errors
+            )
         )
 
     if export_path and export_entries:
@@ -872,48 +979,50 @@ def rename_from_log(
             json.dumps(export_entries, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        typer.echo(f"Résumé écrit dans {resolved_export}")
+        typer.echo(_("Summary written to {path}").format(path=resolved_export))
 
 
 @completion_app.command(
     "install",
-    help="Installe le script d'auto-complétion pour le shell courant.",
+    help=_("Install the shell completion script for the current shell."),
 )
 def completion_install(
+    ctx: typer.Context,
     shell: str | None = typer.Option(
         None,
         "--shell",
         "-s",
-        help="Shell cible (bash, zsh, fish, powershell/pwsh). Détection automatique sinon.",
+        help=_("Target shell (bash, zsh, fish, powershell/pwsh). Autodetected if omitted."),
     ),
     print_command: bool = typer.Option(
         False,
         "--print-command",
-        help="Affiche uniquement la commande à ajouter dans le profil sans texte supplémentaire.",
+        help=_("Print only the command to add to your shell profile."),
     ),
     no_write: bool = typer.Option(
         False,
         "--no-write",
-        help="Génère le script sur la sortie standard sans créer/modifier de fichier.",
+        help=_("Output the completion script to stdout without writing files."),
     ),
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Écrit le script de complétion dans un fichier spécifique (chemin absolu ou relatif).",
+        help=_("Write the completion script to a specific file (absolute or relative path)."),
     ),
 ) -> None:
     """Install the shell completion script for the current shell."""
+    _apply_locale(ctx)
     target_shell = _normalize_shell(shell)
 
     if sum(bool(flag) for flag in (print_command, no_write, output is not None)) > 1:
-        typer.echo("Choisissez une seule option parmi --print-command, --no-write ou --output.")
+        typer.echo(_("Use only one of --print-command, --no-write, or --output."))
         raise typer.Exit(code=1)
 
     if no_write:
         detected_shell = _detect_shell(target_shell)
         if not detected_shell:
-            typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
+            typer.echo(_("Unable to detect the shell. Provide --shell (bash/zsh/fish/pwsh)."))
             raise typer.Exit(code=1)
 
         script = generate_completion_script(
@@ -927,7 +1036,7 @@ def completion_install(
     if output is not None:
         detected_shell = _detect_shell(target_shell)
         if not detected_shell:
-            typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
+            typer.echo(_("Unable to detect the shell. Provide --shell (bash/zsh/fish/pwsh)."))
             raise typer.Exit(code=1)
 
         script = generate_completion_script(
@@ -938,14 +1047,14 @@ def completion_install(
         resolved_path = _resolve_path(output)
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
         resolved_path.write_text(script, encoding="utf-8")
-        typer.echo(f"Script de complétion écrit dans {resolved_path}")
-        typer.echo("Ajoutez-le manuellement à votre configuration de shell si nécessaire.")
+        typer.echo(_("Completion script written to {path}").format(path=resolved_path))
+        typer.echo(_("Add it to your shell configuration if needed."))
         return
 
     try:
         detected_shell, script_path = install_completion(shell=target_shell, prog_name="recozik")
     except click.exceptions.Exit as exc:
-        typer.echo("Shell non pris en charge pour l'auto-complétion.")
+        typer.echo(_("Shell not supported for auto-completion."))
         raise typer.Exit(code=1) from exc
 
     command = _completion_source_command(detected_shell, script_path)
@@ -957,29 +1066,31 @@ def completion_install(
             typer.echo(str(script_path))
         return
 
-    typer.echo(f"Complétion installée pour {detected_shell}.")
+    typer.echo(_("Completion installed for {shell}.").format(shell=detected_shell))
     typer.echo(f"Script: {script_path}")
     if command:
-        typer.echo(f"Commande à ajouter: {command}")
+        typer.echo(_("Command to add: {command}").format(command=command))
     typer.echo(_completion_hint(detected_shell, script_path))
 
 
 @completion_app.command(
     "show",
-    help="Affiche le script d'auto-complétion généré.",
+    help=_("Display the generated auto-completion script."),
 )
 def completion_show(
+    ctx: typer.Context,
     shell: str | None = typer.Option(
         None,
         "--shell",
         "-s",
-        help="Shell cible (bash, zsh, fish, powershell/pwsh). Détection automatique sinon.",
+        help=_("Target shell (bash, zsh, fish, powershell/pwsh). Autodetected if omitted."),
     ),
 ) -> None:
     """Display the generated shell-completion script."""
+    _apply_locale(ctx)
     detected_shell = _detect_shell(shell)
     if not detected_shell:
-        typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
+        typer.echo(_("Unable to detect the shell. Provide --shell (bash/zsh/fish/pwsh)."))
         raise typer.Exit(code=1)
 
     script = generate_completion_script(
@@ -992,28 +1103,30 @@ def completion_show(
 
 @completion_app.command(
     "uninstall",
-    help="Supprime le script d'auto-complétion installé par recozik.",
+    help=_("Remove the auto-completion script installed by Recozik."),
 )
 def completion_uninstall(
+    ctx: typer.Context,
     shell: str | None = typer.Option(
         None,
         "--shell",
         "-s",
-        help="Shell cible (bash, zsh, fish, powershell/pwsh). Détection automatique sinon.",
+        help=_("Target shell (bash, zsh, fish, powershell/pwsh). Autodetected if omitted."),
     ),
 ) -> None:
     """Remove the shell-completion script installed by recozik."""
+    _apply_locale(ctx)
     detected_shell = _detect_shell(shell)
     if not detected_shell:
-        typer.echo("Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh).")
+        typer.echo(_("Unable to detect the shell. Provide --shell (bash/zsh/fish/pwsh)."))
         raise typer.Exit(code=1)
 
     script_path = _completion_script_path(detected_shell)
     if script_path and script_path.exists():
         script_path.unlink()
-        typer.echo(f"Script de complétion supprimé: {script_path}")
+        typer.echo(_("Completion script removed: {path}").format(path=script_path))
     else:
-        typer.echo("Aucun script de complétion spécifique à supprimer.")
+        typer.echo(_("No completion script to remove."))
 
     typer.echo(_completion_uninstall_hint(detected_shell))
 
@@ -1044,7 +1157,7 @@ def _detect_shell(shell: str | None) -> str | None:
 
     try:
         detected_shell, _ = completion_shellingham.detect_shell()
-    except Exception:  # pragma: no cover - dépend du système
+    except Exception:  # pragma: no cover - depends on the system
         return None
 
     return _normalize_shell(detected_shell)
@@ -1054,18 +1167,18 @@ def _completion_hint(shell: str, script_path: Path) -> str:
     command = _completion_source_command(shell, script_path)
     if command:
         if shell in {"bash", "zsh"}:
-            return (
-                f"Exécutez `{command}` ou ajoutez cette ligne à votre fichier "
-                "de profil (ex. ~/.bashrc, ~/.zshrc)."
-            )
+            return _(
+                "Run `{command}` or add this line to your profile file (e.g. ~/.bashrc, ~/.zshrc)."
+            ).format(command=command)
         if shell == "fish":
-            return f"Relancez `fish` ou exécutez `{command}` pour activer la complétion."
-        if shell in {"powershell", "pwsh"}:
-            return (
-                f"Ajoutez `{command}` à votre `$PROFILE` (PowerShell) "
-                "pour charger automatiquement la complétion."
+            return _("Restart `fish` or run `{command}` to activate completion.").format(
+                command=command
             )
-    return "La complétion est installée. Rechargez votre terminal pour l'utiliser."
+        if shell in {"powershell", "pwsh"}:
+            return _(
+                "Add `{command}` to your `$PROFILE` (PowerShell) to load completion automatically."
+            ).format(command=command)
+    return _("Completion installed. Restart your terminal to use it.")
 
 
 def _completion_source_command(shell: str, script_path: Path) -> str | None:
@@ -1092,13 +1205,13 @@ def _powershell_profile_path(shell: str) -> Path | None:
     shell_bin = "pwsh" if shell == "pwsh" else "powershell"
     try:
         command = [shell_bin, "-NoProfile", "-Command", "echo", "$profile"]
-        result = subprocess.run(  # noqa: S603 - arguments forcés en liste contrôlée
+        result = subprocess.run(  # noqa: S603 - controlled argument list
             command,
             check=True,
             capture_output=True,
             text=True,
         )
-    except FileNotFoundError:  # pragma: no cover - dépend de l'environnement
+    except FileNotFoundError:  # pragma: no cover - environment dependent
         return None
 
     output = result.stdout.strip()
@@ -1109,22 +1222,16 @@ def _powershell_profile_path(shell: str) -> Path | None:
 
 def _completion_uninstall_hint(shell: str) -> str:
     if shell == "bash":
-        return (
-            "Si besoin, supprimez la ligne `source ~/.bash_completions/recozik.sh` "
-            "de votre ~/.bashrc."
+        return _(
+            "Remove the line `source ~/.bash_completions/recozik.sh` from ~/.bashrc if necessary."
         )
     if shell == "zsh":
-        return (
-            "Vérifiez votre ~/.zshrc et retirez la ligne ajoutant ~/.zfunc "
-            "si vous ne l'utilisez plus."
-        )
+        return _("Check ~/.zshrc and remove the line adding ~/.zfunc if you no longer use it.")
     if shell == "fish":
-        return "Redémarrez fish pour prendre en compte la suppression."
+        return _("Restart fish to apply the removal.")
     if shell in {"powershell", "pwsh"}:
-        return (
-            "Éditez votre fichier $PROFILE pour retirer le bloc de complétion ajouté par recozik."
-        )
-    return "Complétion désinstallée."
+        return _("Edit your $PROFILE file to remove the completion block added by Recozik.")
+    return _("Completion uninstalled.")
 
 
 class _SafeDict(dict):
@@ -1160,8 +1267,8 @@ def _build_match_context(match: AcoustIDMatch) -> dict[str, str]:
         release_id = match.releases[0].release_id
 
     return {
-        "artist": match.artist or "Artiste inconnu",
-        "title": match.title or "Titre inconnu",
+        "artist": match.artist or _("Unknown artist"),
+        "title": match.title or _("Unknown title"),
         "album": album or "",
         "release_id": release_id or "",
         "recording_id": match.recording_id or "",
@@ -1293,19 +1400,20 @@ def _load_jsonl_log(path: Path) -> list[dict]:
                 payload = json.loads(stripped)
             except json.JSONDecodeError as exc:
                 raise ValueError(
-                    "Le log doit être au format JSONL "
-                    "(réexécutez `identify-batch` avec --log-format jsonl)."
+                    _("The log must be JSONL (rerun `identify-batch` with --log-format jsonl).")
                 ) from exc
             if not isinstance(payload, dict):
-                raise ValueError(f"Entrée invalide au format JSONL (ligne {line_number}).")
+                raise ValueError(
+                    _("Invalid JSONL entry (line {number}).").format(number=line_number)
+                )
             entries.append(payload)
     return entries
 
 
 def _render_log_template(match: dict, template: str, source_path: Path) -> str:
     context = {
-        "artist": match.get("artist") or "Artiste inconnu",
-        "title": match.get("title") or "Titre inconnu",
+        "artist": match.get("artist") or _("Unknown artist"),
+        "title": match.get("title") or _("Unknown title"),
         "album": match.get("album") or "",
         "score": _format_score(match.get("score")),
         "recording_id": match.get("recording_id") or "",
@@ -1332,12 +1440,12 @@ def _format_score(value: object) -> str:
 
 
 def _extract_audio_metadata(path: Path) -> dict[str, str] | None:
-    if mutagen is None:  # pragma: no cover - dépend des installations
+    if mutagen is None:  # pragma: no cover - depends on installed packages
         return None
 
     try:
         audio = mutagen.File(path, easy=True)  # type: ignore[attr-defined]
-    except Exception:  # pragma: no cover - sécurité supplémentaire
+    except Exception:  # pragma: no cover - defensive safety
         return None
 
     if audio is None:
@@ -1361,7 +1469,8 @@ def _extract_audio_metadata(path: Path) -> dict[str, str] | None:
             return None
         try:
             candidate = str(tag_value).strip()
-        except Exception:  # pragma: no cover - conversion prudente
+        except Exception as exc:  # pragma: no cover - defensive conversion
+            _LOGGER.debug("Failed to normalize tag value %r: %s", tag_value, exc)
             return None
         return candidate or None
 
@@ -1372,7 +1481,6 @@ def _extract_audio_metadata(path: Path) -> dict[str, str] | None:
             metadata[key] = value
 
     return metadata or None
-
 
 
 def _coerce_metadata_dict(value: object) -> dict[str, str]:
@@ -1389,17 +1497,17 @@ def _coerce_metadata_dict(value: object) -> dict[str, str]:
         else:
             try:
                 candidate = str(raw).strip()
-            except Exception:  # pragma: no cover - conversion prudente
+            except Exception as exc:  # pragma: no cover - defensive conversion
+                _LOGGER.debug("Skipping metadata value %r for %s: %s", raw, key, exc)
                 continue
         if candidate:
             result[key] = candidate
     return result
 
 
-
 def _build_metadata_match(metadata: dict[str, str]) -> dict[str, object]:
-    artist_value = metadata.get("artist") or "Artiste inconnu"
-    title_value = metadata.get("title") or "Titre inconnu"
+    artist_value = metadata.get("artist") or _("Unknown artist")
+    title_value = metadata.get("title") or _("Unknown title")
     formatted = f"{artist_value} - {title_value}"
     return {
         "score": None,
@@ -1470,14 +1578,21 @@ def _compute_backup_path(source: Path, root: Path, backup_root: Path) -> Path:
 
 
 def _prompt_match_selection(matches: list[dict], source_path: Path) -> int | None:
-    typer.echo(f"Plusieurs propositions pour {source_path.name}:")
+    typer.echo(_("Multiple proposals for {name}:").format(name=source_path.name))
     for idx, match in enumerate(matches, start=1):
-        artist = match.get("artist") or "Artiste inconnu"
-        title = match.get("title") or "Titre inconnu"
+        artist = match.get("artist") or _("Unknown artist")
+        title = match.get("title") or _("Unknown title")
         score = _format_score(match.get("score"))
-        typer.echo(f"  {idx}. {artist} - {title} (score {score})")
+        typer.echo(
+            _("  {index}. {artist} - {title} (score {score})").format(
+                index=idx,
+                artist=artist,
+                title=title,
+                score=score,
+            )
+        )
 
-    prompt = "Sélectionnez un numéro (ENTER pour annuler) : "
+    prompt = _("Select a number (press ENTER to cancel): ")
 
     while True:
         choice = typer.prompt(prompt, default="", show_default=False).strip()
@@ -1487,19 +1602,19 @@ def _prompt_match_selection(matches: list[dict], source_path: Path) -> int | Non
         try:
             idx = int(choice)
         except ValueError:
-            typer.echo("Sélection invalide, veuillez réessayer.")
+            typer.echo(_("Invalid selection, please try again."))
             continue
 
         if 1 <= idx <= len(matches):
             return idx - 1
 
-        typer.echo("Indice hors plage, veuillez réessayer.")
+        typer.echo(_("Index out of range, please try again."))
 
 
 def _prompt_yes_no(message: str, *, default: bool = True) -> bool:
-    suffix = "[o/N]" if not default else "[O/n]"
+    suffix = _("[y/N]") if not default else _("[Y/n]")
     prompt = f"{message} {suffix}"
-    default_char = "o" if default else "n"
+    default_char = "y" if default else "n"
 
     while True:
         response = typer.prompt(prompt, default=default_char, show_default=False)
@@ -1510,16 +1625,16 @@ def _prompt_yes_no(message: str, *, default: bool = True) -> bool:
             return True
         if normalized in {"n", "non", "no"}:
             return False
-        typer.echo("Réponse invalide (o/n).")
+        typer.echo(_("Invalid input (y/n)."))
 
 
 def _prompt_api_key() -> str | None:
-    key = typer.prompt("Clé API AcoustID", show_default=False).strip()
+    key = typer.prompt(_("AcoustID API key"), show_default=False).strip()
     if not key:
         return None
-    confirmation = typer.prompt("Confirmez la clé", default=key, show_default=False).strip()
+    confirmation = typer.prompt(_("Confirm the key"), default=key, show_default=False).strip()
     if confirmation != key:
-        typer.echo("Les clés ne correspondent pas.")
+        typer.echo(_("The keys do not match."))
         return None
     return key
 
@@ -1532,21 +1647,21 @@ def _validate_client_key(key: str, timeout: float = 5.0) -> tuple[bool, str]:
             timeout=timeout,
         )
     except requests.RequestException as exc:
-        return False, f"Impossible de contacter AcoustID ({exc})."
+        return False, _("Unable to contact AcoustID ({error}).").format(error=exc)
 
     if response.status_code != 200:
-        return False, f"Réponse HTTP inattendue ({response.status_code})."
+        return False, _("Unexpected HTTP response ({status}).").format(status=response.status_code)
 
     try:
         data = response.json()
     except ValueError:
-        return False, "Réponse JSON invalide reçue depuis AcoustID."
+        return False, _("Invalid JSON response received from AcoustID.")
 
     if data.get("status") != "ok":
         error = data.get("message")
         if not error and isinstance(data.get("error"), dict):
             error = data["error"].get("message")
-        return False, error or "Clé refusée par AcoustID."
+        return False, error or _("Key rejected by AcoustID.")
 
     return True, ""
 
@@ -1564,7 +1679,7 @@ def _configure_api_key_interactively(
     if not skip_validation:
         valid, message = _validate_client_key(key)
         if not valid:
-            typer.echo(f"Validation de la clé échouée: {message}")
+            typer.echo(_("Key validation failed: {message}").format(message=message))
             return None
 
     updated = AppConfig(
@@ -1577,30 +1692,34 @@ def _configure_api_key_interactively(
     )
 
     target = write_config(updated, config_path)
-    typer.echo(f"Clé AcoustID enregistrée dans {target}")
+    typer.echo(_("AcoustID key stored in {path}").format(path=target))
     return key
 
 
 @config_app.command(
     "path",
-    help="Affiche le chemin du fichier de configuration actuellement utilisé.",
+    help=_("Display the path to the configuration file in use."),
 )
 def config_path(
+    ctx: typer.Context,
     config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
 ) -> None:
     """Print the configuration file path in use."""
+    _apply_locale(ctx)
     target = config_path or default_config_path()
     typer.echo(str(target))
 
 
 @config_app.command(
     "show",
-    help="Affiche les principaux paramètres de configuration.",
+    help=_("Display the main configuration settings."),
 )
 def config_show(
+    ctx: typer.Context,
     config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
 ) -> None:
     """Show the key configuration settings."""
+    _apply_locale(ctx)
     target = config_path or default_config_path()
     try:
         config = load_config(target)
@@ -1611,42 +1730,54 @@ def config_show(
     key = config.acoustid_api_key
     if key:
         masked = key[:4] + "…" + key[-4:] if len(key) > 8 else "…" * len(key)
-        typer.echo(f"Clé AcoustID: {masked}")
+        typer.echo(_("AcoustID key: {masked}").format(masked=masked))
     else:
-        typer.echo("Clé AcoustID: non configurée")
-        typer.echo("Créez ou mettez à jour votre clé avec `recozik config set-key`.")
-    cache_state = "oui" if config.cache_enabled else "non"
-    typer.echo(f"Cache activé: {cache_state} (TTL: {config.cache_ttl_hours} h)")
+        typer.echo(_("AcoustID key: not configured"))
+        typer.echo(_("Create or update your key with `recozik config set-key`."))
+    cache_state = _("yes") if config.cache_enabled else _("no")
+    typer.echo(
+        _("Cache enabled: {state} (TTL: {hours} h)").format(
+            state=cache_state,
+            hours=config.cache_ttl_hours,
+        )
+    )
     template = config.output_template or "{artist} - {title}"
-    typer.echo(f"Template par défaut: {template}")
-    path_mode = "absolus" if config.log_absolute_paths else "relatifs"
-    typer.echo(f"Format du log: {config.log_format} (chemins {path_mode})")
-    typer.echo(f"Fichier: {target}")
+    typer.echo(_("Default template: {template}").format(template=template))
+    path_mode = _("absolute") if config.log_absolute_paths else _("relative")
+    typer.echo(
+        _("Log format: {format} (paths {mode})").format(
+            format=config.log_format,
+            mode=path_mode,
+        )
+    )
+    typer.echo(_("File: {path}").format(path=target))
 
 
 @config_app.command(
     "set-key",
-    help="Enregistre une clé API AcoustID dans la configuration.",
+    help=_("Store an AcoustID API key in the configuration."),
 )
 def config_set_key(
+    ctx: typer.Context,
     api_key_arg: str | None = typer.Argument(
         None,
-        help="Clé API AcoustID à enregistrer.",
+        help=_("AcoustID API key to record."),
     ),
     api_key_opt: str | None = typer.Option(
         None,
         "--api-key",
         "-k",
-        help="Clé API AcoustID à enregistrer (alternative à l'argument).",
+        help=_("AcoustID API key to record (alternative to the positional argument)."),
     ),
     skip_validation: bool = typer.Option(
         False,
         "--skip-validation/--validate",
-        help="Ignore la vérification en ligne (déconseillé).",
+        help=_("Skip online validation (not recommended)."),
     ),
     config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
 ) -> None:
     """Persist the AcoustID API key into the configuration file."""
+    _apply_locale(ctx)
     target_path = config_path or default_config_path()
     try:
         existing = load_config(target_path)
@@ -1656,20 +1787,20 @@ def config_set_key(
     key = (api_key_opt or api_key_arg or "").strip()
 
     if key:
-        confirmation = typer.prompt("Confirmez la clé", default=key)
+        confirmation = typer.prompt(_("Confirm the key"), default=key)
         if confirmation.strip() != key:
-            typer.echo("Les clés ne correspondent pas. Opération annulée.")
+            typer.echo(_("The keys do not match. Operation cancelled."))
             raise typer.Exit(code=1)
     else:
         key = _prompt_api_key()
         if not key:
-            typer.echo("Aucune clé API fournie.")
+            typer.echo(_("No API key provided."))
             raise typer.Exit(code=1)
 
     if not skip_validation:
         valid, message = _validate_client_key(key)
         if not valid:
-            typer.echo(f"Validation de la clé échouée: {message}")
+            typer.echo(_("Key validation failed: {message}").format(message=message))
             raise typer.Exit(code=1)
 
     updated = AppConfig(
@@ -1682,7 +1813,7 @@ def config_set_key(
     )
 
     target = write_config(updated, config_path)
-    typer.echo(f"Clé AcoustID enregistrée dans {target}")
+    typer.echo(_("AcoustID key stored in {path}").format(path=target))
 
 
 if __name__ == "__main__":  # pragma: no cover

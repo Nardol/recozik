@@ -67,6 +67,14 @@ Vous pouvez vérifier la valeur et le chemin avec `uv run recozik config show`. 
   uv run recozik config set-key --api-key VOTRE_CLE
   ```
 
+## Internationalisation
+- Les chaînes affichées côté terminal sont désormais gérées en anglais côté code et traduites à l'exécution avec `gettext`.
+- Par défaut, recozik tente d'utiliser la locale système. Vous pouvez la surcharger via :
+  - l'option CLI `--locale fr` (prioritaire sur le reste) ;
+  - la variable d'environnement `RECOZIK_LOCALE=fr_FR` ;
+  - la clé `[general] locale = "fr_FR"` dans `config.toml`.
+- Les fichiers de traduction (`.po`/`.mo`) se trouvent sous `src/recozik/locales/`. Consultez [TRANSLATION.md](TRANSLATION.md) pour le workflow de mise à jour (extraction, compilation, bonnes pratiques).
+
 ## Cache et personnalisation
 - Le fichier `config.toml` peut contenir d'autres sections pour ajuster le comportement :
   ```toml

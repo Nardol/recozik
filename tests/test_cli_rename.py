@@ -187,7 +187,6 @@ def test_rename_from_log_invalid_format(tmp_path: Path) -> None:
 
 def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
     """Let the user choose a match interactively before renaming."""
-
     root = tmp_path / "music"
     root.mkdir()
     src = root / "interactive.mp3"
@@ -247,7 +246,6 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
 
 def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
     """Retry selection until a valid input is provided."""
-
     root = tmp_path / "retry"
     root.mkdir()
     src = root / "retry.mp3"
@@ -301,11 +299,10 @@ def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert "Indice hors plage" in result.stdout
-    assert "Sélection invalide" in result.stdout
+    assert "Index out of range" in result.stdout
+    assert "Invalid selection" in result.stdout
     assert not src.exists()
     assert (root / "Artist - Second.mp3").exists()
-
 
 
 def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
@@ -347,8 +344,8 @@ def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert "utilisation des métadonnées" in result.stdout
-    assert "Confirmer le renommage basé sur les métadonnées" in result.stdout
+    assert "using embedded metadata" in result.stdout
+    assert "Confirm rename based on embedded metadata" in result.stdout
     assert not src.exists()
     assert (root / "Tagged Artist - Tagged Title.mp3").exists()
 
@@ -391,8 +388,8 @@ def test_rename_from_log_metadata_fallback_auto_confirm(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert "utilisation des métadonnées" in result.stdout
-    assert "Confirmer le renommage basé sur les métadonnées" not in result.stdout
+    assert "using embedded metadata" in result.stdout
+    assert "Confirm rename based on embedded metadata" not in result.stdout
     assert not src.exists()
     assert (root / "Auto Artist - Auto Title.mp3").exists()
 
@@ -435,7 +432,7 @@ def test_rename_from_log_metadata_fallback_reject(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert "Renommage par métadonnées ignoré" in result.stdout
+    assert "Metadata-based rename skipped" in result.stdout
     assert src.exists()
 
 
@@ -530,7 +527,7 @@ def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert src.exists()
-    assert "Renommage ignoré" in result.stdout
+    assert "Rename skipped" in result.stdout
 
 
 def test_rename_from_log_export(tmp_path: Path) -> None:

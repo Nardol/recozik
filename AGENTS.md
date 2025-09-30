@@ -21,6 +21,8 @@
 - CLI options use kebab-case (e.g., `--log-format`); internal functions use snake_case.
 - Keep Typer command functions in `cli.py`; supporting utilities go in dedicated modules.
 - Sanitize filenames using `_sanitize_filename`; reuse helpers instead of ad-hoc logic.
+- Route every user-facing string through `recozik.i18n._` using an English msgid. Update the relevant `.po` file under `src/recozik/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.
+- Honor locale precedence in this order: CLI option `--locale` > environment variable `RECOZIK_LOCALE` > config `[general].locale` > system locale.
 
 ## Testing Guidelines
 - Framework: Pytest (`tests/` modules prefixed `test_`).
@@ -38,3 +40,4 @@
 - Always run `git status` before exiting to ensure a clean tree.
 - If GPG signing blocks commits, rerun with elevated permissions (`with_escalated_permissions: true`).
 - Request the user's approval before running any `uv …` command and rerun with `with_escalated_permissions: true` once granted (it unlocks workspace access, not sudo).
+- See `TRANSLATION.md` for the translation workflow (extraction, `.mo` compilation, multi-locale testing).

@@ -1,0 +1,559 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: recozik\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-09-30 00:00+0000\n"
+"PO-Revision-Date: 2025-09-30 00:00+0000\n"
+"Last-Translator: AI Agent <agent@example.com>\n"
+"Language-Team: French\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "  Album: {value}"
+msgstr "  Album : {value}"
+
+msgid "  Album: {value}{suffix}"
+msgstr "  Album : {value}{suffix}"
+
+msgid "  Artist: {value}"
+msgstr "  Artiste : {value}"
+
+msgid "  Recording ID: {identifier}"
+msgstr "  Recording ID : {identifier}"
+
+msgid "  Release Group ID: {identifier}"
+msgstr "  Release Group ID : {identifier}"
+
+msgid "  Title: {value}"
+msgstr "  Titre : {value}"
+
+msgid "  {index}. {artist} - {title} (score {score})"
+msgstr "  {index}. {artist} - {title} (score {score})"
+
+msgid "AcoustID API key"
+msgstr "Clé API AcoustID"
+
+msgid "AcoustID API key to record (alternative to the positional argument)."
+msgstr "Clé API AcoustID à enregistrer (alternative à l'argument positionnel)."
+
+msgid "AcoustID API key to record."
+msgstr "Clé API AcoustID à enregistrer."
+
+msgid "AcoustID API key to use (takes priority over the configuration file)."
+msgstr "Clé API AcoustID à utiliser (prioritaire sur la configuration)."
+
+msgid "AcoustID key stored in {path}"
+msgstr "Clé AcoustID enregistrée dans {path}"
+
+msgid "AcoustID key: not configured"
+msgstr "Clé AcoustID : non configurée"
+
+msgid "AcoustID key: {masked}"
+msgstr "Clé AcoustID : {masked}"
+
+msgid "Add `{command}` to your `$PROFILE` (PowerShell) to load completion automatically."
+msgstr "Ajoutez `{command}` à votre `$PROFILE` (PowerShell) pour charger automatiquement la complétion."
+
+msgid "Add it to your shell configuration if needed."
+msgstr "Ajoutez-la à votre configuration de shell si nécessaire."
+
+msgid "Already named correctly: {name}"
+msgstr "Déjà au bon nom : {name}"
+
+msgid "Append to the existing log instead of recreating it."
+msgstr "Ajoute à la fin du log existant au lieu de le recréer."
+
+msgid "Ask for confirmation before renaming each file."
+msgstr "Demande une confirmation pour chaque fichier avant renommage."
+
+msgid "Confirm renames based on embedded metadata (use --metadata-fallback-no-confirm)."
+msgstr "Confirme les renommages basés sur les métadonnées intégrées (utilisez --metadata-fallback-no-confirm)."
+
+msgid "Cache enabled: {state} (TTL: {hours} h)"
+msgstr "Cache activé : {state} (TTL : {hours} h)"
+
+msgid "Channels: {channels}"
+msgstr "Canaux : {channels}"
+
+msgid "Check ~/.zshrc and remove the line adding ~/.zfunc if you no longer use it."
+msgstr "Vérifiez votre ~/.zshrc et retirez la ligne ajoutant ~/.zfunc si vous ne l'utilisez plus."
+
+msgid "Chromaprint fingerprint:"
+msgstr "Empreinte Chromaprint :"
+
+msgid "Collision handling strategy: append (default), skip, overwrite."
+msgstr "Gestion des collisions : append (défaut), skip, overwrite."
+
+msgid "Command to add: {command}"
+msgstr "Commande à ajouter : {command}"
+
+msgid "Completion installed for {shell}."
+msgstr "Complétion installée pour {shell}."
+
+msgid "Completion installed. Restart your terminal to use it."
+msgstr "Complétion installée. Rechargez votre terminal pour l'utiliser."
+
+msgid "Completion script removed: {path}"
+msgstr "Script de complétion supprimé : {path}"
+
+msgid "Completion script written to {path}"
+msgstr "Script de complétion écrit dans {path}"
+
+msgid "Completion uninstalled."
+msgstr "Complétion désinstallée."
+
+msgid "Confirm rename based on embedded metadata: {source} -> {target}?"
+msgstr "Confirmer le renommage basé sur les métadonnées : {source} -> {target} ?"
+
+msgid "Confirm the key"
+msgstr "Confirmez la clé"
+
+msgid "Control how paths are written in the log (overrides configuration)."
+msgstr "Contrôle l'affichage des chemins dans le log (écrase la configuration)."
+
+msgid "Create or update your key with `recozik config set-key`."
+msgstr "Créez ou mettez à jour votre clé avec `recozik config set-key`."
+
+msgid "Custom configuration file path (tests)."
+msgstr "Chemin personnalisé du fichier de configuration (tests)."
+
+msgid "Default template: {template}"
+msgstr "Template par défaut : {template}"
+
+msgid "Directory containing the audio files."
+msgstr "Dossier contenant les fichiers audio."
+
+msgid "Directory not found: {path}"
+msgstr "Dossier introuvable : {path}"
+
+msgid "Directory where originals are copied before renaming (optional)."
+msgstr "Dossier dans lequel copier les originaux avant renommage (optionnel)."
+
+msgid "Display basic metadata extracted from an audio file."
+msgstr "Affiche les métadonnées de base du fichier audio."
+
+msgid "Show full fingerprint in console (long and less convenient for screen readers)."
+msgstr "Affiche l'empreinte complète dans la console (longue et moins pratique pour les lecteurs d'écran)."
+
+msgid "Display the generated auto-completion script."
+msgstr "Affiche le script d'auto-complétion généré."
+
+msgid "Display the main configuration settings."
+msgstr "Affiche les principaux paramètres de configuration."
+
+msgid "Display the path to the configuration file in use."
+msgstr "Affiche le chemin du fichier de configuration utilisé."
+
+msgid "Preview rename operations only (default). Use --apply to commit changes."
+msgstr "Prévisualise uniquement les renommages (par défaut). Utilisez --apply pour valider les changements."
+
+msgid "Display the results as JSON (useful for scripting or screen readers)."
+msgstr "Affiche les résultats au format JSON (utile pour les scripts ou les lecteurs d'écran)."
+
+msgid "Dry-run complete: {planned} potential renames, {skipped} skipped, {errors} errors."
+msgstr "Dry-run terminé : {planned} renommages potentiels, {skipped} ignoré(s), {errors} en erreur."
+
+msgid "Use --apply to run the renames."
+msgstr "Utilisez --apply pour lancer les renommages."
+
+msgid "Edit your $PROFILE file to remove the completion block added by Recozik."
+msgstr "Éditez votre fichier $PROFILE pour retirer le bloc de complétion ajouté par Recozik."
+
+msgid "Embedded metadata:"
+msgstr "Métadonnées (tags) :"
+
+msgid "Entry with error, skipped: {path} ({error})"
+msgstr "Entrée en erreur, ignorée : {path} ({error})"
+
+msgid "Entry without a path: skipped."
+msgstr "Entrée sans chemin : ignorée."
+
+msgid "Estimated duration: {duration:.2f} s"
+msgstr "Durée estimée : {duration:.2f} s"
+
+msgid "Explicit path to the fpcalc executable when Chromaprint is not on PATH."
+msgstr "Chemin explicite vers l'exécutable fpcalc si Chromaprint n'est pas dans PATH."
+
+msgid "File extension to include (e.g. mp3). Can be repeated."
+msgstr "Extension de fichier à inclure (ex : mp3). Peut être répétée."
+
+msgid "File not found, skipped: {path}"
+msgstr "Fichier introuvable, ignoré : {path}"
+
+msgid "File not found: {path}"
+msgstr "Fichier introuvable : {path}"
+
+msgid "File where the fingerprint should be written in JSON format."
+msgstr "Fichier dans lequel écrire l'empreinte au format JSON."
+
+msgid "File: {path}"
+msgstr "Fichier : {path}"
+
+msgid "Fingerprint saved to {path}"
+msgstr "Empreinte sauvegardée dans {path}"
+
+msgid "Format: {format}, {subtype}"
+msgstr "Format : {format}, {subtype}"
+
+msgid "Frame count: {frames}"
+msgstr "Nombre d'images : {frames}"
+
+msgid "Generate the Chromaprint fingerprint of an audio file."
+msgstr "Génère l'empreinte Chromaprint d'un fichier audio."
+
+msgid "Glob pattern to apply (can be repeated)."
+msgstr "Motif glob à appliquer (peut être répété)."
+
+msgid "Identify a track using the AcoustID API."
+msgstr "Identifie un morceau via l'API AcoustID."
+
+msgid "Identify audio files in a directory and persist the results."
+msgstr "Identifie les fichiers audio d'un dossier et enregistre les résultats."
+
+msgid "Ignore the local cache and force a new API call."
+msgstr "Ignore le cache local et force un nouvel appel à l'API."
+
+msgid "Ignore the local cache and force a new API request."
+msgstr "Ignore le cache local et force un nouvel appel à l'API."
+
+msgid "Index out of range, please try again."
+msgstr "Indice hors plage, veuillez réessayer."
+
+msgid "Install the shell completion script for the current shell."
+msgstr "Installe le script d'auto-complétion pour le shell courant."
+
+msgid "Invalid --on-conflict value. Choose append, skip, or overwrite."
+msgstr "Valeur --on-conflict invalide. Choisissez append, skip ou overwrite."
+
+msgid "Invalid JSON response received from AcoustID."
+msgstr "Réponse JSON invalide reçue depuis AcoustID."
+
+msgid "Invalid JSONL entry (line {number})."
+msgstr "Entrée invalide au format JSONL (ligne {number})."
+
+msgid "Invalid TOML configuration in {path}: {error}"
+msgstr "Configuration TOML invalide dans {path} : {error}"
+
+msgid "Invalid input (y/n)."
+msgstr "Réponse invalide (o/n)."
+
+msgid "Invalid log format. Use 'text' or 'jsonl'."
+msgstr "Format de log invalide. Utilisez 'text' ou 'jsonl'."
+
+msgid "Invalid selection, please try again."
+msgstr "Sélection invalide, veuillez réessayer."
+
+msgid "JSONL log generated by `identify-batch`."
+msgstr "Log JSONL généré par `identify-batch`."
+
+msgid "Key rejected by AcoustID."
+msgstr "Clé refusée par AcoustID."
+
+msgid "Key validation failed: {message}"
+msgstr "Validation de la clé échouée : {message}"
+
+msgid "Log file not found: {path}"
+msgstr "Log introuvable : {path}"
+
+msgid "Log format: text or jsonl."
+msgstr "Format du log : text ou jsonl."
+
+msgid "Log format: {format} (paths {mode})"
+msgstr "Format du log : {format} (chemins {mode})"
+
+msgid "Manage local configuration."
+msgstr "Gestion de la configuration locale."
+
+msgid "Metadata-based rename skipped for {name}."
+msgstr "Renommage par métadonnées ignoré pour {name}"
+
+msgid "Multiple proposals for {name}:"
+msgstr "Plusieurs propositions pour {name} :"
+
+msgid "Music recognition based on audio fingerprints."
+msgstr "Reconnaissance musicale basée sur les empreintes audio."
+
+msgid "No API key provided."
+msgstr "Aucune clé API fournie."
+
+msgid "No AcoustID API key configured."
+msgstr "Aucune clé API AcoustID configurée."
+
+msgid "No AcoustID match for {path}, using embedded metadata."
+msgstr "Aucune correspondance AcoustID pour {path}, utilisation des métadonnées intégrées."
+
+msgid "No audio files matched the selection."
+msgstr "Aucun fichier audio correspondant."
+
+msgid "No completion script to remove."
+msgstr "Aucun script de complétion spécifique à supprimer."
+
+msgid "No entries found in the log."
+msgstr "Aucune entrée dans le log."
+
+msgid "No key was stored. Operation cancelled."
+msgstr "Aucune clé n'a été enregistrée. Opération annulée."
+
+msgid "No match for {path}, embedded metadata recorded in the log."
+msgstr "Aucune correspondance pour {path}, métadonnées locales enregistrées."
+
+msgid "No match."
+msgstr "Aucune correspondance."
+
+msgid "No matches found."
+msgstr "Aucune correspondance trouvée."
+
+msgid "No metadata available (mutagen library missing)."
+msgstr "Métadonnées non disponibles (bibliothèque mutagen absente)."
+
+msgid "No proposal for: {path}"
+msgstr "Aucune proposition pour : {path}"
+
+msgid "No proposal for: {path}{context}"
+msgstr "Aucune proposition pour : {path}{context}"
+
+msgid "No rename performed ({skipped} skipped, {errors} errors)."
+msgstr "Aucun renommage à effectuer ({skipped} ignoré(s), {errors} en erreur)."
+
+msgid "No selection made for {name}; skipping."
+msgstr "Aucune sélection faite pour {name}, passage."
+
+msgid "Number of proposals to keep for each file."
+msgstr "Nombre de propositions à conserver."
+
+msgid "Number of results to display."
+msgstr "Nombre de résultats à afficher."
+
+msgid "Offer an interactive choice when multiple matches are available."
+msgstr "Propose un choix interactif quand plusieurs correspondances sont disponibles."
+
+msgid "Operation cancelled."
+msgstr "Opération annulée."
+
+msgid "Output template (placeholders: {artist}, {title}, {album}, {score}, ...)."
+msgstr "Modèle d'affichage ({artist}, {title}, {album}, {score}, ...)."
+
+msgid "Output the completion script to stdout without writing files."
+msgstr "Génère le script sur la sortie standard sans créer/modifier de fichier."
+
+msgid "Override the locale for this invocation (examples: en, fr, fr_FR)."
+msgstr "Force la locale pour cette exécution (exemples : en, fr, fr_FR)."
+
+msgid "Path to a JSON file summarising the planned renames."
+msgstr "Chemin d'un fichier JSON résumant les renommages planifiés."
+
+msgid "Path to the audio file to analyse."
+msgstr "Chemin du fichier audio à analyser."
+
+msgid "Path to the audio file to fingerprint."
+msgstr "Chemin du fichier audio à fingerprint."
+
+msgid "Path to the audio file to identify."
+msgstr "Chemin du fichier audio à identifier."
+
+msgid "Print only the command to add to your shell profile."
+msgstr "Affiche uniquement la commande à ajouter dans le profil sans texte supplémentaire."
+
+msgid "Processing complete."
+msgstr "Traitement terminé."
+
+msgid "Results: {identified} identified, {unmatched} unmatched, {failed} failures."
+msgstr "Résultats : {identified} identifié(s), {unmatched} non reconnu(s), {failed} en erreur."
+
+msgid "Log: {path}"
+msgstr "Log : {path}"
+
+msgid "Remove the auto-completion script installed by Recozik."
+msgstr "Supprime le script d'auto-complétion installé par Recozik."
+
+msgid "Remove the line `source ~/.bash_completions/recozik.sh` from ~/.bashrc if necessary."
+msgstr "Si besoin, supprimez la ligne `source ~/.bash_completions/recozik.sh` de votre ~/.bashrc."
+
+msgid "Rename files using a JSONL log produced by `identify-batch`."
+msgstr "Renomme les fichiers à partir d'un log JSONL produit par `identify-batch`."
+
+msgid "Rename skipped for {name}"
+msgstr "Renommage ignoré pour {name}"
+
+msgid "Rename template ({artist}, {title}, {album}, {score}, ...)."
+msgstr "Modèle de renommage ({artist}, {title}, {album}, {score}, ...)."
+
+msgid "Rename {source} -> {target}?"
+msgstr "Renommer {source} -> {target} ?"
+
+msgid "Renaming complete: {renamed} file(s), {skipped} skipped, {errors} errors."
+msgstr "Renommage terminé : {renamed} fichier(s), {skipped} ignoré(s), {errors} en erreur."
+
+msgid "Report output file (default: recozik-batch.log)."
+msgstr "Fichier de sortie du rapport (défaut : recozik-batch.log)."
+
+msgid "Restart `fish` or run `{command}` to activate completion."
+msgstr "Relancez `fish` ou exécutez `{command}` pour activer la complétion."
+
+msgid "Restart fish to apply the removal."
+msgstr "Redémarrez fish pour prendre en compte la suppression."
+
+msgid "Result {index}: score {score:.2f}"
+msgstr "Résultat {index} : score {score:.2f}"
+
+msgid "Root directory containing the files to rename (defaults to the log directory)."
+msgstr "Répertoire racine contenant les fichiers à renommer (défaut : dossier du log)."
+
+msgid "Run `{command}` or add this line to your profile file (e.g. ~/.bashrc, ~/.zshrc)."
+msgstr "Exécutez `{command}` ou ajoutez cette ligne à votre fichier de profil (ex. ~/.bashrc, ~/.zshrc)."
+
+msgid "Sample rate: {samplerate} Hz"
+msgstr "Fréquence d'échantillonnage : {samplerate} Hz"
+
+msgid "Search recursively in sub-directories."
+msgstr "Active la recherche récursive dans les sous-dossiers."
+
+msgid "Select a number (press ENTER to cancel): "
+msgstr "Sélectionnez un numéro (ENTER pour annuler) : "
+
+msgid "Shell auto-completion helpers."
+msgstr "Outils d'auto-complétion du shell."
+
+msgid "Shell not supported for auto-completion."
+msgstr "Shell non pris en charge pour l'auto-complétion."
+
+msgid "Skip online validation (not recommended)."
+msgstr "Ignore la vérification en ligne (déconseillé)."
+
+msgid "Store an AcoustID API key in the configuration."
+msgstr "Enregistre une clé API AcoustID dans la configuration."
+
+msgid "Store only the best proposal for each file."
+msgstr "Enregistre uniquement la meilleure proposition pour chaque fichier."
+
+msgid "Summary written to {path}"
+msgstr "Résumé écrit dans {path}"
+
+msgid "Target shell (bash, zsh, fish, powershell/pwsh). Autodetected if omitted."
+msgstr "Shell cible (bash, zsh, fish, powershell/pwsh). Détection automatique sinon."
+
+msgid "Template for proposals ({artist}, {title}, {album}, {score}, ...)."
+msgstr "Modèle d'affichage des propositions ({artist}, {title}, {album}, {score}, ...)."
+
+msgid "The field acoustid.api_key must be a string."
+msgstr "Le champ acoustid.api_key doit être une chaîne de caractères."
+
+msgid "The field cache.ttl_hours must be an integer."
+msgstr "Le champ cache.ttl_hours doit être un entier."
+
+msgid "The field general.locale must be a string."
+msgstr "Le champ general.locale doit être une chaîne de caractères."
+
+msgid "The field output.template must be a string."
+msgstr "Le champ output.template doit être une chaîne de caractères."
+
+msgid "The keys do not match."
+msgstr "Les clés ne correspondent pas."
+
+msgid "The keys do not match. Operation cancelled."
+msgstr "Les clés ne correspondent pas. Opération annulée."
+
+msgid "The log must be in JSONL format (rerun `identify-batch` with --log-format jsonl)."
+msgstr "Le log doit être au format JSONL (réexécutez `identify-batch` avec --log-format jsonl)."
+
+msgid "The soundfile library is missing; run `uv sync` to install project dependencies."
+msgstr "La bibliothèque soundfile est absente ; lancez `uv sync` pour installer les dépendances."
+
+msgid "Unable to contact AcoustID ({error})."
+msgstr "Impossible de contacter AcoustID ({error})."
+
+msgid "Unable to detect the shell. Provide --shell (bash/zsh/fish/pwsh)."
+msgstr "Impossible de détecter le shell. Fournissez --shell (bash/zsh/fish/pwsh)."
+
+msgid "Unable to read the audio file: {error}"
+msgstr "Impossible de lire le fichier audio : {error}"
+
+msgid "Unable to read the configuration file: {error}"
+msgstr "Impossible de lire la configuration : {error}"
+
+msgid "Unexpected HTTP response ({status})."
+msgstr "Réponse HTTP inattendue ({status})."
+
+msgid "Unknown album"
+msgstr "Album inconnu"
+
+msgid "Unknown artist"
+msgstr "Artiste inconnu"
+
+msgid "Unknown title"
+msgstr "Titre inconnu"
+
+msgid "Unresolved collision, file skipped: {name}"
+msgstr "Collision non résolue, fichier ignoré : {name}"
+
+msgid "Use embedded metadata when AcoustID returns no match; follows configuration defaults."
+msgstr "Utilise les métadonnées embarquées lorsqu'AcoustID ne retourne aucune correspondance ; respecte les valeurs de configuration."
+
+msgid "Use embedded metadata when no proposal is available."
+msgstr "Utilise les métadonnées du fichier lorsqu'aucune proposition n'est disponible."
+
+msgid "Use only one of --print-command, --no-write, or --output."
+msgstr "Choisissez une seule option parmi --print-command, --no-write ou --output."
+
+msgid "Arguments"
+msgstr "Arguments"
+
+msgid "Options"
+msgstr "Options"
+
+msgid "Commands"
+msgstr "Commandes"
+
+msgid "Would you like to save it now?"
+msgstr "Souhaitez-vous l'enregistrer maintenant ?"
+
+msgid "Write the completion script to a specific file (absolute or relative path)."
+msgstr "Écrit le script de complétion dans un fichier spécifique (chemin absolu ou relatif)."
+
+msgid "[Y/n]"
+msgstr "[O/n]"
+
+msgid "[y/N]"
+msgstr "[o/N]"
+
+msgid "absolute"
+msgstr "absolus"
+
+msgid "no"
+msgstr "non"
+
+msgid "relative"
+msgstr "relatifs"
+
+msgid "yes"
+msgstr "oui"
+
+msgid "{action}: {source} -> {target}"
+msgstr "{action} : {source} -> {target}"
+
+msgid "Usage:"
+msgstr "Utilisation :"
+
+msgid "Try '{command} {option}' for help."
+msgstr "Essayez '{command} {option}' pour obtenir de l'aide."
+
+msgid "Try [blue]'{command_path} {help_option}'[/] for help."
+msgstr "Essayez [blue]'{command_path} {help_option}'[/] pour obtenir de l'aide."
+
+msgid "Missing argument"
+msgstr "Argument manquant"
+
+msgid "Missing option"
+msgstr "Option manquante"
+
+msgid "Invalid value for '{param_name}': {message}"
+msgstr "Valeur invalide pour '{param_name}' : {message}"
+
+msgid "Error"
+msgstr "Erreur"
+
+msgid "Error: {message}"
+msgstr "Erreur : {message}"

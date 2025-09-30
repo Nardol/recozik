@@ -126,7 +126,6 @@ def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
 
 def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
     """Emit JSONL records when log format is jsonl."""
-
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
     file_a = audio_dir / "song.mp3"
@@ -217,7 +216,7 @@ def test_identify_batch_metadata_fallback(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert "métadonnées locales enregistrées" in result.stdout
+    assert "embedded metadata recorded" in result.stdout
 
     lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
     assert len(lines) == 1
