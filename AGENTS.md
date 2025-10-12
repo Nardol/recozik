@@ -2,8 +2,11 @@
 
 ## Project Structure & Module Organization
 
-- `src/recozik/` – Typer CLI entry points (`cli.py`), fingerprint utilities (`fingerprint.py`), caching (`cache.py`), and config helpers (`config.py`).
-- `tests/` – Pytest suites mirroring CLI features: completion, identify, batch, rename.
+- `src/recozik/cli.py` – Typer app registration + backward-compatible shims (exposes lazy symbols such as `compute_fingerprint`, `LookupCache`, completion helpers).
+- `src/recozik/commands/` – Feature-focused command modules (`inspect`, `fingerprint`, `identify`, `identify_batch`, `rename`, `config`, `completion`).
+- `src/recozik/cli_support/` – Shared utilities (locale resolution, path helpers, metadata/log formatting, prompts, lazy dependency loaders).
+- `src/recozik/` – Core libraries (`fingerprint.py`, `cache.py`, `config.py`, etc.) used by command modules.
+- `tests/` – Pytest suites mirroring CLI features and performance guards (includes `test_cli_import_time.py`).
 - `README.md` – User-facing quick start; AGENTS should cross-check when updating commands.
 - `dist/`, `build/`, and `.venv/` are generated artifacts; never commit them.
 
@@ -23,7 +26,8 @@
 
 - Python 3.10–3.12, 4-space indentation, type hints encouraged.
 - CLI options use kebab-case (e.g., `--log-format`); internal functions use snake_case.
-- Keep Typer command functions in `cli.py`; supporting utilities go in dedicated modules.
+- Keep Typer command logic inside the relevant module under `src/recozik/commands/`; `cli.py` should only register commands and surface compatibility wrappers.
+- When touching completion logic, update both `src/recozik/commands/completion.py` and the wrapper wiring in `cli.py` so tests that monkeypatch `recozik.cli` continue to work.
 - Sanitize filenames using `_sanitize_filename`; reuse helpers instead of ad-hoc logic.
 - Route every user-facing string through `recozik.i18n._` using an English msgid. Update the relevant `.po` file under `src/recozik/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.
 - Honor locale precedence in this order: CLI option `--locale` > environment variable `RECOZIK_LOCALE` > config `[general].locale` > system locale.
@@ -34,6 +38,7 @@
 - Cover new CLI flags with focused tests using `CliRunner` and temp directories.
 - When adding dependencies, verify `uv run pytest` passes locally and in dry-run modes (`--dry-run`, `--json`).
 - Prefer deterministic fixtures; avoid network calls in tests.
+- Keep the import-time guard (`tests/test_cli_import_time.py`) passing; if you introduce heavier startup logic, adjust the threshold deliberately and document the change.
 
 ## Commit & Pull Request Guidelines
 
@@ -48,3 +53,4 @@
 - If GPG signing blocks commits, rerun with elevated permissions (`with_escalated_permissions: true`).
 - Request the user's approval before running any `uv …` command and rerun with `with_escalated_permissions: true` once granted (it unlocks workspace access, not sudo).
 - See `TRANSLATION.md` for the translation workflow (extraction, `.mo` compilation, multi-locale testing).
+- When adding new commands, create a dedicated module under `src/recozik/commands/`, surface any required backward-compatible aliases via `cli.py`, and extend `AGENTS.md`/README as needed.
