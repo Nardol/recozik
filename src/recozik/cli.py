@@ -11,10 +11,9 @@ from collections.abc import Iterable
 from datetime import timedelta
 from pathlib import Path
 from string import Formatter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
-import requests
 import typer
 from typer.completion import (
     get_completion_script as generate_completion_script,
@@ -26,22 +25,22 @@ from typer.completion import (
     shellingham as completion_shellingham,
 )
 
-from .cache import LookupCache
-from .config import AppConfig, default_config_path, load_config, write_config
-from .fingerprint import (
-    AcoustIDLookupError,
-    AcoustIDMatch,
-    FingerprintError,
-    FingerprintResult,
-    compute_fingerprint,
-    lookup_recordings,
-)
 from .i18n import (
     _,
     detect_system_locale,
     resolve_preferred_locale,
     set_locale,
 )
+
+if TYPE_CHECKING:
+    from .cache import LookupCache
+    from .config import AppConfig
+    from .fingerprint import (
+        AcoustIDLookupError,
+        AcoustIDMatch,
+        FingerprintError,
+        FingerprintResult,
+    )
 
 try:  # pragma: no cover - depends on the environment
     import mutagen  # type: ignore[import-not-found]
@@ -70,6 +69,80 @@ app.add_typer(completion_app, name="completion")
 DEFAULT_AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".opus"}
 _VALIDATION_TRACK_ID = "9ff43b6a-4f16-427c-93c2-92307ca505e0"
 _VALIDATION_ENDPOINT = "https://api.acoustid.org/v2/lookup"
+
+
+def _config_module():
+    """Return the configuration module lazily to avoid import-time side effects."""
+    from . import config as config_module
+
+    return config_module
+
+
+def _cache_module():
+    """Return the cache module lazily to avoid import-time side effects."""
+    from . import cache as cache_module
+
+    return cache_module
+
+
+def _fingerprint_module():
+    """Return the fingerprint module lazily to avoid import-time side effects."""
+    from . import fingerprint as fingerprint_module
+
+    return fingerprint_module
+
+
+_UNINITIALIZED = object()
+
+compute_fingerprint: Any = _UNINITIALIZED
+lookup_recordings: Any = _UNINITIALIZED
+FingerprintResult: Any = _UNINITIALIZED
+FingerprintError: Any = _UNINITIALIZED
+AcoustIDMatch: Any = _UNINITIALIZED
+AcoustIDLookupError: Any = _UNINITIALIZED
+LookupCache: Any = _UNINITIALIZED
+
+
+def _ensure_fingerprint_symbols() -> None:
+    """Load fingerprint helpers lazily."""
+    global compute_fingerprint, lookup_recordings
+    global FingerprintResult, FingerprintError, AcoustIDMatch, AcoustIDLookupError
+
+    if compute_fingerprint is _UNINITIALIZED:
+        fingerprint_module = _fingerprint_module()
+        compute_fingerprint = fingerprint_module.compute_fingerprint
+        lookup_recordings = fingerprint_module.lookup_recordings
+        FingerprintResult = fingerprint_module.FingerprintResult
+        FingerprintError = fingerprint_module.FingerprintError
+        AcoustIDMatch = fingerprint_module.AcoustIDMatch
+        AcoustIDLookupError = fingerprint_module.AcoustIDLookupError
+
+
+def _ensure_cache_symbols() -> None:
+    """Load cache helpers lazily."""
+    global LookupCache
+
+    if LookupCache is _UNINITIALIZED:
+        cache_module = _cache_module()
+        LookupCache = cache_module.LookupCache
+
+
+def __getattr__(name: str) -> Any:
+    """Provide backwards-compatible lazy access to heavy modules."""
+    if name in {
+        "AcoustIDLookupError",
+        "AcoustIDMatch",
+        "FingerprintError",
+        "FingerprintResult",
+        "compute_fingerprint",
+        "lookup_recordings",
+    }:
+        _ensure_fingerprint_symbols()
+        return globals()[name]
+    if name == "LookupCache":
+        _ensure_cache_symbols()
+        return LookupCache
+    raise AttributeError(name)
 
 
 def _resolve_path(path: Path) -> Path:
@@ -194,6 +267,7 @@ def fingerprint(
 ) -> None:
     """Generate a Chromaprint fingerprint for an audio file."""
     _apply_locale(ctx)
+    _ensure_fingerprint_symbols()
     resolved_audio = _resolve_path(audio_path)
     resolved_fpcalc = _resolve_path(fpcalc_path) if fpcalc_path else None
 
@@ -269,11 +343,14 @@ def identify(
 ) -> None:
     """Identify a track with the AcoustID API."""
     _apply_locale(ctx)
+    config_module = _config_module()
+    _ensure_fingerprint_symbols()
+    _ensure_cache_symbols()
     resolved_audio = _resolve_path(audio_path)
     resolved_fpcalc = _resolve_path(fpcalc_path) if fpcalc_path else None
 
     try:
-        config = load_config(config_path)
+        config = config_module.load_config(config_path)
     except RuntimeError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
@@ -290,9 +367,9 @@ def identify(
                 raise typer.Exit(code=1)
             key = new_key
             try:
-                config = load_config(config_path)
+                config = config_module.load_config(config_path)
             except RuntimeError:
-                config = AppConfig(acoustid_api_key=key)
+                config = config_module.AppConfig(acoustid_api_key=key)
             _apply_locale(ctx, config=config)
         else:
             typer.echo(_("Operation cancelled."))
@@ -457,13 +534,16 @@ def identify_batch(
 ) -> None:
     """Identify audio files in a directory and record the results."""
     _apply_locale(ctx)
+    config_module = _config_module()
+    _ensure_fingerprint_symbols()
+    _ensure_cache_symbols()
     resolved_dir = _resolve_path(directory)
     if not resolved_dir.is_dir():
         typer.echo(_("Directory not found: {path}").format(path=resolved_dir))
         raise typer.Exit(code=1)
 
     try:
-        config = load_config(config_path)
+        config = config_module.load_config(config_path)
     except RuntimeError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
@@ -480,9 +560,9 @@ def identify_batch(
                 raise typer.Exit(code=1)
             key = new_key
             try:
-                config = load_config(config_path)
+                config = config_module.load_config(config_path)
             except RuntimeError:
-                config = AppConfig(acoustid_api_key=key)
+                config = config_module.AppConfig(acoustid_api_key=key)
             _apply_locale(ctx, config=config)
         else:
             typer.echo(_("Operation cancelled."))
@@ -714,6 +794,7 @@ def rename_from_log(
 ) -> None:
     """Rename files using a JSONL log generated by ``identify-batch``."""
     _apply_locale(ctx)
+    config_module = _config_module()
     resolved_log = _resolve_path(log_path)
     if not resolved_log.is_file():
         typer.echo(_("Log file not found: {path}").format(path=resolved_log))
@@ -722,7 +803,7 @@ def rename_from_log(
     root_path = _resolve_path(root) if root else resolved_log.parent
 
     try:
-        config = load_config(config_path)
+        config = config_module.load_config(config_path)
     except RuntimeError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
@@ -1777,6 +1858,8 @@ def _prompt_api_key() -> str | None:
 
 
 def _validate_client_key(key: str, timeout: float = 5.0) -> tuple[bool, str]:
+    import requests
+
     try:
         response = requests.get(
             _VALIDATION_ENDPOINT,
@@ -1809,6 +1892,7 @@ def _configure_api_key_interactively(
     *,
     skip_validation: bool = False,
 ) -> str | None:
+    config_module = _config_module()
     key = _prompt_api_key()
     if not key:
         return None
@@ -1819,7 +1903,7 @@ def _configure_api_key_interactively(
             typer.echo(_("Key validation failed: {message}").format(message=message))
             return None
 
-    updated = AppConfig(
+    updated = config_module.AppConfig(
         acoustid_api_key=key,
         cache_enabled=existing.cache_enabled,
         cache_ttl_hours=existing.cache_ttl_hours,
@@ -1828,7 +1912,7 @@ def _configure_api_key_interactively(
         log_absolute_paths=existing.log_absolute_paths,
     )
 
-    target = write_config(updated, config_path)
+    target = config_module.write_config(updated, config_path)
     typer.echo(_("AcoustID key stored in {path}").format(path=target))
     return key
 
@@ -1843,7 +1927,8 @@ def config_path(
 ) -> None:
     """Print the configuration file path in use."""
     _apply_locale(ctx)
-    target = config_path or default_config_path()
+    config_module = _config_module()
+    target = config_path or config_module.default_config_path()
     typer.echo(str(target))
 
 
@@ -1857,9 +1942,10 @@ def config_show(
 ) -> None:
     """Show the key configuration settings."""
     _apply_locale(ctx)
-    target = config_path or default_config_path()
+    config_module = _config_module()
+    target = config_path or config_module.default_config_path()
     try:
-        config = load_config(target)
+        config = config_module.load_config(target)
     except RuntimeError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
@@ -1915,11 +2001,12 @@ def config_set_key(
 ) -> None:
     """Persist the AcoustID API key into the configuration file."""
     _apply_locale(ctx)
-    target_path = config_path or default_config_path()
+    config_module = _config_module()
+    target_path = config_path or config_module.default_config_path()
     try:
-        existing = load_config(target_path)
+        existing = config_module.load_config(target_path)
     except RuntimeError:
-        existing = AppConfig()
+        existing = config_module.AppConfig()
 
     key = (api_key_opt or api_key_arg or "").strip()
 
@@ -1940,7 +2027,7 @@ def config_set_key(
             typer.echo(_("Key validation failed: {message}").format(message=message))
             raise typer.Exit(code=1)
 
-    updated = AppConfig(
+    updated = config_module.AppConfig(
         acoustid_api_key=key,
         cache_enabled=existing.cache_enabled,
         cache_ttl_hours=existing.cache_ttl_hours,
@@ -1949,7 +2036,7 @@ def config_set_key(
         log_absolute_paths=existing.log_absolute_paths,
     )
 
-    target = write_config(updated, config_path)
+    target = config_module.write_config(updated, config_path)
     typer.echo(_("AcoustID key stored in {path}").format(path=target))
 
 
