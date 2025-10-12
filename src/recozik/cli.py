@@ -759,6 +759,7 @@ def rename_from_log(
     renamed = 0
     skipped = 0
     errors = 0
+    apply_after_interrupt = False
 
     for entry in entries:
         raw_path = entry.get("path")
@@ -840,7 +841,25 @@ def rename_from_log(
 
         selected_match_index = 0
         if interactive and len(matches) > 1:
-            selected_match_index = _prompt_match_selection(matches, source_path)
+            while True:
+                try:
+                    selected_match_index = _prompt_match_selection(matches, source_path)
+                except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+                    decision = _prompt_interactive_interrupt_decision(bool(planned))
+                    if decision == "cancel":
+                        typer.echo(_("Operation cancelled; no files renamed."))
+                        raise typer.Exit(code=1) from None
+                    if decision == "apply":
+                        apply_after_interrupt = True
+                        break
+                    # decision == "resume"
+                    continue
+                else:
+                    break
+
+            if apply_after_interrupt:
+                break
+
             if selected_match_index is None:
                 skipped += 1
                 typer.echo(
@@ -887,20 +906,60 @@ def rename_from_log(
             question = _("Confirm rename based on embedded metadata: {source} -> {target}?").format(
                 source=source_path.name, target=final_target.name
             )
-            if not _prompt_yes_no(question, default=True):
+            skip_current = False
+            while True:
+                try:
+                    if not _prompt_yes_no(question, default=True):
+                        skip_current = True
+                        break
+                    metadata_confirmation_done = True
+                    break
+                except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+                    decision = _prompt_interactive_interrupt_decision(bool(planned))
+                    if decision == "cancel":
+                        typer.echo(_("Operation cancelled; no files renamed."))
+                        raise typer.Exit(code=1) from None
+                    if decision == "apply":
+                        apply_after_interrupt = True
+                        break
+                    continue
+
+            if apply_after_interrupt:
+                break
+
+            if skip_current:
                 skipped += 1
                 typer.echo(
                     _("Metadata-based rename skipped for {name}.").format(name=source_path.name)
                 )
                 continue
-            metadata_confirmation_done = True
 
         if confirm and not metadata_confirmation_done:
             question = _("Rename {source} -> {target}?").format(
                 source=source_path.name,
                 target=final_target.name,
             )
-            if not _prompt_yes_no(question, default=True):
+            skip_current = False
+            while True:
+                try:
+                    if not _prompt_yes_no(question, default=True):
+                        skip_current = True
+                        break
+                    break
+                except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+                    decision = _prompt_interactive_interrupt_decision(bool(planned))
+                    if decision == "cancel":
+                        typer.echo(_("Operation cancelled; no files renamed."))
+                        raise typer.Exit(code=1) from None
+                    if decision == "apply":
+                        apply_after_interrupt = True
+                        break
+                    continue
+
+            if apply_after_interrupt:
+                break
+
+            if skip_current:
                 skipped += 1
                 typer.echo(_("Rename skipped for {name}").format(name=source_path.name))
                 continue
@@ -916,7 +975,13 @@ def rename_from_log(
         )
         return
 
-    for source_path, target_path, match_data in planned:
+    if apply_after_interrupt and planned:
+        typer.echo(_("Continuing with renames confirmed before the interruption."))
+
+    index = 0
+    interrupted_during_rename = False
+    while index < len(planned):
+        source_path, target_path, match_data = planned[index]
         action = "DRY-RUN" if dry_run else "RENAMED"
         typer.echo(
             _("{action}: {source} -> {target}").format(
@@ -935,19 +1000,39 @@ def rename_from_log(
                     "match": match_data,
                 }
             )
+            index += 1
             continue
 
-        target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if backup_path:
-            backup_file = _compute_backup_path(source_path, root_path, backup_path)
-            backup_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_path, backup_file)
+            if backup_path:
+                backup_file = _compute_backup_path(source_path, root_path, backup_path)
+                backup_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, backup_file)
 
-        if target_path.exists() and conflict_strategy == "overwrite":
-            target_path.unlink()
+            if target_path.exists() and conflict_strategy == "overwrite":
+                target_path.unlink()
 
-        source_path.rename(target_path)
+            source_path.rename(target_path)
+        except KeyboardInterrupt:
+            decision = _prompt_rename_interrupt_decision(len(planned) - index)
+            if decision == "continue":
+                typer.echo(_("Continuing renaming."))
+                continue
+
+            interrupted_during_rename = True
+            typer.echo(
+                _(
+                    "Renaming interrupted; {completed} file(s) already renamed, "
+                    "{remaining} file(s) left untouched."
+                ).format(
+                    completed=renamed,
+                    remaining=len(planned) - index,
+                )
+            )
+            break
+
         renamed += 1
         export_entries.append(
             {
@@ -957,6 +1042,7 @@ def rename_from_log(
                 "match": match_data,
             }
         )
+        index += 1
 
     if dry_run:
         typer.echo(
@@ -965,7 +1051,7 @@ def rename_from_log(
             ).format(planned=len(planned), skipped=skipped, errors=errors)
         )
         typer.echo(_("Use --apply to run the renames."))
-    else:
+    elif not interrupted_during_rename:
         typer.echo(
             _("Renaming complete: {renamed} file(s), {skipped} skipped, {errors} errors.").format(
                 renamed=renamed, skipped=skipped, errors=errors
@@ -980,6 +1066,9 @@ def rename_from_log(
             encoding="utf-8",
         )
         typer.echo(_("Summary written to {path}").format(path=resolved_export))
+
+    if interrupted_during_rename:
+        raise typer.Exit(code=1)
 
 
 @completion_app.command(
@@ -1575,6 +1664,54 @@ def _compute_backup_path(source: Path, root: Path, backup_root: Path) -> Path:
     except ValueError:
         relative = Path(source.name)
     return backup_root / relative
+
+
+def _prompt_interactive_interrupt_decision(has_planned: bool) -> str:
+    typer.echo(_("Interrupt received during interactive selection."))
+    typer.echo(_("  1. Cancel everything and exit."))
+    typer.echo(_("  2. Stop asking questions and apply the confirmed renames."))
+    typer.echo(_("  3. Resume the current question."))
+    choices = {"1": "cancel", "2": "apply", "3": "resume"}
+    prompt = _("Choose an option: ")
+
+    while True:
+        try:
+            selection = typer.prompt(prompt, show_default=False).strip()
+        except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+            typer.echo(_("Use the menu to continue."))
+            continue
+
+        if selection in choices:
+            if selection == "2" and not has_planned:
+                typer.echo(_("No rename has been confirmed yet, nothing to apply."))
+                continue
+            return choices[selection]
+
+        typer.echo(_("Invalid option, please try again."))
+
+
+def _prompt_rename_interrupt_decision(remaining: int) -> str:
+    typer.echo(
+        _("Renaming is in progress. {remaining} file(s) still need to be processed.").format(
+            remaining=remaining
+        )
+    )
+    typer.echo(_("  1. Stop now (remaining files will stay unchanged)."))
+    typer.echo(_("  2. Continue renaming the remaining files."))
+    prompt = _("Choose an option: ")
+    choices = {"1": "cancel", "2": "continue"}
+
+    while True:
+        try:
+            selection = typer.prompt(prompt, default="2", show_default=False).strip()
+        except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+            typer.echo(_("Please confirm how you want to proceed."))
+            continue
+
+        if selection in choices:
+            return choices[selection]
+
+        typer.echo(_("Invalid option, please try again."))
 
 
 def _prompt_match_selection(matches: list[dict], source_path: Path) -> int | None:
