@@ -5,6 +5,7 @@ from __future__ import annotations
 import gettext as _gettext_module
 import importlib
 import locale as _locale
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -87,7 +88,6 @@ def set_locale(locale_value: str | None) -> str | None:
         "click.decorators",
         "click.formatting",
         "typer.builtin_display",
-        "typer.rich_utils",
     ]:
         try:
             module = importlib.import_module(module_name)
@@ -98,11 +98,8 @@ def set_locale(locale_value: str | None) -> str | None:
         if hasattr(module, "ngettext"):
             module.ngettext = translator.ngettext
 
-    try:
-        rich_utils = importlib.import_module("typer.rich_utils")
-    except ModuleNotFoundError:  # pragma: no cover - optional dependency
-        pass
-    else:
+    rich_utils = sys.modules.get("typer.rich_utils")
+    if rich_utils is not None:
         if hasattr(rich_utils, "ARGUMENTS_PANEL_TITLE"):
             rich_utils.ARGUMENTS_PANEL_TITLE = translator.gettext("Arguments")
         if hasattr(rich_utils, "OPTIONS_PANEL_TITLE"):
