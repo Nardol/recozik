@@ -181,6 +181,14 @@ absolute_paths = false
 locale = "en"
 ```
 
+## Code structure
+
+- `src/recozik/cli.py` registers the Typer application and exposes backwards-compatible aliases for tests and integrations.
+- `src/recozik/commands/` contains the command implementations split by feature (`inspect`, `identify`, `identify-batch`, `rename-from-log`, `config`, `completion`).
+- `src/recozik/cli_support/` provides shared helpers (locale handling, filesystem utilities, metadata parsing, logging helpers, and lazy dependency loaders).
+
+This layout keeps the import-time fast while making the command code easier to navigate and test.
+
 ## Testing
 
 ```bash
