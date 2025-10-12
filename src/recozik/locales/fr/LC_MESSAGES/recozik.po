@@ -417,6 +417,9 @@ msgstr "Renommer {source} -> {target} ?"
 msgid "Renaming complete: {renamed} file(s), {skipped} skipped, {errors} errors."
 msgstr "Renommage terminé : {renamed} fichier(s), {skipped} ignoré(s), {errors} en erreur."
 
+msgid "RENAMED"
+msgstr "RENOMMÉ"
+
 msgid "Renaming is in progress. {remaining} file(s) still need to be processed."
 msgstr "Renommage en cours. {remaining} fichier(s) restent à traiter."
 
@@ -431,6 +434,9 @@ msgstr "Merci d'indiquer comment poursuivre."
 
 msgid "Continuing renaming."
 msgstr "Poursuite du renommage."
+
+msgid "DRY-RUN"
+msgstr "SIMULATION"
 
 msgid ""
 "Renaming interrupted; {completed} file(s) already renamed, {remaining} file(s) left "
@@ -447,6 +453,9 @@ msgstr "Relancez `fish` ou exécutez `{command}` pour activer la complétion."
 
 msgid "Restart fish to apply the removal."
 msgstr "Redémarrez fish pour prendre en compte la suppression."
+
+msgid "Script: {path}"
+msgstr "Script : {path}"
 
 msgid "Result {index}: score {score:.2f}"
 msgstr "Résultat {index} : score {score:.2f}"

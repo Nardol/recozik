@@ -982,7 +982,7 @@ def rename_from_log(
     interrupted_during_rename = False
     while index < len(planned):
         source_path, target_path, match_data = planned[index]
-        action = "DRY-RUN" if dry_run else "RENAMED"
+        action = _("DRY-RUN") if dry_run else _("RENAMED")
         typer.echo(
             _("{action}: {source} -> {target}").format(
                 action=action,
@@ -1156,7 +1156,7 @@ def completion_install(
         return
 
     typer.echo(_("Completion installed for {shell}.").format(shell=detected_shell))
-    typer.echo(f"Script: {script_path}")
+    typer.echo(_("Script: {path}").format(path=script_path))
     if command:
         typer.echo(_("Command to add: {command}").format(command=command))
     typer.echo(_completion_hint(detected_shell, script_path))
