@@ -181,7 +181,7 @@ msgid "Display the results as JSON (useful for scripting or screen readers)."
 msgstr "Affiche les résultats au format JSON (utile pour les scripts ou les lecteurs d'écran)."
 
 msgid "Dry-run complete: {planned} potential renames, {skipped} skipped, {errors} errors."
-msgstr "Dry-run terminé : {planned} renommages potentiels, {skipped} ignoré(s), {errors} en erreur."
+msgstr "Simulation terminée : {planned} renommages potentiels, {skipped} ignoré(s), {errors} en erreur."
 
 msgid "Use --apply to run the renames."
 msgstr "Utilisez --apply pour lancer les renommages."
