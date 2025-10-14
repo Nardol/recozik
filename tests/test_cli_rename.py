@@ -10,17 +10,10 @@ from typer.testing import CliRunner
 
 from recozik import cli
 
-runner = CliRunner()
+from .helpers.rename import invoke_rename, write_jsonl_log
 
 
-def _write_jsonl_log(path: Path, entries: list[dict]) -> None:
-    """Write JSONL entries to the provided path."""
-    with path.open("w", encoding="utf-8") as handle:
-        for entry in entries:
-            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
-def test_rename_from_log_apply(tmp_path: Path) -> None:
+def test_rename_from_log_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Apply rename operations when --apply is provided."""
     root = tmp_path / "music"
     root.mkdir()
@@ -28,7 +21,7 @@ def test_rename_from_log_apply(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -49,8 +42,8 @@ def test_rename_from_log_apply(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -70,7 +63,7 @@ def test_rename_from_log_apply(tmp_path: Path) -> None:
     assert log_path.exists()
 
 
-def test_rename_from_log_log_cleanup_prompt_delete(tmp_path: Path) -> None:
+def test_rename_from_log_log_cleanup_prompt_delete(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Delete the log after confirmation in default prompt mode."""
     root = tmp_path / "cleanup-prompt"
     root.mkdir()
@@ -78,7 +71,7 @@ def test_rename_from_log_log_cleanup_prompt_delete(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "cleanup.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -96,8 +89,8 @@ def test_rename_from_log_log_cleanup_prompt_delete(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -117,7 +110,7 @@ def test_rename_from_log_log_cleanup_prompt_delete(tmp_path: Path) -> None:
     assert "Log file deleted" in result.stdout
 
 
-def test_rename_from_log_log_cleanup_always_option(tmp_path: Path) -> None:
+def test_rename_from_log_log_cleanup_always_option(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Always delete the log when the option is provided."""
     root = tmp_path / "cleanup-option"
     root.mkdir()
@@ -125,7 +118,7 @@ def test_rename_from_log_log_cleanup_always_option(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "cleanup.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -143,8 +136,8 @@ def test_rename_from_log_log_cleanup_always_option(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -165,7 +158,7 @@ def test_rename_from_log_log_cleanup_always_option(tmp_path: Path) -> None:
     assert "Delete the log file" not in result.stdout
 
 
-def test_rename_from_log_log_cleanup_from_config(tmp_path: Path) -> None:
+def test_rename_from_log_log_cleanup_from_config(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Obey the log cleanup strategy provided by the configuration file."""
     root = tmp_path / "cleanup-config"
     root.mkdir()
@@ -173,7 +166,7 @@ def test_rename_from_log_log_cleanup_from_config(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "cleanup.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -203,8 +196,8 @@ def test_rename_from_log_log_cleanup_from_config(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -224,7 +217,7 @@ def test_rename_from_log_log_cleanup_from_config(tmp_path: Path) -> None:
     assert "Log file deleted" in result.stdout
 
 
-def test_rename_from_log_dry_run(tmp_path: Path) -> None:
+def test_rename_from_log_dry_run(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Preview rename operations without touching files."""
     root = tmp_path / "music"
     root.mkdir()
@@ -232,7 +225,7 @@ def test_rename_from_log_dry_run(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -253,8 +246,8 @@ def test_rename_from_log_dry_run(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -273,7 +266,7 @@ def test_rename_from_log_dry_run(tmp_path: Path) -> None:
     assert "Use --apply to run the renames." in result.stdout
 
 
-def test_rename_from_log_dry_run_then_apply(tmp_path: Path) -> None:
+def test_rename_from_log_dry_run_then_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Offer to apply the renames after a dry-run."""
     root = tmp_path / "music-apply"
     root.mkdir()
@@ -281,7 +274,7 @@ def test_rename_from_log_dry_run_then_apply(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "apply.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -302,8 +295,8 @@ def test_rename_from_log_dry_run_then_apply(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -324,7 +317,7 @@ def test_rename_from_log_dry_run_then_apply(tmp_path: Path) -> None:
     assert "RENAMED" in result.stdout
 
 
-def test_rename_from_log_conflict_append(tmp_path: Path) -> None:
+def test_rename_from_log_conflict_append(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Append a numeric suffix when the target filename already exists."""
     root = tmp_path / "music"
     root.mkdir()
@@ -332,7 +325,7 @@ def test_rename_from_log_conflict_append(tmp_path: Path) -> None:
     (root / "song2.mp3").write_bytes(b"b")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -368,8 +361,8 @@ def test_rename_from_log_conflict_append(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -388,18 +381,18 @@ def test_rename_from_log_conflict_append(tmp_path: Path) -> None:
     assert files == {"Artist - Same.mp3", "Artist - Same-1.mp3"}
 
 
-def test_rename_from_log_invalid_format(tmp_path: Path) -> None:
+def test_rename_from_log_invalid_format(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Abort when the provided log file is not JSONL."""
     log_path = tmp_path / "plain.log"
     log_path.write_text("file: track.mp3\n", encoding="utf-8")
 
-    result = runner.invoke(cli.app, ["rename-from-log", str(log_path)])
+    result = invoke_rename(cli_runner, ["rename-from-log", str(log_path)])
 
     assert result.exit_code == 1
     assert "JSONL" in result.stdout
 
 
-def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
+def test_rename_from_log_interactive(monkeypatch, cli_runner: CliRunner, tmp_path: Path) -> None:
     """Let the user choose a match interactively before renaming."""
     root = tmp_path / "music"
     root.mkdir()
@@ -407,7 +400,7 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -438,8 +431,8 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -460,7 +453,7 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
     assert (root / "Artist - Option2.mp3").exists()
 
 
-def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
+def test_rename_from_log_interactive_reprompt(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Retry selection until a valid input is provided."""
     root = tmp_path / "retry"
     root.mkdir()
@@ -468,7 +461,7 @@ def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "retry.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -499,8 +492,8 @@ def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -523,7 +516,9 @@ def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
     assert (root / "Artist - Second.mp3").exists()
 
 
-def test_rename_from_log_interactive_interrupt_cancel(monkeypatch, tmp_path: Path) -> None:
+def test_rename_from_log_interactive_interrupt_cancel(
+    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+) -> None:
     """Cancel the command after Ctrl+C during selection."""
     root = tmp_path / "interrupt-cancel"
     root.mkdir()
@@ -531,7 +526,7 @@ def test_rename_from_log_interactive_interrupt_cancel(monkeypatch, tmp_path: Pat
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -568,8 +563,8 @@ def test_rename_from_log_interactive_interrupt_cancel(monkeypatch, tmp_path: Pat
 
     monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -589,7 +584,9 @@ def test_rename_from_log_interactive_interrupt_cancel(monkeypatch, tmp_path: Pat
     assert src.exists()
 
 
-def test_rename_from_log_interactive_interrupt_apply(monkeypatch, tmp_path: Path) -> None:
+def test_rename_from_log_interactive_interrupt_apply(
+    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+) -> None:
     """Apply partial renames after Ctrl+C."""
     root = tmp_path / "interrupt-apply"
     root.mkdir()
@@ -599,7 +596,7 @@ def test_rename_from_log_interactive_interrupt_apply(monkeypatch, tmp_path: Path
     second.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -655,8 +652,8 @@ def test_rename_from_log_interactive_interrupt_apply(monkeypatch, tmp_path: Path
 
     monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -678,7 +675,9 @@ def test_rename_from_log_interactive_interrupt_apply(monkeypatch, tmp_path: Path
     assert second.exists()
 
 
-def test_rename_from_log_interactive_interrupt_resume(monkeypatch, tmp_path: Path) -> None:
+def test_rename_from_log_interactive_interrupt_resume(
+    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+) -> None:
     """Resume questioning after Ctrl+C."""
     root = tmp_path / "interrupt-resume"
     root.mkdir()
@@ -686,7 +685,7 @@ def test_rename_from_log_interactive_interrupt_resume(monkeypatch, tmp_path: Pat
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -723,8 +722,8 @@ def test_rename_from_log_interactive_interrupt_resume(monkeypatch, tmp_path: Pat
 
     monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -745,7 +744,9 @@ def test_rename_from_log_interactive_interrupt_resume(monkeypatch, tmp_path: Pat
     assert (root / "Artist - Option2.mp3").exists()
 
 
-def test_rename_from_log_rename_interrupt_continue(monkeypatch, tmp_path: Path) -> None:
+def test_rename_from_log_rename_interrupt_continue(
+    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+) -> None:
     """Confirm continuation after Ctrl+C during the renaming stage."""
     root = tmp_path / "rename-continue"
     root.mkdir()
@@ -753,7 +754,7 @@ def test_rename_from_log_rename_interrupt_continue(monkeypatch, tmp_path: Path) 
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -802,8 +803,8 @@ def test_rename_from_log_rename_interrupt_continue(monkeypatch, tmp_path: Path) 
     monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
     monkeypatch.setattr(Path, "rename", fake_rename)
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -825,7 +826,9 @@ def test_rename_from_log_rename_interrupt_continue(monkeypatch, tmp_path: Path) 
     assert "Continuing renaming." in result.stdout
 
 
-def test_rename_from_log_rename_interrupt_cancel(monkeypatch, tmp_path: Path) -> None:
+def test_rename_from_log_rename_interrupt_cancel(
+    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+) -> None:
     """Allow the user to abort during the renaming stage."""
     root = tmp_path / "rename-cancel"
     root.mkdir()
@@ -833,7 +836,7 @@ def test_rename_from_log_rename_interrupt_cancel(monkeypatch, tmp_path: Path) ->
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -880,8 +883,8 @@ def test_rename_from_log_rename_interrupt_cancel(monkeypatch, tmp_path: Path) ->
     monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
     monkeypatch.setattr(Path, "rename", fake_rename)
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -902,7 +905,7 @@ def test_rename_from_log_rename_interrupt_cancel(monkeypatch, tmp_path: Path) ->
     assert "Renaming interrupted" in result.stdout
 
 
-def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
+def test_rename_from_log_metadata_fallback(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Rename using metadata when no matches are provided."""
     root = tmp_path / "metadata"
     root.mkdir()
@@ -910,7 +913,7 @@ def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "meta.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -925,8 +928,8 @@ def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -949,7 +952,9 @@ def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
     assert (root / "Tagged Artist - Tagged Title.mp3").exists()
 
 
-def test_rename_from_log_metadata_fallback_auto_confirm(tmp_path: Path) -> None:
+def test_rename_from_log_metadata_fallback_auto_confirm(
+    cli_runner: CliRunner, tmp_path: Path
+) -> None:
     """Allow automation by disabling the metadata confirmation prompt."""
     root = tmp_path / "auto"
     root.mkdir()
@@ -957,7 +962,7 @@ def test_rename_from_log_metadata_fallback_auto_confirm(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "auto.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -971,8 +976,8 @@ def test_rename_from_log_metadata_fallback_auto_confirm(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -995,7 +1000,7 @@ def test_rename_from_log_metadata_fallback_auto_confirm(tmp_path: Path) -> None:
     assert (root / "Auto Artist - Auto Title.mp3").exists()
 
 
-def test_rename_from_log_metadata_fallback_reject(tmp_path: Path) -> None:
+def test_rename_from_log_metadata_fallback_reject(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Skip renaming when the user refuses the metadata fallback."""
     root = tmp_path / "reject"
     root.mkdir()
@@ -1003,7 +1008,7 @@ def test_rename_from_log_metadata_fallback_reject(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "reject.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -1017,8 +1022,8 @@ def test_rename_from_log_metadata_fallback_reject(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -1039,7 +1044,7 @@ def test_rename_from_log_metadata_fallback_reject(tmp_path: Path) -> None:
     assert src.exists()
 
 
-def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
+def test_rename_from_log_confirm_yes(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Proceed with renaming when confirmation is accepted."""
     root = tmp_path / "music"
     root.mkdir()
@@ -1047,7 +1052,7 @@ def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -1068,8 +1073,8 @@ def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -1088,7 +1093,7 @@ def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
     assert (root / "Artist - Confirm.mp3").exists()
 
 
-def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
+def test_rename_from_log_confirm_no(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Cancel renaming when the user declines confirmation."""
     root = tmp_path / "music"
     root.mkdir()
@@ -1096,7 +1101,7 @@ def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -1117,8 +1122,8 @@ def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
@@ -1137,7 +1142,7 @@ def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
     assert "Rename skipped" in result.stdout
 
 
-def test_rename_from_log_export(tmp_path: Path) -> None:
+def test_rename_from_log_export(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Export the rename plan to JSON while applying changes."""
     root = tmp_path / "music"
     root.mkdir()
@@ -1145,7 +1150,7 @@ def test_rename_from_log_export(tmp_path: Path) -> None:
     src.write_bytes(b"data")
 
     log_path = tmp_path / "batch.jsonl"
-    _write_jsonl_log(
+    write_jsonl_log(
         log_path,
         [
             {
@@ -1168,8 +1173,8 @@ def test_rename_from_log_export(tmp_path: Path) -> None:
 
     export_file = tmp_path / "renames.json"
 
-    result = runner.invoke(
-        cli.app,
+    result = invoke_rename(
+        cli_runner,
         [
             "rename-from-log",
             str(log_path),
