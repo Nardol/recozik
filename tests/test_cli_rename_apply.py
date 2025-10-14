@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from .conftest import RenameTestEnv
-from .helpers.rename import invoke_rename, make_entry, make_match
+from .helpers.rename import build_rename_command, invoke_rename, make_entry, make_match
 
 
 def test_rename_from_log_apply(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
@@ -36,17 +36,7 @@ def test_rename_from_log_apply(cli_runner: CliRunner, rename_env: RenameTestEnv)
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        [*build_rename_command(log_path, root), "--apply", "--log-cleanup", "never"],
     )
 
     assert result.exit_code == 0
@@ -94,12 +84,7 @@ def test_rename_from_log_log_cleanup_modes(
     )
 
     args = [
-        "rename-from-log",
-        str(log_path),
-        "--root",
-        str(root),
-        "--template",
-        "{artist} - {title}",
+        *build_rename_command(log_path, root),
         "--apply",
         *extra_args,
     ]
@@ -163,17 +148,7 @@ def test_rename_from_log_conflict_append(cli_runner: CliRunner, rename_env: Rena
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        [*build_rename_command(log_path, root), "--apply", "--log-cleanup", "never"],
     )
 
     assert result.exit_code == 0
@@ -222,12 +197,7 @@ def test_rename_from_log_export(cli_runner: CliRunner, rename_env: RenameTestEnv
     result = invoke_rename(
         cli_runner,
         [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
+            *build_rename_command(log_path, root),
             "--apply",
             "--log-cleanup",
             "never",
