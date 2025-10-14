@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from .helpers.rename import (
@@ -15,58 +16,36 @@ from .helpers.rename import (
 )
 
 
-def test_rename_from_log_metadata_fallback(cli_runner: CliRunner, tmp_path: Path) -> None:
-    """Rename using metadata when no matches are provided."""
-    root = tmp_path / "metadata"
-    root.mkdir()
-    src = root / "meta.mp3"
-    src.write_bytes(b"data")
-
-    log_path = tmp_path / "meta.jsonl"
-    write_jsonl_log(
-        log_path,
-        [
-            make_entry(
-                "meta.mp3",
-                matches=[],
-                metadata=make_metadata(
-                    artist="Tagged Artist",
-                    title="Tagged Title",
-                    album="Tagged Album",
-                ),
-            )
-        ],
-    )
-
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
-        input="o\n",
-    )
-
-    assert result.exit_code == 0
-    assert not src.exists()
-    assert (root / "Tagged Artist - Tagged Title.mp3").exists()
-
-
-def test_rename_from_log_metadata_fallback_auto_confirm(
-    cli_runner: CliRunner, tmp_path: Path
+@pytest.mark.parametrize(
+    (
+        "case_name",
+        "extra_args",
+        "input_text",
+        "expect_renamed",
+        "expected_message",
+    ),
+    [
+        ("metadata", [], "o\n", True, None),
+        ("metadata-auto", ["--metadata-fallback-no-confirm"], None, True, None),
+        ("metadata-reject", [], "n\n", False, "Metadata-based rename skipped"),
+    ],
+)
+def test_rename_from_log_metadata_fallback_modes(
+    cli_runner: CliRunner,
+    tmp_path: Path,
+    case_name: str,
+    extra_args: list[str],
+    input_text: str | None,
+    expect_renamed: bool,
+    expected_message: str | None,
 ) -> None:
-    """Skip confirmation when metadata fallback auto-confirmation is active."""
-    root = tmp_path / "metadata-auto"
+    """Cover metadata fallback confirmation flows with a single parametrized test."""
+    root = tmp_path / case_name
     root.mkdir()
     src = root / "meta.mp3"
     src.write_bytes(b"data")
 
-    log_path = tmp_path / "meta.jsonl"
+    log_path = tmp_path / f"{case_name}.jsonl"
     write_jsonl_log(
         log_path,
         [
@@ -82,80 +61,60 @@ def test_rename_from_log_metadata_fallback_auto_confirm(
         ],
     )
 
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--apply",
-            "--metadata-fallback-no-confirm",
-            "--log-cleanup",
-            "never",
-        ],
-    )
+    args = [
+        "rename-from-log",
+        str(log_path),
+        "--root",
+        str(root),
+        "--apply",
+        "--log-cleanup",
+        "never",
+        *extra_args,
+    ]
+
+    result = invoke_rename(cli_runner, args, input=input_text)
 
     assert result.exit_code == 0
-    assert not src.exists()
-    assert (root / "Tagged Artist - Tagged Title.mp3").exists()
+    new_path = root / "Tagged Artist - Tagged Title.mp3"
+    if expect_renamed:
+        assert not src.exists()
+        assert new_path.exists()
+    else:
+        assert src.exists()
+        assert not new_path.exists()
+
+    if expected_message:
+        assert expected_message in result.stdout
 
 
-def test_rename_from_log_metadata_fallback_reject(cli_runner: CliRunner, tmp_path: Path) -> None:
-    """Skip metadata fallback when the user declines."""
-    root = tmp_path / "metadata-reject"
+@pytest.mark.parametrize(
+    ("case_name", "input_text", "expect_renamed", "expected_message"),
+    [
+        ("confirm", "o\n", True, None),
+        ("confirm", "n\n", False, "Rename skipped"),
+    ],
+)
+def test_rename_from_log_confirm_prompt(
+    cli_runner: CliRunner,
+    tmp_path: Path,
+    case_name: str,
+    input_text: str,
+    expect_renamed: bool,
+    expected_message: str | None,
+) -> None:
+    """Exercise confirm/decline flows with metadata-derived matches."""
+    root = tmp_path / case_name
     root.mkdir()
-    src = root / "meta.mp3"
+    src_name = "confirm.mp3" if expect_renamed else "skip.mp3"
+    src = root / src_name
     src.write_bytes(b"data")
 
-    log_path = tmp_path / "meta.jsonl"
+    log_path = tmp_path / f"{case_name}.jsonl"
     write_jsonl_log(
         log_path,
         [
             make_entry(
-                "meta.mp3",
-                matches=[],
-                metadata=make_metadata(
-                    artist="Tagged Artist",
-                    title="Tagged Title",
-                    album="Tagged Album",
-                ),
-            )
-        ],
-    )
-
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
-        input="n\n",
-    )
-
-    assert result.exit_code == 0
-    assert src.exists()
-    assert "Metadata-based rename skipped" in result.stdout
-
-
-def test_rename_from_log_confirm_yes(cli_runner: CliRunner, tmp_path: Path) -> None:
-    """Proceed when the user confirms the rename."""
-    root = tmp_path / "confirm"
-    root.mkdir()
-    src = root / "confirm.mp3"
-    src.write_bytes(b"data")
-
-    log_path = tmp_path / "confirm.jsonl"
-    write_jsonl_log(
-        log_path,
-        [
-            make_entry(
-                "confirm.mp3",
+                src_name,
                 matches=[
                     make_match(
                         artist="Artist",
@@ -180,54 +139,16 @@ def test_rename_from_log_confirm_yes(cli_runner: CliRunner, tmp_path: Path) -> N
             "--log-cleanup",
             "never",
         ],
-        input="o\n",
+        input=input_text,
     )
 
     assert result.exit_code == 0
-    assert not src.exists()
-    assert (root / "Artist - Confirm.mp3").exists()
-
-
-def test_rename_from_log_confirm_no(cli_runner: CliRunner, tmp_path: Path) -> None:
-    """Cancel renaming when the user declines confirmation."""
-    root = tmp_path / "confirm"
-    root.mkdir()
-    src = root / "skip.mp3"
-    src.write_bytes(b"data")
-
-    log_path = tmp_path / "confirm.jsonl"
-    write_jsonl_log(
-        log_path,
-        [
-            make_entry(
-                "skip.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="Skip",
-                        score=0.9,
-                        recording_id="id",
-                    )
-                ],
-            )
-        ],
-    )
-
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--confirm",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
-        input="n\n",
-    )
-
-    assert result.exit_code == 0
-    assert src.exists()
-    assert "Rename skipped" in result.stdout
+    target = root / "Artist - Confirm.mp3"
+    if expect_renamed:
+        assert not src.exists()
+        assert target.exists()
+    else:
+        assert src.exists()
+        assert not target.exists()
+        if expected_message:
+            assert expected_message in result.stdout
