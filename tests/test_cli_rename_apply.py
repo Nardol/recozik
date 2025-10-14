@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
@@ -57,9 +58,25 @@ def test_rename_from_log_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
     assert log_path.exists()
 
 
-def test_rename_from_log_log_cleanup_prompt_delete(cli_runner: CliRunner, tmp_path: Path) -> None:
-    """Delete the log after confirmation in default prompt mode."""
-    root = tmp_path / "cleanup-prompt"
+@pytest.mark.parametrize(
+    ("extra_args", "input_text", "config_cleanup", "expect_deleted", "expect_prompt"),
+    [
+        ([], "o\n", None, True, True),
+        (["--log-cleanup", "always"], None, None, True, False),
+        ([], None, "always", True, False),
+    ],
+)
+def test_rename_from_log_log_cleanup_modes(
+    cli_runner: CliRunner,
+    tmp_path: Path,
+    extra_args: list[str],
+    input_text: str | None,
+    config_cleanup: str | None,
+    expect_deleted: bool,
+    expect_prompt: bool,
+) -> None:
+    """Exercise the different log cleanup strategies."""
+    root = tmp_path / "cleanup"
     root.mkdir()
     src = root / "track.mp3"
     src.write_bytes(b"data")
@@ -82,130 +99,38 @@ def test_rename_from_log_log_cleanup_prompt_delete(cli_runner: CliRunner, tmp_pa
         ],
     )
 
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--apply",
-        ],
-        input="o\n",
-    )
+    args = [
+        "rename-from-log",
+        str(log_path),
+        "--root",
+        str(root),
+        "--template",
+        "{artist} - {title}",
+        "--apply",
+        *extra_args,
+    ]
+
+    if config_cleanup:
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            "\n".join(["[rename]", f'log_cleanup = "{config_cleanup}"', ""]),
+            encoding="utf-8",
+        )
+        args.extend(["--config-path", str(config_path)])
+
+    result = invoke_rename(cli_runner, args, input=input_text)
 
     assert result.exit_code == 0
     assert not src.exists()
-    assert not log_path.exists()
-    assert "Delete the log file" in result.stdout
-    assert "Log file deleted" in result.stdout
 
+    if expect_deleted:
+        assert not log_path.exists()
+        assert "Log file deleted" in result.stdout
+    else:
+        assert log_path.exists()
 
-def test_rename_from_log_log_cleanup_always_option(cli_runner: CliRunner, tmp_path: Path) -> None:
-    """Always delete the log when the option is provided."""
-    root = tmp_path / "cleanup-option"
-    root.mkdir()
-    src = root / "track.mp3"
-    src.write_bytes(b"data")
-
-    log_path = tmp_path / "cleanup.jsonl"
-    write_jsonl_log(
-        log_path,
-        [
-            make_entry(
-                "track.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="Track",
-                        score=0.9,
-                        recording_id="id",
-                    )
-                ],
-            )
-        ],
-    )
-
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--apply",
-            "--log-cleanup",
-            "always",
-        ],
-    )
-
-    assert result.exit_code == 0
-    assert not src.exists()
-    assert not log_path.exists()
-    assert "Log file deleted" in result.stdout
-    assert "Delete the log file" not in result.stdout
-
-
-def test_rename_from_log_log_cleanup_from_config(cli_runner: CliRunner, tmp_path: Path) -> None:
-    """Obey the log cleanup strategy provided by the configuration file."""
-    root = tmp_path / "cleanup-config"
-    root.mkdir()
-    src = root / "track.mp3"
-    src.write_bytes(b"data")
-
-    log_path = tmp_path / "cleanup.jsonl"
-    write_jsonl_log(
-        log_path,
-        [
-            make_entry(
-                "track.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="Track",
-                        score=0.9,
-                        recording_id="id",
-                    )
-                ],
-            )
-        ],
-    )
-
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(
-        "\n".join(
-            [
-                "[rename]",
-                'log_cleanup = "always"',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--apply",
-            "--config-path",
-            str(config_path),
-        ],
-    )
-
-    assert result.exit_code == 0
-    assert not src.exists()
-    assert not log_path.exists()
-    assert "Log file deleted" in result.stdout
+    prompt_present = "Delete the log file" in result.stdout
+    assert prompt_present is expect_prompt
 
 
 def test_rename_from_log_conflict_append(cli_runner: CliRunner, tmp_path: Path) -> None:
