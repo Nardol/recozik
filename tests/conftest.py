@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from typer.testing import CliRunner
 
 
 @pytest.fixture(autouse=True)
@@ -14,3 +15,9 @@ def force_english_locale(monkeypatch: pytest.MonkeyPatch) -> None:
     except ModuleNotFoundError:  # pragma: no cover - during initial imports
         return
     set_locale("en")
+
+
+@pytest.fixture()
+def cli_runner() -> CliRunner:
+    """Return a new CLI runner for each test."""
+    return CliRunner()
