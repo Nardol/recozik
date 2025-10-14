@@ -59,12 +59,169 @@ def test_rename_from_log_apply(tmp_path: Path) -> None:
             "--template",
             "{artist} - {title}",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
     assert result.exit_code == 0
     assert not src.exists()
     assert (root / "Artist - Title.mp3").exists()
+    assert log_path.exists()
+
+
+def test_rename_from_log_log_cleanup_prompt_delete(tmp_path: Path) -> None:
+    """Delete the log after confirmation in default prompt mode."""
+    root = tmp_path / "cleanup-prompt"
+    root.mkdir()
+    src = root / "track.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "cleanup.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "track.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - Track",
+                        "score": 0.9,
+                        "recording_id": "id",
+                        "artist": "Artist",
+                        "title": "Track",
+                    }
+                ],
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--apply",
+        ],
+        input="o\n",
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert not log_path.exists()
+    assert "Delete the log file" in result.stdout
+    assert "Log file deleted" in result.stdout
+
+
+def test_rename_from_log_log_cleanup_always_option(tmp_path: Path) -> None:
+    """Always delete the log when the option is provided."""
+    root = tmp_path / "cleanup-option"
+    root.mkdir()
+    src = root / "track.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "cleanup.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "track.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - Track",
+                        "score": 0.9,
+                        "recording_id": "id",
+                        "artist": "Artist",
+                        "title": "Track",
+                    }
+                ],
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--apply",
+            "--log-cleanup",
+            "always",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert not log_path.exists()
+    assert "Log file deleted" in result.stdout
+    assert "Delete the log file" not in result.stdout
+
+
+def test_rename_from_log_log_cleanup_from_config(tmp_path: Path) -> None:
+    """Obey the log cleanup strategy provided by the configuration file."""
+    root = tmp_path / "cleanup-config"
+    root.mkdir()
+    src = root / "track.mp3"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "cleanup.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "track.mp3",
+                "matches": [
+                    {
+                        "formatted": "Artist - Track",
+                        "score": 0.9,
+                        "recording_id": "id",
+                        "artist": "Artist",
+                        "title": "Track",
+                    }
+                ],
+            }
+        ],
+    )
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[rename]",
+                'log_cleanup = "always"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--apply",
+            "--config-path",
+            str(config_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert not log_path.exists()
+    assert "Log file deleted" in result.stdout
 
 
 def test_rename_from_log_dry_run(tmp_path: Path) -> None:
@@ -154,6 +311,8 @@ def test_rename_from_log_dry_run_then_apply(tmp_path: Path) -> None:
             str(root),
             "--template",
             "{artist} - {title}",
+            "--log-cleanup",
+            "never",
         ],
         input="o\n",
     )
@@ -219,6 +378,8 @@ def test_rename_from_log_conflict_append(tmp_path: Path) -> None:
             "--template",
             "{artist} - {title}",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
@@ -288,6 +449,8 @@ def test_rename_from_log_interactive(monkeypatch, tmp_path: Path) -> None:
             "{artist} - {title}",
             "--interactive",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
         input="2\n",
     )
@@ -347,6 +510,8 @@ def test_rename_from_log_interactive_reprompt(tmp_path: Path) -> None:
             "{artist} - {title}",
             "--interactive",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
         input="0\nabc\n2\n",
     )
@@ -414,6 +579,8 @@ def test_rename_from_log_interactive_interrupt_cancel(monkeypatch, tmp_path: Pat
             "{artist} - {title}",
             "--interactive",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
@@ -499,6 +666,8 @@ def test_rename_from_log_interactive_interrupt_apply(monkeypatch, tmp_path: Path
             "{artist} - {title}",
             "--interactive",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
@@ -565,6 +734,8 @@ def test_rename_from_log_interactive_interrupt_resume(monkeypatch, tmp_path: Pat
             "{artist} - {title}",
             "--interactive",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
@@ -642,6 +813,8 @@ def test_rename_from_log_rename_interrupt_continue(monkeypatch, tmp_path: Path) 
             "{artist} - {title}",
             "--interactive",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
@@ -718,6 +891,8 @@ def test_rename_from_log_rename_interrupt_cancel(monkeypatch, tmp_path: Path) ->
             "{artist} - {title}",
             "--interactive",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
@@ -761,6 +936,8 @@ def test_rename_from_log_metadata_fallback(tmp_path: Path) -> None:
             "{artist} - {title}",
             "--metadata-fallback",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
         input="o\n",
     )
@@ -806,6 +983,8 @@ def test_rename_from_log_metadata_fallback_auto_confirm(tmp_path: Path) -> None:
             "--metadata-fallback",
             "--metadata-fallback-no-confirm",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
     )
 
@@ -849,6 +1028,8 @@ def test_rename_from_log_metadata_fallback_reject(tmp_path: Path) -> None:
             "{artist} - {title}",
             "--metadata-fallback",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
         input="n\n",
     )
@@ -896,6 +1077,8 @@ def test_rename_from_log_confirm_yes(tmp_path: Path) -> None:
             str(root),
             "--confirm",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
         input="o\n",
     )
@@ -943,6 +1126,8 @@ def test_rename_from_log_confirm_no(tmp_path: Path) -> None:
             str(root),
             "--confirm",
             "--apply",
+            "--log-cleanup",
+            "never",
         ],
         input="n\n",
     )
@@ -993,6 +1178,8 @@ def test_rename_from_log_export(tmp_path: Path) -> None:
             "--template",
             "{artist} - {title}",
             "--apply",
+            "--log-cleanup",
+            "never",
             "--export",
             str(export_file),
         ],

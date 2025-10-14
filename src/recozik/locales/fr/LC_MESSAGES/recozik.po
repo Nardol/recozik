@@ -72,6 +72,12 @@ msgstr "Demande une confirmation pour chaque fichier avant renommage."
 msgid "Apply the planned renames now?"
 msgstr "Appliquer les renommages prévus maintenant ?"
 
+msgid "Log cleanup strategy after applying renames: ask (default), always, or never."
+msgstr "Stratégie de nettoyage du log après application des renommages : ask (défaut), always ou never."
+
+msgid "Invalid --log-cleanup value. Choose ask, always, or never."
+msgstr "Valeur --log-cleanup invalide. Choisissez ask, always ou never."
+
 msgid "Confirm renames based on embedded metadata (use --metadata-fallback-no-confirm)."
 msgstr "Confirme les renommages basés sur les métadonnées intégrées (utilisez --metadata-fallback-no-confirm)."
 
@@ -89,6 +95,24 @@ msgstr "Empreinte Chromaprint :"
 
 msgid "Collision handling strategy: append (default), skip, overwrite."
 msgstr "Gestion des collisions : append (défaut), skip, overwrite."
+
+msgid "Log file already removed: {path}"
+msgstr "Fichier de log déjà supprimé : {path}"
+
+msgid "Unable to delete log file {path}: {error}"
+msgstr "Impossible de supprimer le fichier de log {path} : {error}"
+
+msgid "Log file deleted: {path}"
+msgstr "Fichier de log supprimé : {path}"
+
+msgid "Log file kept: {path}"
+msgstr "Fichier de log conservé : {path}"
+
+msgid "Delete the log file {path}?"
+msgstr "Supprimer le fichier de log {path} ?"
+
+msgid "Operation cancelled; log file kept."
+msgstr "Opération annulée ; fichier de log conservé."
 
 msgid "Command to add: {command}"
 msgstr "Commande à ajouter : {command}"
@@ -513,6 +537,12 @@ msgstr "Le champ general.locale doit être une chaîne de caractères."
 
 msgid "The field output.template must be a string."
 msgstr "Le champ output.template doit être une chaîne de caractères."
+
+msgid "The field rename.log_cleanup must be a string."
+msgstr "Le champ rename.log_cleanup doit être une chaîne."
+
+msgid "The field rename.log_cleanup must be ask, always, or never."
+msgstr "Le champ rename.log_cleanup doit valoir ask, always ou never."
 
 msgid "The keys do not match."
 msgstr "Les clés ne correspondent pas."

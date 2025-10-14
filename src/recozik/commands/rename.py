@@ -84,6 +84,11 @@ def rename_from_log(
         "--metadata-fallback-confirm/--metadata-fallback-no-confirm",
         help=_("Confirm renames based on embedded metadata (use --metadata-fallback-no-confirm)."),
     ),
+    log_cleanup: str | None = typer.Option(
+        None,
+        "--log-cleanup",
+        help=_("Log cleanup strategy after applying renames: ask (default), always, or never."),
+    ),
     config_path: Path | None = typer.Option(
         None,
         "--config-path",
@@ -119,6 +124,18 @@ def rename_from_log(
     metadata_fallback_enabled = (
         config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
     )
+
+    valid_cleanup_modes = {"ask", "always", "never"}
+    cleanup_choice = None
+    if log_cleanup is not None:
+        cleanup_choice = log_cleanup.lower()
+        if cleanup_choice not in valid_cleanup_modes:
+            typer.echo(_("Invalid --log-cleanup value. Choose ask, always, or never."))
+            raise typer.Exit(code=1)
+
+    cleanup_mode = cleanup_choice or getattr(config, "rename_log_cleanup", "ask")
+    if cleanup_mode not in valid_cleanup_modes:
+        cleanup_mode = "ask"
 
     try:
         entries = load_jsonl_log(resolved_log)
@@ -429,6 +446,50 @@ def rename_from_log(
 
         return renamed_count, interrupted, entries
 
+    def handle_log_cleanup(mode: str) -> None:
+        normalized = mode if mode in valid_cleanup_modes else "ask"
+
+        def delete_log_file() -> None:
+            try:
+                resolved_log.unlink()
+            except FileNotFoundError:
+                typer.echo(_("Log file already removed: {path}").format(path=resolved_log))
+            except OSError as exc:
+                typer.echo(
+                    _("Unable to delete log file {path}: {error}").format(
+                        path=resolved_log, error=exc
+                    )
+                )
+            else:
+                typer.echo(_("Log file deleted: {path}").format(path=resolved_log))
+
+        if not resolved_log.exists():
+            typer.echo(_("Log file already removed: {path}").format(path=resolved_log))
+            return
+
+        if normalized == "always":
+            delete_log_file()
+            return
+
+        if normalized == "never":
+            typer.echo(_("Log file kept: {path}").format(path=resolved_log))
+            return
+
+        while True:
+            try:
+                if prompt_yes_no(
+                    _("Delete the log file {path}?").format(path=resolved_log),
+                    default=False,
+                    require_answer=True,
+                ):
+                    delete_log_file()
+                else:
+                    typer.echo(_("Log file kept: {path}").format(path=resolved_log))
+                break
+            except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+                typer.echo(_("Operation cancelled; log file kept."))
+                break
+
     renamed_count, interrupted_during_rename, export_entries = execute_planned(dry_run)
 
     if dry_run and not interrupted_during_rename:
@@ -471,6 +532,9 @@ def rename_from_log(
             encoding="utf-8",
         )
         typer.echo(_("Summary written to {path}").format(path=resolved_export))
+
+    if not dry_run and not interrupted_during_rename and renamed_count > 0:
+        handle_log_cleanup(cleanup_mode)
 
     if interrupted_during_rename:
         raise typer.Exit(code=1)
