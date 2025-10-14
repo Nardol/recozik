@@ -2,23 +2,19 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from typer.testing import CliRunner
 
-from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
+from .conftest import RenameTestEnv
+from .helpers.rename import invoke_rename, make_entry, make_match
 
 
-def test_rename_from_log_interactive(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_interactive(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
     """Let the user choose a match interactively before renaming."""
-    root = tmp_path / "music"
-    root.mkdir()
-    src = root / "interactive.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("music")
+    src = rename_env.create_source(root, "interactive.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "interactive.jsonl",
         [
             make_entry(
                 "interactive.mp3",
@@ -62,16 +58,15 @@ def test_rename_from_log_interactive(cli_runner: CliRunner, tmp_path: Path) -> N
     assert (root / "Artist - Option2.mp3").exists()
 
 
-def test_rename_from_log_interactive_reprompt(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_interactive_reprompt(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
     """Retry selection until a valid input is provided."""
-    root = tmp_path / "retry"
-    root.mkdir()
-    src = root / "retry.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("retry")
+    src = rename_env.create_source(root, "retry.mp3")
 
-    log_path = tmp_path / "retry.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "retry.jsonl",
         [
             make_entry(
                 "retry.mp3",

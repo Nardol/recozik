@@ -9,21 +9,19 @@ from typer.testing import CliRunner
 
 from recozik import cli
 
-from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
+from .conftest import RenameTestEnv
+from .helpers.rename import invoke_rename, make_entry, make_match
 
 
 def test_rename_from_log_interactive_interrupt_cancel(
-    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+    monkeypatch, cli_runner: CliRunner, rename_env: RenameTestEnv
 ) -> None:
     """Cancel the command after Ctrl+C during selection."""
-    root = tmp_path / "interrupt-cancel"
-    root.mkdir()
-    src = root / "track.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("interrupt-cancel")
+    src = rename_env.create_source(root, "track.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "interrupt-cancel.jsonl",
         [
             make_entry(
                 "track.mp3",
@@ -79,19 +77,15 @@ def test_rename_from_log_interactive_interrupt_cancel(
 
 
 def test_rename_from_log_interactive_interrupt_apply(
-    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+    monkeypatch, cli_runner: CliRunner, rename_env: RenameTestEnv
 ) -> None:
     """Apply partial renames after Ctrl+C."""
-    root = tmp_path / "interrupt-apply"
-    root.mkdir()
-    first = root / "first.mp3"
-    second = root / "second.mp3"
-    first.write_bytes(b"data")
-    second.write_bytes(b"data")
+    root = rename_env.make_root("interrupt-apply")
+    first = rename_env.create_source(root, "first.mp3")
+    second = rename_env.create_source(root, "second.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "interrupt-apply.jsonl",
         [
             make_entry(
                 "first.mp3",
@@ -166,17 +160,14 @@ def test_rename_from_log_interactive_interrupt_apply(
 
 
 def test_rename_from_log_interactive_interrupt_resume(
-    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+    monkeypatch, cli_runner: CliRunner, rename_env: RenameTestEnv
 ) -> None:
     """Resume questioning after the user requests it."""
-    root = tmp_path / "interrupt-resume"
-    root.mkdir()
-    src = root / "resume.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("interrupt-resume")
+    src = rename_env.create_source(root, "resume.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "interrupt-resume.jsonl",
         [
             make_entry(
                 "resume.mp3",
@@ -233,17 +224,14 @@ def test_rename_from_log_interactive_interrupt_resume(
 
 
 def test_rename_from_log_rename_interrupt_continue(
-    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+    monkeypatch, cli_runner: CliRunner, rename_env: RenameTestEnv
 ) -> None:
     """Continue renaming after an interrupt during the apply stage."""
-    root = tmp_path / "rename-continue"
-    root.mkdir()
-    src = root / "continue.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("rename-continue")
+    src = rename_env.create_source(root, "continue.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "rename-continue.jsonl",
         [
             make_entry(
                 "continue.mp3",
@@ -316,17 +304,14 @@ def test_rename_from_log_rename_interrupt_continue(
 
 
 def test_rename_from_log_rename_interrupt_cancel(
-    monkeypatch, cli_runner: CliRunner, tmp_path: Path
+    monkeypatch, cli_runner: CliRunner, rename_env: RenameTestEnv
 ) -> None:
     """Cancel renaming after an interrupt during the apply stage."""
-    root = tmp_path / "rename-cancel"
-    root.mkdir()
-    src = root / "cancel.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("rename-cancel")
+    src = rename_env.create_source(root, "cancel.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "rename-cancel.jsonl",
         [
             make_entry(
                 "cancel.mp3",

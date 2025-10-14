@@ -2,23 +2,19 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from typer.testing import CliRunner
 
-from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
+from .conftest import RenameTestEnv
+from .helpers.rename import invoke_rename, make_entry, make_match
 
 
-def test_rename_from_log_dry_run(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_dry_run(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
     """Preview rename operations without touching files."""
-    root = tmp_path / "music"
-    root.mkdir()
-    src = root / "track.wav"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("music")
+    src = rename_env.create_source(root, "track.wav")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "dry-run.jsonl",
         [
             make_entry(
                 "track.wav",
@@ -54,16 +50,15 @@ def test_rename_from_log_dry_run(cli_runner: CliRunner, tmp_path: Path) -> None:
     assert "Use --apply to run the renames." in result.stdout
 
 
-def test_rename_from_log_dry_run_then_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_dry_run_then_apply(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
     """Offer to apply the renames after a dry-run."""
-    root = tmp_path / "music-apply"
-    root.mkdir()
-    src = root / "demo.flac"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("music-apply")
+    src = rename_env.create_source(root, "demo.flac")
 
-    log_path = tmp_path / "apply.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "dry-run-apply.jsonl",
         [
             make_entry(
                 "demo.flac",
