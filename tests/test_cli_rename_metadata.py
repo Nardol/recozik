@@ -6,7 +6,13 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from .helpers.rename import invoke_rename, write_jsonl_log
+from .helpers.rename import (
+    invoke_rename,
+    make_entry,
+    make_match,
+    make_metadata,
+    write_jsonl_log,
+)
 
 
 def test_rename_from_log_metadata_fallback(cli_runner: CliRunner, tmp_path: Path) -> None:
@@ -20,15 +26,15 @@ def test_rename_from_log_metadata_fallback(cli_runner: CliRunner, tmp_path: Path
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "meta.mp3",
-                "matches": [],
-                "metadata": {
-                    "artist": "Tagged Artist",
-                    "title": "Tagged Title",
-                    "album": "Tagged Album",
-                },
-            }
+            make_entry(
+                "meta.mp3",
+                matches=[],
+                metadata=make_metadata(
+                    artist="Tagged Artist",
+                    title="Tagged Title",
+                    album="Tagged Album",
+                ),
+            )
         ],
     )
 
@@ -64,15 +70,15 @@ def test_rename_from_log_metadata_fallback_auto_confirm(
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "meta.mp3",
-                "matches": [],
-                "metadata": {
-                    "artist": "Tagged Artist",
-                    "title": "Tagged Title",
-                    "album": "Tagged Album",
-                },
-            }
+            make_entry(
+                "meta.mp3",
+                matches=[],
+                metadata=make_metadata(
+                    artist="Tagged Artist",
+                    title="Tagged Title",
+                    album="Tagged Album",
+                ),
+            )
         ],
     )
 
@@ -106,15 +112,15 @@ def test_rename_from_log_metadata_fallback_reject(cli_runner: CliRunner, tmp_pat
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "meta.mp3",
-                "matches": [],
-                "metadata": {
-                    "artist": "Tagged Artist",
-                    "title": "Tagged Title",
-                    "album": "Tagged Album",
-                },
-            }
+            make_entry(
+                "meta.mp3",
+                matches=[],
+                metadata=make_metadata(
+                    artist="Tagged Artist",
+                    title="Tagged Title",
+                    album="Tagged Album",
+                ),
+            )
         ],
     )
 
@@ -148,18 +154,17 @@ def test_rename_from_log_confirm_yes(cli_runner: CliRunner, tmp_path: Path) -> N
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "confirm.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Confirm",
-                        "score": 0.9,
-                        "recording_id": "id",
-                        "artist": "Artist",
-                        "title": "Confirm",
-                    }
+            make_entry(
+                "confirm.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Confirm",
+                        score=0.9,
+                        recording_id="id",
+                    )
                 ],
-            }
+            )
         ],
     )
 
@@ -194,18 +199,17 @@ def test_rename_from_log_confirm_no(cli_runner: CliRunner, tmp_path: Path) -> No
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "skip.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Skip",
-                        "score": 0.9,
-                        "recording_id": "id",
-                        "artist": "Artist",
-                        "title": "Skip",
-                    }
+            make_entry(
+                "skip.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Skip",
+                        score=0.9,
+                        recording_id="id",
+                    )
                 ],
-            }
+            )
         ],
     )
 

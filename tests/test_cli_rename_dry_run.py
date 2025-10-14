@@ -6,7 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from .helpers.rename import invoke_rename, write_jsonl_log
+from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
 
 
 def test_rename_from_log_dry_run(cli_runner: CliRunner, tmp_path: Path) -> None:
@@ -20,21 +20,17 @@ def test_rename_from_log_dry_run(cli_runner: CliRunner, tmp_path: Path) -> None:
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "track.wav",
-                "matches": [
-                    {
-                        "formatted": "Artist - Track",
-                        "score": 0.9,
-                        "recording_id": "id",
-                        "artist": "Artist",
-                        "title": "Track",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    }
+            make_entry(
+                "track.wav",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Track",
+                        score=0.9,
+                        recording_id="id",
+                    )
                 ],
-            }
+            )
         ],
     )
 
@@ -69,21 +65,17 @@ def test_rename_from_log_dry_run_then_apply(cli_runner: CliRunner, tmp_path: Pat
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "demo.flac",
-                "matches": [
-                    {
-                        "formatted": "Artist - Demo",
-                        "score": 0.93,
-                        "recording_id": "apply-1",
-                        "artist": "Artist",
-                        "title": "Demo",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    }
+            make_entry(
+                "demo.flac",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Demo",
+                        score=0.93,
+                        recording_id="apply-1",
+                    )
                 ],
-            }
+            )
         ],
     )
 

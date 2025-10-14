@@ -6,7 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from .helpers.rename import invoke_rename, write_jsonl_log
+from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
 
 
 def test_rename_from_log_interactive(cli_runner: CliRunner, tmp_path: Path) -> None:
@@ -20,31 +20,23 @@ def test_rename_from_log_interactive(cli_runner: CliRunner, tmp_path: Path) -> N
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "interactive.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Option1",
-                        "score": 0.9,
-                        "recording_id": "id1",
-                        "artist": "Artist",
-                        "title": "Option1",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    },
-                    {
-                        "formatted": "Artist - Option2",
-                        "score": 0.8,
-                        "recording_id": "id2",
-                        "artist": "Artist",
-                        "title": "Option2",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    },
+            make_entry(
+                "interactive.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Option1",
+                        score=0.9,
+                        recording_id="id1",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="Option2",
+                        score=0.8,
+                        recording_id="id2",
+                    ),
                 ],
-            }
+            )
         ],
     )
 
@@ -81,31 +73,23 @@ def test_rename_from_log_interactive_reprompt(cli_runner: CliRunner, tmp_path: P
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "retry.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - First",
-                        "score": 0.9,
-                        "recording_id": "id1",
-                        "artist": "Artist",
-                        "title": "First",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    },
-                    {
-                        "formatted": "Artist - Second",
-                        "score": 0.85,
-                        "recording_id": "id2",
-                        "artist": "Artist",
-                        "title": "Second",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    },
+            make_entry(
+                "retry.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="First",
+                        score=0.9,
+                        recording_id="id1",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="Second",
+                        score=0.85,
+                        recording_id="id2",
+                    ),
                 ],
-            }
+            )
         ],
     )
 

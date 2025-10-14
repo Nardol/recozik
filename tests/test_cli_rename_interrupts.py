@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 
 from recozik import cli
 
-from .helpers.rename import invoke_rename, write_jsonl_log
+from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
 
 
 def test_rename_from_log_interactive_interrupt_cancel(
@@ -25,25 +25,23 @@ def test_rename_from_log_interactive_interrupt_cancel(
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "track.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Pick Me",
-                        "score": 0.9,
-                        "recording_id": "1",
-                        "artist": "Artist",
-                        "title": "Pick Me",
-                    },
-                    {
-                        "formatted": "Artist - Other Option",
-                        "score": 0.8,
-                        "recording_id": "2",
-                        "artist": "Artist",
-                        "title": "Other Option",
-                    },
+            make_entry(
+                "track.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Pick Me",
+                        score=0.9,
+                        recording_id="1",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="Other Option",
+                        score=0.8,
+                        recording_id="2",
+                    ),
                 ],
-            }
+            )
         ],
     )
 
@@ -95,44 +93,40 @@ def test_rename_from_log_interactive_interrupt_apply(
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "first.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - A",
-                        "score": 0.9,
-                        "recording_id": "1",
-                        "artist": "Artist",
-                        "title": "A",
-                    },
-                    {
-                        "formatted": "Artist - B",
-                        "score": 0.8,
-                        "recording_id": "2",
-                        "artist": "Artist",
-                        "title": "B",
-                    },
+            make_entry(
+                "first.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="A",
+                        score=0.9,
+                        recording_id="1",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="B",
+                        score=0.8,
+                        recording_id="2",
+                    ),
                 ],
-            },
-            {
-                "path": "second.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - C",
-                        "score": 0.95,
-                        "recording_id": "3",
-                        "artist": "Artist",
-                        "title": "C",
-                    },
-                    {
-                        "formatted": "Artist - D",
-                        "score": 0.6,
-                        "recording_id": "4",
-                        "artist": "Artist",
-                        "title": "D",
-                    },
+            ),
+            make_entry(
+                "second.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="C",
+                        score=0.95,
+                        recording_id="3",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="D",
+                        score=0.6,
+                        recording_id="4",
+                    ),
                 ],
-            },
+            ),
         ],
     )
 
@@ -184,25 +178,23 @@ def test_rename_from_log_interactive_interrupt_resume(
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "resume.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Resume",
-                        "score": 0.9,
-                        "recording_id": "1",
-                        "artist": "Artist",
-                        "title": "Resume",
-                    },
-                    {
-                        "formatted": "Artist - Continue",
-                        "score": 0.8,
-                        "recording_id": "2",
-                        "artist": "Artist",
-                        "title": "Continue",
-                    },
+            make_entry(
+                "resume.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Resume",
+                        score=0.9,
+                        recording_id="1",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="Continue",
+                        score=0.8,
+                        recording_id="2",
+                    ),
                 ],
-            }
+            )
         ],
     )
 
@@ -253,25 +245,23 @@ def test_rename_from_log_rename_interrupt_continue(
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "continue.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Keep",
-                        "score": 0.9,
-                        "recording_id": "1",
-                        "artist": "Artist",
-                        "title": "Keep",
-                    },
-                    {
-                        "formatted": "Artist - Skip",
-                        "score": 0.1,
-                        "recording_id": "2",
-                        "artist": "Artist",
-                        "title": "Skip",
-                    },
+            make_entry(
+                "continue.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Keep",
+                        score=0.9,
+                        recording_id="1",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="Skip",
+                        score=0.1,
+                        recording_id="2",
+                    ),
                 ],
-            }
+            )
         ],
     )
 
@@ -338,25 +328,23 @@ def test_rename_from_log_rename_interrupt_cancel(
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "cancel.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Stop",
-                        "score": 0.9,
-                        "recording_id": "1",
-                        "artist": "Artist",
-                        "title": "Stop",
-                    },
-                    {
-                        "formatted": "Artist - Other",
-                        "score": 0.8,
-                        "recording_id": "2",
-                        "artist": "Artist",
-                        "title": "Other",
-                    },
+            make_entry(
+                "cancel.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Stop",
+                        score=0.9,
+                        recording_id="1",
+                    ),
+                    make_match(
+                        artist="Artist",
+                        title="Other",
+                        score=0.8,
+                        recording_id="2",
+                    ),
                 ],
-            }
+            )
         ],
     )
 

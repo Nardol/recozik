@@ -7,7 +7,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from .helpers.rename import invoke_rename, write_jsonl_log
+from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
 
 
 def test_rename_from_log_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
@@ -21,21 +21,18 @@ def test_rename_from_log_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "original.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Title",
-                        "score": 0.95,
-                        "recording_id": "id-1",
-                        "artist": "Artist",
-                        "title": "Title",
-                        "album": "Album",
-                        "release_group_id": None,
-                        "release_id": None,
-                    }
+            make_entry(
+                "original.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Title",
+                        score=0.95,
+                        recording_id="id-1",
+                        album="Album",
+                    )
                 ],
-            }
+            )
         ],
     )
 
@@ -71,18 +68,17 @@ def test_rename_from_log_log_cleanup_prompt_delete(cli_runner: CliRunner, tmp_pa
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "track.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Track",
-                        "score": 0.9,
-                        "recording_id": "id",
-                        "artist": "Artist",
-                        "title": "Track",
-                    }
+            make_entry(
+                "track.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Track",
+                        score=0.9,
+                        recording_id="id",
+                    )
                 ],
-            }
+            )
         ],
     )
 
@@ -118,18 +114,17 @@ def test_rename_from_log_log_cleanup_always_option(cli_runner: CliRunner, tmp_pa
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "track.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Track",
-                        "score": 0.9,
-                        "recording_id": "id",
-                        "artist": "Artist",
-                        "title": "Track",
-                    }
+            make_entry(
+                "track.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Track",
+                        score=0.9,
+                        recording_id="id",
+                    )
                 ],
-            }
+            )
         ],
     )
 
@@ -166,18 +161,17 @@ def test_rename_from_log_log_cleanup_from_config(cli_runner: CliRunner, tmp_path
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "track.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Track",
-                        "score": 0.9,
-                        "recording_id": "id",
-                        "artist": "Artist",
-                        "title": "Track",
-                    }
+            make_entry(
+                "track.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Track",
+                        score=0.9,
+                        recording_id="id",
+                    )
                 ],
-            }
+            )
         ],
     )
 
@@ -225,36 +219,28 @@ def test_rename_from_log_conflict_append(cli_runner: CliRunner, tmp_path: Path) 
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "song1.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Same",
-                        "score": 0.9,
-                        "recording_id": "id1",
-                        "artist": "Artist",
-                        "title": "Same",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    }
+            make_entry(
+                "song1.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Same",
+                        score=0.9,
+                        recording_id="id1",
+                    )
                 ],
-            },
-            {
-                "path": "song2.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Same",
-                        "score": 0.85,
-                        "recording_id": "id2",
-                        "artist": "Artist",
-                        "title": "Same",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    }
+            ),
+            make_entry(
+                "song2.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Same",
+                        score=0.85,
+                        recording_id="id2",
+                    )
                 ],
-            },
+            ),
         ],
     )
 
@@ -303,21 +289,17 @@ def test_rename_from_log_export(cli_runner: CliRunner, tmp_path: Path) -> None:
     write_jsonl_log(
         log_path,
         [
-            {
-                "path": "export.mp3",
-                "matches": [
-                    {
-                        "formatted": "Artist - Export",
-                        "score": 0.88,
-                        "recording_id": "id",
-                        "artist": "Artist",
-                        "title": "Export",
-                        "album": None,
-                        "release_group_id": None,
-                        "release_id": None,
-                    }
+            make_entry(
+                "export.mp3",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Export",
+                        score=0.88,
+                        recording_id="id",
+                    )
                 ],
-            }
+            )
         ],
     )
 
