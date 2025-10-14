@@ -32,9 +32,14 @@ class AppConfig:
     log_absolute_paths: bool = False
     metadata_fallback_enabled: bool = True
     locale: str | None = None
+    rename_log_cleanup: str = "ask"
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
+        cleanup_mode = self.rename_log_cleanup
+        if cleanup_mode not in {"ask", "always", "never"}:
+            cleanup_mode = "ask"
+
         data: dict[str, dict] = {
             "acoustid": {},
             "cache": {
@@ -50,6 +55,9 @@ class AppConfig:
                 "fallback": self.metadata_fallback_enabled,
             },
             "general": {},
+            "rename": {
+                "log_cleanup": cleanup_mode,
+            },
         }
 
         if self.acoustid_api_key:
@@ -124,6 +132,16 @@ def load_config(path: Path | None = None) -> AppConfig:
     if locale_value is not None and not isinstance(locale_value, str):
         raise RuntimeError(_("The field general.locale must be a string."))
 
+    rename_section = data.get("rename", {}) or {}
+    cleanup_value = rename_section.get("log_cleanup", "ask")
+    if cleanup_value is None:
+        cleanup_value = "ask"
+    if not isinstance(cleanup_value, str):
+        raise RuntimeError(_("The field rename.log_cleanup must be a string."))
+    cleanup_value = cleanup_value.lower()
+    if cleanup_value not in {"ask", "always", "never"}:
+        raise RuntimeError(_("The field rename.log_cleanup must be ask, always, or never."))
+
     return AppConfig(
         acoustid_api_key=api_key,
         cache_enabled=cache_enabled,
@@ -133,6 +151,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         log_absolute_paths=log_absolute_paths,
         metadata_fallback_enabled=metadata_fallback,
         locale=locale_value,
+        rename_log_cleanup=cleanup_value,
     )
 
 
@@ -180,6 +199,11 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append("[logging]")
     lines.append(f'format = "{data["logging"]["format"]}"')
     lines.append(f"absolute_paths = {str(data['logging']['absolute_paths']).lower()}")
+    lines.append("")
+
+    lines.append("[rename]")
+    cleanup_mode = data["rename"]["log_cleanup"]
+    lines.append(f'log_cleanup = "{cleanup_mode}"')
     lines.append("")
 
     lines.append("[general]")
