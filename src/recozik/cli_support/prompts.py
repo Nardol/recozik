@@ -11,7 +11,7 @@ from ..i18n import _
 from .logs import format_score
 
 
-def prompt_yes_no(message: str, *, default: bool = True) -> bool:
+def prompt_yes_no(message: str, *, default: bool = True, require_answer: bool = False) -> bool:
     """Display a yes/no prompt compatible with multiple locales."""
     suffix = _("[y/N]") if not default else _("[Y/n]")
     prompt = f"{message} {suffix}"
@@ -20,6 +20,9 @@ def prompt_yes_no(message: str, *, default: bool = True) -> bool:
     while True:
         response = typer.prompt(prompt, default=default_char, show_default=False)
         if not response:
+            if require_answer:
+                typer.echo(_("Invalid input (y/n)."))
+                continue
             return default
         normalized = response.strip().lower()
         if normalized in {"o", "oui", "y", "yes"}:

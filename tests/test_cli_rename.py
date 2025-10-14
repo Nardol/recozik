@@ -106,11 +106,63 @@ def test_rename_from_log_dry_run(tmp_path: Path) -> None:
             "--template",
             "{artist} - {title}",
         ],
+        input="n\n",
     )
 
     assert result.exit_code == 0
     assert src.exists()
     assert "DRY-RUN" in result.stdout
+    assert "Apply the planned renames now?" in result.stdout
+    assert "Use --apply to run the renames." in result.stdout
+
+
+def test_rename_from_log_dry_run_then_apply(tmp_path: Path) -> None:
+    """Offer to apply the renames after a dry-run."""
+    root = tmp_path / "music-apply"
+    root.mkdir()
+    src = root / "demo.flac"
+    src.write_bytes(b"data")
+
+    log_path = tmp_path / "apply.jsonl"
+    _write_jsonl_log(
+        log_path,
+        [
+            {
+                "path": "demo.flac",
+                "matches": [
+                    {
+                        "formatted": "Artist - Demo",
+                        "score": 0.93,
+                        "recording_id": "apply-1",
+                        "artist": "Artist",
+                        "title": "Demo",
+                        "album": None,
+                        "release_group_id": None,
+                        "release_id": None,
+                    }
+                ],
+            }
+        ],
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+        ],
+        input="o\n",
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert (root / "Artist - Demo.flac").exists()
+    assert "DRY-RUN" in result.stdout
+    assert "RENAMED" in result.stdout
 
 
 def test_rename_from_log_conflict_append(tmp_path: Path) -> None:

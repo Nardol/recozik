@@ -137,7 +137,6 @@ def rename_from_log(
     planned: list[tuple[Path, Path, dict]] = []
     export_entries: list[dict] = []
     occupied: set[Path] = set()
-    renamed = 0
     skipped = 0
     errors = 0
     apply_after_interrupt = False
@@ -358,83 +357,109 @@ def rename_from_log(
     if apply_after_interrupt and planned:
         typer.echo(_("Continuing with renames confirmed before the interruption."))
 
-    index = 0
-    interrupted_during_rename = False
-    while index < len(planned):
-        source_path, target_path, match_data = planned[index]
-        action = _("DRY-RUN") if dry_run else _("RENAMED")
-        typer.echo(
-            _("{action}: {source} -> {target}").format(
-                action=action,
-                source=source_path,
-                target=target_path,
-            )
-        )
+    def execute_planned(run_dry_run: bool) -> tuple[int, bool, list[dict]]:
+        renamed_count = 0
+        index = 0
+        interrupted = False
+        entries: list[dict] = []
 
-        if dry_run:
-            export_entries.append(
+        while index < len(planned):
+            source_path, target_path, match_data = planned[index]
+            action = _("DRY-RUN") if run_dry_run else _("RENAMED")
+            typer.echo(
+                _("{action}: {source} -> {target}").format(
+                    action=action,
+                    source=source_path,
+                    target=target_path,
+                )
+            )
+
+            if run_dry_run:
+                entries.append(
+                    {
+                        "source": str(source_path),
+                        "target": str(target_path),
+                        "applied": False,
+                        "match": match_data,
+                    }
+                )
+                index += 1
+                continue
+
+            try:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+
+                if backup_path:
+                    backup_file = compute_backup_path(source_path, root_path, backup_path)
+                    backup_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source_path, backup_file)
+
+                if target_path.exists() and conflict_strategy == "overwrite":
+                    target_path.unlink()
+
+                source_path.rename(target_path)
+            except KeyboardInterrupt:
+                decision = prompt_rename_interrupt_decision(len(planned) - index)
+                if decision == "continue":
+                    typer.echo(_("Continuing renaming."))
+                    continue
+
+                interrupted = True
+                typer.echo(
+                    _(
+                        "Renaming interrupted; {completed} file(s) already renamed, "
+                        "{remaining} file(s) left untouched."
+                    ).format(
+                        completed=renamed_count,
+                        remaining=len(planned) - index,
+                    )
+                )
+                break
+
+            renamed_count += 1
+            entries.append(
                 {
                     "source": str(source_path),
                     "target": str(target_path),
-                    "applied": False,
+                    "applied": True,
                     "match": match_data,
                 }
             )
             index += 1
-            continue
 
-        try:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+        return renamed_count, interrupted, entries
 
-            if backup_path:
-                backup_file = compute_backup_path(source_path, root_path, backup_path)
-                backup_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_path, backup_file)
+    renamed_count, interrupted_during_rename, export_entries = execute_planned(dry_run)
 
-            if target_path.exists() and conflict_strategy == "overwrite":
-                target_path.unlink()
-
-            source_path.rename(target_path)
-        except KeyboardInterrupt:
-            decision = prompt_rename_interrupt_decision(len(planned) - index)
-            if decision == "continue":
-                typer.echo(_("Continuing renaming."))
-                continue
-
-            interrupted_during_rename = True
-            typer.echo(
-                _(
-                    "Renaming interrupted; {completed} file(s) already renamed, "
-                    "{remaining} file(s) left untouched."
-                ).format(
-                    completed=renamed,
-                    remaining=len(planned) - index,
-                )
-            )
-            break
-
-        renamed += 1
-        export_entries.append(
-            {
-                "source": str(source_path),
-                "target": str(target_path),
-                "applied": True,
-                "match": match_data,
-            }
-        )
-        index += 1
-
-    if dry_run:
+    if dry_run and not interrupted_during_rename:
         typer.echo(
             _(
                 "Dry-run complete: {planned} potential renames, {skipped} skipped, {errors} errors."
             ).format(planned=len(planned), skipped=skipped, errors=errors)
         )
-        typer.echo(_("Use --apply to run the renames."))
-    elif not interrupted_during_rename:
+
+        while True:
+            try:
+                apply_now = prompt_yes_no(
+                    _("Apply the planned renames now?"),
+                    default=False,
+                    require_answer=True,
+                )
+                break
+            except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+                typer.echo(_("Operation cancelled; no files renamed."))
+                return
+
+        if apply_now:
+            dry_run = False
+            renamed_count, interrupted_during_rename, export_entries = execute_planned(False)
+        else:
+            typer.echo(_("Use --apply to run the renames."))
+
+    if not dry_run and not interrupted_during_rename:
         typer.echo(
             _("Renaming complete: {renamed} file(s), {skipped} skipped, {errors} errors.").format(
-                renamed=renamed, skipped=skipped, errors=errors
+                renamed=renamed_count, skipped=skipped, errors=errors
             )
         )
 
