@@ -6,7 +6,13 @@ import pytest
 from typer.testing import CliRunner
 
 from .conftest import RenameTestEnv
-from .helpers.rename import invoke_rename, make_entry, make_match, make_metadata
+from .helpers.rename import (
+    build_rename_command,
+    invoke_rename,
+    make_entry,
+    make_match,
+    make_metadata,
+)
 
 
 @pytest.mark.parametrize(
@@ -51,18 +57,15 @@ def test_rename_from_log_metadata_fallback_modes(
         ],
     )
 
-    args = [
-        "rename-from-log",
-        str(log_path),
-        "--root",
-        str(root),
+    command = [
+        *build_rename_command(log_path, root, template="{artist} - {title}"),
         "--apply",
         "--log-cleanup",
         "never",
         *extra_args,
     ]
 
-    result = invoke_rename(cli_runner, args, input=input_text)
+    result = invoke_rename(cli_runner, command, input=input_text)
 
     assert result.exit_code == 0
     new_path = root / "Tagged Artist - Tagged Title.mp3"
@@ -117,10 +120,7 @@ def test_rename_from_log_confirm_prompt(
     result = invoke_rename(
         cli_runner,
         [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
+            *build_rename_command(log_path, root, template="{artist} - {title}"),
             "--confirm",
             "--apply",
             "--log-cleanup",

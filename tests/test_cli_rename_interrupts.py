@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import typer
 from typer.testing import CliRunner
 
 from recozik import cli
 
 from .conftest import RenameTestEnv
-from .helpers.rename import invoke_rename, make_entry, make_match
+from .helpers.rename import build_matches, build_rename_command, invoke_rename, make_entry
 
 
 def test_rename_from_log_interactive_interrupt_cancel(
@@ -25,20 +26,12 @@ def test_rename_from_log_interactive_interrupt_cancel(
         [
             make_entry(
                 "track.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="Pick Me",
-                        score=0.9,
-                        recording_id="1",
-                    ),
-                    make_match(
-                        artist="Artist",
-                        title="Other Option",
-                        score=0.8,
-                        recording_id="2",
-                    ),
-                ],
+                matches=build_matches(
+                    [
+                        ("Pick Me", 0.9, "1"),
+                        ("Other Option", 0.8, "2"),
+                    ]
+                ),
             )
         ],
     )
@@ -58,12 +51,7 @@ def test_rename_from_log_interactive_interrupt_cancel(
     result = invoke_rename(
         cli_runner,
         [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
+            *build_rename_command(log_path, root),
             "--interactive",
             "--apply",
             "--log-cleanup",
@@ -89,37 +77,21 @@ def test_rename_from_log_interactive_interrupt_apply(
         [
             make_entry(
                 "first.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="A",
-                        score=0.9,
-                        recording_id="1",
-                    ),
-                    make_match(
-                        artist="Artist",
-                        title="B",
-                        score=0.8,
-                        recording_id="2",
-                    ),
-                ],
+                matches=build_matches(
+                    [
+                        ("A", 0.9, "1"),
+                        ("B", 0.8, "2"),
+                    ]
+                ),
             ),
             make_entry(
                 "second.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="C",
-                        score=0.95,
-                        recording_id="3",
-                    ),
-                    make_match(
-                        artist="Artist",
-                        title="D",
-                        score=0.6,
-                        recording_id="4",
-                    ),
-                ],
+                matches=build_matches(
+                    [
+                        ("C", 0.95, "3"),
+                        ("D", 0.6, "4"),
+                    ]
+                ),
             ),
         ],
     )
@@ -139,12 +111,7 @@ def test_rename_from_log_interactive_interrupt_apply(
     result = invoke_rename(
         cli_runner,
         [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
+            *build_rename_command(log_path, root),
             "--interactive",
             "--apply",
             "--log-cleanup",
@@ -171,20 +138,12 @@ def test_rename_from_log_interactive_interrupt_resume(
         [
             make_entry(
                 "resume.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="Resume",
-                        score=0.9,
-                        recording_id="1",
-                    ),
-                    make_match(
-                        artist="Artist",
-                        title="Continue",
-                        score=0.8,
-                        recording_id="2",
-                    ),
-                ],
+                matches=build_matches(
+                    [
+                        ("Resume", 0.9, "1"),
+                        ("Continue", 0.8, "2"),
+                    ]
+                ),
             )
         ],
     )
@@ -204,12 +163,7 @@ def test_rename_from_log_interactive_interrupt_resume(
     result = invoke_rename(
         cli_runner,
         [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
+            *build_rename_command(log_path, root),
             "--interactive",
             "--apply",
             "--log-cleanup",
@@ -223,70 +177,102 @@ def test_rename_from_log_interactive_interrupt_resume(
     assert (root / "Artist - Continue.mp3").exists()
 
 
-def test_rename_from_log_rename_interrupt_continue(
-    monkeypatch, cli_runner: CliRunner, rename_env: RenameTestEnv
+@pytest.mark.parametrize(
+    (
+        "case_name",
+        "responses",
+        "matches",
+        "persistent_interrupt",
+        "expected_exit",
+        "expected_message",
+        "expect_target",
+        "target_title",
+        "expected_call_count",
+    ),
+    [
+        (
+            "rename-continue",
+            ["1", "2"],
+            [("Keep", 0.9, "1"), ("Skip", 0.1, "2")],
+            False,
+            0,
+            "Continuing renaming.",
+            True,
+            "Keep",
+            2,
+        ),
+        (
+            "rename-cancel",
+            ["1", "1"],
+            [("Stop", 0.9, "1"), ("Other", 0.8, "2")],
+            True,
+            1,
+            "Renaming interrupted",
+            False,
+            "Stop",
+            1,
+        ),
+    ],
+)
+def test_rename_from_log_rename_interrupt_behaviour(
+    monkeypatch,
+    cli_runner: CliRunner,
+    rename_env: RenameTestEnv,
+    case_name: str,
+    responses: list[str],
+    matches: list[tuple[str, float, str]],
+    persistent_interrupt: bool,
+    expected_exit: int,
+    expected_message: str,
+    expect_target: bool,
+    target_title: str,
+    expected_call_count: int,
 ) -> None:
-    """Continue renaming after an interrupt during the apply stage."""
-    root = rename_env.make_root("rename-continue")
-    src = rename_env.create_source(root, "continue.mp3")
+    """Cover continue and cancel flows during the rename stage."""
+    filename = f"{case_name}.mp3"
+    root = rename_env.make_root(case_name)
+    src = rename_env.create_source(root, filename)
 
     log_path = rename_env.write_log(
-        "rename-continue.jsonl",
+        f"{case_name}.jsonl",
         [
             make_entry(
-                "continue.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="Keep",
-                        score=0.9,
-                        recording_id="1",
-                    ),
-                    make_match(
-                        artist="Artist",
-                        title="Skip",
-                        score=0.1,
-                        recording_id="2",
-                    ),
-                ],
+                filename,
+                matches=build_matches(matches),
             )
         ],
     )
 
-    responses: list[object] = ["1", "2"]
+    response_queue: list[object] = list(responses)
 
     def fake_prompt(*args, **kwargs):
-        if not responses:
+        if not response_queue:
             raise AssertionError("Unexpected prompt call")
-        value = responses.pop(0)
+        value = response_queue.pop(0)
         if isinstance(value, Exception):
             raise value
         return value
+
+    original_prompt = cli.typer.prompt
+    monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
 
     original_rename = Path.rename
     call_count = {"value": 0}
 
     def fake_rename(self: Path, target: Path) -> None:  # type: ignore[override]
-        if self.name != "continue.mp3":
+        if self.name != filename:
             return original_rename(self, target)
         call_count["value"] += 1
-        if call_count["value"] == 1:
+        if persistent_interrupt or call_count["value"] == 1:
             raise KeyboardInterrupt()
         return original_rename(self, target)
 
-    original_prompt = cli.typer.prompt
-    monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
     monkeypatch.setattr(Path, "rename", fake_rename)
 
     result = invoke_rename(
         cli_runner,
         [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
+            *build_rename_command(log_path, root),
             "--interactive",
             "--apply",
             "--log-cleanup",
@@ -296,82 +282,14 @@ def test_rename_from_log_rename_interrupt_continue(
 
     monkeypatch.setattr(cli.typer, "prompt", original_prompt)
 
-    assert result.exit_code == 0
-    assert call_count["value"] >= 2
-    assert not src.exists()
-    assert (root / "Artist - Keep.mp3").exists()
-    assert "Continuing renaming." in result.stdout
+    assert result.exit_code == expected_exit
+    assert expected_message in result.stdout
+    assert call_count["value"] >= expected_call_count
 
-
-def test_rename_from_log_rename_interrupt_cancel(
-    monkeypatch, cli_runner: CliRunner, rename_env: RenameTestEnv
-) -> None:
-    """Cancel renaming after an interrupt during the apply stage."""
-    root = rename_env.make_root("rename-cancel")
-    src = rename_env.create_source(root, "cancel.mp3")
-
-    log_path = rename_env.write_log(
-        "rename-cancel.jsonl",
-        [
-            make_entry(
-                "cancel.mp3",
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title="Stop",
-                        score=0.9,
-                        recording_id="1",
-                    ),
-                    make_match(
-                        artist="Artist",
-                        title="Other",
-                        score=0.8,
-                        recording_id="2",
-                    ),
-                ],
-            )
-        ],
-    )
-
-    responses: list[object] = ["1", "1"]
-
-    def fake_prompt(*args, **kwargs):
-        if not responses:
-            raise AssertionError("Unexpected prompt call")
-        value = responses.pop(0)
-        if isinstance(value, Exception):
-            raise value
-        return value
-
-    original_rename = Path.rename
-    call_count = {"value": 0}
-
-    def fake_rename(self: Path, target: Path) -> None:  # type: ignore[override]
-        if self.name != "cancel.mp3":
-            return original_rename(self, target)
-        call_count["value"] += 1
-        raise KeyboardInterrupt()
-
-    monkeypatch.setattr(cli.typer, "prompt", fake_prompt)
-    monkeypatch.setattr(Path, "rename", fake_rename)
-
-    result = invoke_rename(
-        cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
-    )
-
-    assert result.exit_code == 1
-    assert call_count["value"] == 1
-    assert src.exists()
-    assert "Renaming interrupted" in result.stdout
+    target = root / f"Artist - {target_title}.mp3"
+    if expect_target:
+        assert not src.exists()
+        assert target.exists()
+    else:
+        assert src.exists()
+        assert not target.exists()

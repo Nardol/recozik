@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +46,18 @@ def make_match(
     if source is not None:
         data["source"] = source
     return data
+
+
+def build_matches(
+    items: Iterable[tuple[str, float, str]],
+    *,
+    artist: str = "Artist",
+) -> list[dict[str, Any]]:
+    """Create match dictionaries from (title, score, recording_id) tuples."""
+    return [
+        make_match(artist=artist, title=title, score=score, recording_id=recording_id)
+        for title, score, recording_id in items
+    ]
 
 
 def make_metadata(*, artist: str, title: str, album: str | None = None) -> dict[str, Any]:
@@ -96,7 +108,30 @@ def invoke_rename(
     return runner.invoke(cli.app, command_args, input=input)
 
 
+def build_rename_command(
+    log_path: Path,
+    root: Path,
+    *,
+    template: str = "{artist} - {title}",
+    extra_args: Sequence[object] | None = None,
+) -> list[object]:
+    """Return a base rename-from-log CLI command for convenience."""
+    command: list[object] = [
+        "rename-from-log",
+        str(log_path),
+        "--root",
+        str(root),
+        "--template",
+        template,
+    ]
+    if extra_args:
+        command.extend(extra_args)
+    return command
+
+
 __all__ = [
+    "build_matches",
+    "build_rename_command",
     "invoke_rename",
     "make_entry",
     "make_match",

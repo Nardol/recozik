@@ -6,7 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from .conftest import RenameTestEnv
-from .helpers.rename import invoke_rename, make_entry, make_match
+from .helpers.rename import build_matches, invoke_rename, make_entry
 
 
 @pytest.mark.parametrize(
@@ -62,15 +62,7 @@ def test_rename_from_log_interactive_selection(
         [
             make_entry(
                 filename,
-                matches=[
-                    make_match(
-                        artist="Artist",
-                        title=title,
-                        score=score,
-                        recording_id=recording_id,
-                    )
-                    for title, score, recording_id in matches
-                ],
+                matches=build_matches(matches),
             )
         ],
     )

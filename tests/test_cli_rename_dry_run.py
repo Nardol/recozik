@@ -5,7 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from .conftest import RenameTestEnv
-from .helpers.rename import invoke_rename, make_entry, make_match
+from .helpers.rename import build_rename_command, invoke_rename, make_entry, make_match
 
 
 def test_rename_from_log_dry_run(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
@@ -32,14 +32,7 @@ def test_rename_from_log_dry_run(cli_runner: CliRunner, rename_env: RenameTestEn
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-        ],
+        build_rename_command(log_path, root),
         input="n\n",
     )
 
@@ -76,14 +69,7 @@ def test_rename_from_log_dry_run_then_apply(
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-        ],
+        build_rename_command(log_path, root),
         input="o\n",
     )
 
