@@ -3,24 +3,21 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from .helpers.rename import invoke_rename, make_entry, make_match, write_jsonl_log
+from .conftest import RenameTestEnv
+from .helpers.rename import invoke_rename, make_entry, make_match
 
 
-def test_rename_from_log_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_apply(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
     """Apply rename operations when --apply is provided."""
-    root = tmp_path / "music"
-    root.mkdir()
-    src = root / "original.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("music")
+    src = rename_env.create_source(root, "original.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "apply.jsonl",
         [
             make_entry(
                 "original.mp3",
@@ -68,7 +65,7 @@ def test_rename_from_log_apply(cli_runner: CliRunner, tmp_path: Path) -> None:
 )
 def test_rename_from_log_log_cleanup_modes(
     cli_runner: CliRunner,
-    tmp_path: Path,
+    rename_env: RenameTestEnv,
     extra_args: list[str],
     input_text: str | None,
     config_cleanup: str | None,
@@ -76,14 +73,11 @@ def test_rename_from_log_log_cleanup_modes(
     expect_prompt: bool,
 ) -> None:
     """Exercise the different log cleanup strategies."""
-    root = tmp_path / "cleanup"
-    root.mkdir()
-    src = root / "track.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("cleanup")
+    src = rename_env.create_source(root, "track.mp3")
 
-    log_path = tmp_path / "cleanup.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "cleanup.jsonl",
         [
             make_entry(
                 "track.mp3",
@@ -111,7 +105,7 @@ def test_rename_from_log_log_cleanup_modes(
     ]
 
     if config_cleanup:
-        config_path = tmp_path / "config.toml"
+        config_path = rename_env.base / "config.toml"
         config_path.write_text(
             "\n".join(["[rename]", f'log_cleanup = "{config_cleanup}"', ""]),
             encoding="utf-8",
@@ -133,16 +127,14 @@ def test_rename_from_log_log_cleanup_modes(
     assert prompt_present is expect_prompt
 
 
-def test_rename_from_log_conflict_append(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_conflict_append(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
     """Append a numeric suffix when the target filename already exists."""
-    root = tmp_path / "music"
-    root.mkdir()
-    (root / "song1.mp3").write_bytes(b"a")
-    (root / "song2.mp3").write_bytes(b"b")
+    root = rename_env.make_root("music")
+    rename_env.create_source(root, "song1.mp3", data=b"a")
+    rename_env.create_source(root, "song2.mp3", data=b"b")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "conflict.jsonl",
         [
             make_entry(
                 "song1.mp3",
@@ -189,9 +181,9 @@ def test_rename_from_log_conflict_append(cli_runner: CliRunner, tmp_path: Path) 
     assert files == {"Artist - Same.mp3", "Artist - Same-1.mp3"}
 
 
-def test_rename_from_log_invalid_format(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_invalid_format(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
     """Abort when the provided log file is not JSONL."""
-    log_path = tmp_path / "plain.log"
+    log_path = rename_env.base / "plain.log"
     log_path.write_text("file: track.mp3\n", encoding="utf-8")
 
     result = invoke_rename(
@@ -203,16 +195,13 @@ def test_rename_from_log_invalid_format(cli_runner: CliRunner, tmp_path: Path) -
     assert "JSONL" in result.stdout
 
 
-def test_rename_from_log_export(cli_runner: CliRunner, tmp_path: Path) -> None:
+def test_rename_from_log_export(cli_runner: CliRunner, rename_env: RenameTestEnv) -> None:
     """Export the rename plan to JSON while applying changes."""
-    root = tmp_path / "music"
-    root.mkdir()
-    src = root / "export.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root("export")
+    src = rename_env.create_source(root, "export.mp3")
 
-    log_path = tmp_path / "batch.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        "export.jsonl",
         [
             make_entry(
                 "export.mp3",
@@ -228,7 +217,7 @@ def test_rename_from_log_export(cli_runner: CliRunner, tmp_path: Path) -> None:
         ],
     )
 
-    export_file = tmp_path / "renames.json"
+    export_file = rename_env.base / "renames.json"
 
     result = invoke_rename(
         cli_runner,

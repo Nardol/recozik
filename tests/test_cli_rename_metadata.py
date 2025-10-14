@@ -2,18 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from typer.testing import CliRunner
 
-from .helpers.rename import (
-    invoke_rename,
-    make_entry,
-    make_match,
-    make_metadata,
-    write_jsonl_log,
-)
+from .conftest import RenameTestEnv
+from .helpers.rename import invoke_rename, make_entry, make_match, make_metadata
 
 
 @pytest.mark.parametrize(
@@ -32,7 +25,7 @@ from .helpers.rename import (
 )
 def test_rename_from_log_metadata_fallback_modes(
     cli_runner: CliRunner,
-    tmp_path: Path,
+    rename_env: RenameTestEnv,
     case_name: str,
     extra_args: list[str],
     input_text: str | None,
@@ -40,14 +33,11 @@ def test_rename_from_log_metadata_fallback_modes(
     expected_message: str | None,
 ) -> None:
     """Cover metadata fallback confirmation flows with a single parametrized test."""
-    root = tmp_path / case_name
-    root.mkdir()
-    src = root / "meta.mp3"
-    src.write_bytes(b"data")
+    root = rename_env.make_root(case_name)
+    src = rename_env.create_source(root, "meta.mp3")
 
-    log_path = tmp_path / f"{case_name}.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        f"{case_name}.jsonl",
         [
             make_entry(
                 "meta.mp3",
@@ -96,22 +86,19 @@ def test_rename_from_log_metadata_fallback_modes(
 )
 def test_rename_from_log_confirm_prompt(
     cli_runner: CliRunner,
-    tmp_path: Path,
+    rename_env: RenameTestEnv,
     case_name: str,
     input_text: str,
     expect_renamed: bool,
     expected_message: str | None,
 ) -> None:
     """Exercise confirm/decline flows with metadata-derived matches."""
-    root = tmp_path / case_name
-    root.mkdir()
+    root = rename_env.make_root(case_name)
     src_name = "confirm.mp3" if expect_renamed else "skip.mp3"
-    src = root / src_name
-    src.write_bytes(b"data")
+    src = rename_env.create_source(root, src_name)
 
-    log_path = tmp_path / f"{case_name}.jsonl"
-    write_jsonl_log(
-        log_path,
+    log_path = rename_env.write_log(
+        f"{case_name}.jsonl",
         [
             make_entry(
                 src_name,
