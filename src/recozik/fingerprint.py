@@ -230,7 +230,7 @@ def lookup_recordings(
     if data.get("status") != "ok":
         raise AcoustIDLookupError("Réponse AcoustID invalide ou incomplète.")
 
-    matches: list[AcoustIDMatch] = []
+    deduped_matches: dict[str, AcoustIDMatch] = {}
 
     for result in data.get("results", []):
         try:
@@ -249,19 +249,24 @@ def lookup_recordings(
             release_group_id, release_group_title = _extract_release_group(recording)
             releases = _extract_releases(recording)
 
-            matches.append(
-                AcoustIDMatch(
-                    score=score,
-                    recording_id=recording_id,
-                    title=title,
-                    artist=artist,
-                    release_group_id=release_group_id,
-                    release_group_title=release_group_title,
-                    releases=releases,
-                )
+            match = AcoustIDMatch(
+                score=score,
+                recording_id=recording_id,
+                title=title,
+                artist=artist,
+                release_group_id=release_group_id,
+                release_group_title=release_group_title,
+                releases=releases,
             )
 
-    matches.sort(key=lambda match: match.score, reverse=True)
+            existing = deduped_matches.get(recording_id)
+            if existing is None:
+                deduped_matches[recording_id] = match
+                continue
+
+            _merge_matches(existing, match)
+
+    matches = sorted(deduped_matches.values(), key=lambda match: match.score, reverse=True)
 
     return matches
 
@@ -311,3 +316,39 @@ def _extract_releases(recording: dict) -> list[ReleaseInfo]:
         )
 
     return releases
+
+
+def _merge_matches(existing: AcoustIDMatch, new: AcoustIDMatch) -> None:
+    """Merge duplicate AcoustID matches in-place, preserving enriched metadata."""
+    if new.score > existing.score:
+        existing.score = new.score
+    else:
+        existing.score = max(existing.score, new.score)
+
+    if not existing.title and new.title:
+        existing.title = new.title
+
+    if not existing.artist and new.artist:
+        existing.artist = new.artist
+
+    if not existing.release_group_id and new.release_group_id:
+        existing.release_group_id = new.release_group_id
+
+    if new.release_group_title and (
+        not existing.release_group_title or existing.release_group_id == new.release_group_id
+    ):
+        existing.release_group_title = new.release_group_title
+
+    _merge_releases(existing.releases, new.releases)
+
+
+def _merge_releases(target: list[ReleaseInfo], source: list[ReleaseInfo]) -> None:
+    """Extend `target` with releases from `source`, avoiding duplicates."""
+    seen = {(item.release_id, item.title, item.date, item.country) for item in target}
+
+    for release in source:
+        fingerprint = (release.release_id, release.title, release.date, release.country)
+        if fingerprint in seen:
+            continue
+        target.append(release)
+        seen.add(fingerprint)
