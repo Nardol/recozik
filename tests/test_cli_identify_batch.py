@@ -7,7 +7,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from recozik import cli
+from recozik import audd, cli
 from recozik.fingerprint import AcoustIDMatch, FingerprintResult
 
 runner = CliRunner()
@@ -52,6 +52,9 @@ def _write_config(
     sections = [
         "[acoustid]",
         'api_key = "token"',
+        "",
+        "[audd]",
+        '# api_token = "token"',
         "",
         "[cache]",
         "enabled = true",
@@ -275,3 +278,59 @@ def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:
     contents = log_path.read_text(encoding="utf-8")
     assert "keep.wav" in contents
     assert "skip.txt" not in contents
+
+
+def test_identify_batch_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
+    """Use AudD as a fallback provider when AcoustID has no result."""
+    audio_dir = tmp_path / "music"
+    audio_dir.mkdir()
+    sample = audio_dir / "needs-fallback.mp3"
+    sample.write_bytes(b"sample")
+
+    config_path = _write_config(tmp_path, log_format="jsonl")
+    log_path = tmp_path / "fallback.jsonl"
+
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="MISS", duration_seconds=180.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+
+    fake_match = AcoustIDMatch(
+        score=0.92,
+        recording_id="audd-batch",
+        title="Recovered",
+        artist="Fallback Artist",
+    )
+
+    class DummyAudDError(Exception):
+        pass
+
+    monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify-batch",
+            str(audio_dir),
+            "--config-path",
+            str(config_path),
+            "--log-file",
+            str(log_path),
+            "--log-format",
+            "jsonl",
+            "--audd-token",
+            "secret",
+        ],
+    )
+
+    assert result.exit_code == 0
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload["note"] == "Powered by AudD Music (fallback)."
+    assert payload["matches"][0]["recording_id"] == "audd-batch"
+    assert "AudD fallback identified needs-fallback.mp3. Powered by AudD Music." in result.stdout

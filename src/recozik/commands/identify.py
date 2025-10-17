@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -35,6 +36,11 @@ def identify(
         None,
         "--api-key",
         help=_("AcoustID API key to use (takes priority over the configuration file)."),
+    ),
+    audd_token: str | None = typer.Option(
+        None,
+        "--audd-token",
+        help=_("AudD API token to use as a fallback when AcoustID returns no match."),
     ),
     limit: int = typer.Option(
         3,
@@ -90,6 +96,9 @@ def identify(
 
     apply_locale(ctx, config=config)
 
+    env_audd_token = os.environ.get("AUDD_API_TOKEN", "")
+    fallback_audd_token = (audd_token or env_audd_token or (config.audd_api_token or "")).strip()
+
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
         typer.echo(_("No AcoustID API key configured."))
@@ -138,6 +147,20 @@ def identify(
     else:
         matches = list(matches)
 
+    match_source = "acoustid"
+
+    if not matches and fallback_audd_token:
+        from ..audd import AudDLookupError, recognize_with_audd  # Local import to keep startup lean
+
+        try:
+            audd_matches = recognize_with_audd(fallback_audd_token, resolved_audio)
+        except AudDLookupError as exc:
+            typer.echo(_("AudD fallback failed: {error}").format(error=exc))
+        else:
+            if audd_matches:
+                matches = audd_matches
+                match_source = "audd"
+
     if not matches:
         typer.echo(_("No matches found."))
         cache.save()
@@ -146,10 +169,19 @@ def identify(
     matches = matches[:limit]
 
     if json_output:
-        payload = [match.to_dict() for match in matches]
+        if match_source == "audd":
+            typer.echo(_("Powered by AudD Music (fallback)."), err=True)
+        payload = []
+        for match in matches:
+            record = match.to_dict()
+            record["source"] = match_source
+            payload.append(record)
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
         cache.save()
         return
+
+    if match_source == "audd":
+        typer.echo(_("Powered by AudD Music (fallback)."))
 
     template_value = resolve_template(template, config)
 
@@ -192,6 +224,7 @@ def configure_api_key_interactively(
 
     updated = config_module.AppConfig(
         acoustid_api_key=key,
+        audd_api_token=existing.audd_api_token,
         cache_enabled=existing.cache_enabled,
         cache_ttl_hours=existing.cache_ttl_hours,
         output_template=existing.output_template,

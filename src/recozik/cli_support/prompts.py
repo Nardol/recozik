@@ -44,6 +44,19 @@ def prompt_api_key() -> str | None:
     return key
 
 
+def prompt_service_token(label: str, *, confirm_label: str | None = None) -> str | None:
+    """Prompt the user for a generic service token with confirmation."""
+    token = typer.prompt(label, show_default=False).strip()
+    if not token:
+        return None
+    confirmation_label = confirm_label or _("Confirm the token")
+    confirmation = typer.prompt(confirmation_label, default=token, show_default=False).strip()
+    if confirmation != token:
+        typer.echo(_("The tokens do not match."))
+        return None
+    return token
+
+
 def prompt_interactive_interrupt_decision(has_planned: bool) -> str:
     """Handle interrupts during interactive rename selection."""
     typer.echo(_("Interrupt received during interactive selection."))
