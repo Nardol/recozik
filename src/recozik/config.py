@@ -25,6 +25,7 @@ class AppConfig:
     """Application configuration exposed to the CLI."""
 
     acoustid_api_key: str | None = None
+    audd_api_token: str | None = None
     cache_enabled: bool = True
     cache_ttl_hours: int = 24
     output_template: str | None = None
@@ -42,6 +43,7 @@ class AppConfig:
 
         data: dict[str, dict] = {
             "acoustid": {},
+            "audd": {},
             "cache": {
                 "enabled": self.cache_enabled,
                 "ttl_hours": self.cache_ttl_hours,
@@ -62,6 +64,9 @@ class AppConfig:
 
         if self.acoustid_api_key:
             data["acoustid"]["api_key"] = self.acoustid_api_key
+
+        if self.audd_api_token:
+            data["audd"]["api_token"] = self.audd_api_token
 
         if self.output_template:
             data["output"]["template"] = self.output_template
@@ -102,6 +107,11 @@ def load_config(path: Path | None = None) -> AppConfig:
 
     if api_key is not None and not isinstance(api_key, str):
         raise RuntimeError(_("The field acoustid.api_key must be a string."))
+
+    audd_section = data.get("audd", {}) or {}
+    audd_token = audd_section.get("api_token")
+    if audd_token is not None and not isinstance(audd_token, str):
+        raise RuntimeError(_("The field audd.api_token must be a string."))
 
     cache_section = data.get("cache", {}) or {}
     cache_enabled = bool(cache_section.get("enabled", True))
@@ -144,6 +154,7 @@ def load_config(path: Path | None = None) -> AppConfig:
 
     return AppConfig(
         acoustid_api_key=api_key,
+        audd_api_token=audd_token,
         cache_enabled=cache_enabled,
         cache_ttl_hours=cache_ttl_hours,
         output_template=template,
@@ -176,6 +187,15 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
         lines.append(f'api_key = "{escaped}"')
     else:
         lines.append('# api_key = "your_api_key"')
+    lines.append("")
+
+    lines.append("[audd]")
+    audd_token = data["audd"].get("api_token")
+    if audd_token:
+        escaped = audd_token.replace('"', '\\"')
+        lines.append(f'api_token = "{escaped}"')
+    else:
+        lines.append('# api_token = "your_audd_token"')
     lines.append("")
 
     lines.append("[cache]")

@@ -6,6 +6,8 @@ from pathlib import Path
 
 from recozik.config import AppConfig, load_config, write_config
 
+TEST_AUDD_TOKEN = "recozik-test-token"  # noqa: S105
+
 
 def test_write_and_load_config(tmp_path: Path) -> None:
     """Persist a configuration object and load it back."""
@@ -26,6 +28,7 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     loaded = load_config(target)
 
     assert loaded.acoustid_api_key == "abcd1234"
+    assert loaded.audd_api_token is None
     assert loaded.cache_enabled is False
     assert loaded.cache_ttl_hours == 12
     assert loaded.output_template == "{artist} - {title} ({score:.2f})"
@@ -41,9 +44,24 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
     config = load_config(target)
 
     assert config.acoustid_api_key is None
+    assert config.audd_api_token is None
     assert config.cache_enabled is True
     assert config.cache_ttl_hours == 24
     assert config.output_template is None
     assert config.log_format == "text"
     assert config.log_absolute_paths is False
     assert config.metadata_fallback_enabled is True
+
+
+def test_write_config_with_audd_token(tmp_path: Path) -> None:
+    """Persist the AudD token when present."""
+    target = tmp_path / "config.toml"
+    config = AppConfig(
+        acoustid_api_key="key",
+        audd_api_token=TEST_AUDD_TOKEN,
+    )
+
+    write_config(config, target)
+    loaded = load_config(target)
+
+    assert loaded.audd_api_token == TEST_AUDD_TOKEN

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -36,6 +37,11 @@ def identify_batch(
         None,
         "--api-key",
         help=_("AcoustID API key to use (takes priority over the configuration file)."),
+    ),
+    audd_token: str | None = typer.Option(
+        None,
+        "--audd-token",
+        help=_("AudD API token to use as a fallback when AcoustID returns no match."),
     ),
     limit: int = typer.Option(
         3,
@@ -157,6 +163,17 @@ def identify_batch(
             typer.echo(_("Operation cancelled."))
             raise typer.Exit(code=1)
 
+    env_audd_token = os.environ.get("AUDD_API_TOKEN", "")
+    fallback_audd_token = (audd_token or env_audd_token or (config.audd_api_token or "")).strip()
+    audd_lookup_fn = None
+    audd_lookup_exception = None
+    if fallback_audd_token:
+        from ..audd import AudDLookupError as _AudDLookupError
+        from ..audd import recognize_with_audd as _recognize_with_audd
+
+        audd_lookup_fn = _recognize_with_audd
+        audd_lookup_exception = _AudDLookupError
+
     template_value = resolve_template(template, config)
     log_format_value = (log_format or config.log_format).lower()
     if log_format_value not in {"text", "jsonl"}:
@@ -264,8 +281,38 @@ def identify_batch(
             else:
                 matches = list(matches)
 
+            audd_note: str | None = None
+            audd_error_message: str | None = None
+
+            if not matches and audd_lookup_fn:
+                try:
+                    audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
+                except audd_lookup_exception as exc:  # type: ignore[misc]
+                    audd_error_message = str(exc)
+                    typer.echo(
+                        _("AudD fallback failed for {path}: {error}").format(
+                            path=relative_display,
+                            error=audd_error_message,
+                        )
+                    )
+                else:
+                    if audd_candidates:
+                        matches = audd_candidates
+                        audd_note = _("Powered by AudD Music (fallback).")
+                        typer.echo(
+                            _("AudD fallback identified {path}. Powered by AudD Music.").format(
+                                path=relative_display
+                            )
+                        )
+
             if not matches:
                 metadata_payload = metadata_extractor(file_path) if use_metadata_fallback else None
+                note_parts = [_("No match.")]
+                if audd_error_message:
+                    note_parts.append(
+                        _("AudD fallback failed: {error}").format(error=audd_error_message)
+                    )
+                note_text = " ".join(note_parts)
                 write_log_entry(
                     handle,
                     log_format_value,
@@ -275,7 +322,7 @@ def identify_batch(
                     template_value,
                     fingerprint_result,
                     status="unmatched",
-                    note=_("No match."),
+                    note=note_text,
                     metadata=metadata_payload,
                 )
                 if metadata_payload:
@@ -296,6 +343,7 @@ def identify_batch(
                 None,
                 template_value,
                 fingerprint_result,
+                note=audd_note,
                 metadata=None,
             )
             success += 1

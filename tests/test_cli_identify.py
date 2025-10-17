@@ -7,7 +7,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from recozik import cli
+from recozik import audd, cli
 from recozik.config import AppConfig, write_config
 from recozik.fingerprint import AcoustIDMatch, FingerprintResult, ReleaseInfo
 
@@ -91,6 +91,7 @@ def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload[0]["recording_id"] == "mbid-1"
     assert payload[0]["releases"][0]["title"] == "Album"
+    assert payload[0]["source"] == "acoustid"
 
 
 def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
@@ -135,6 +136,99 @@ def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
     assert "Result 1: score 0.75" in result.stdout
     assert "Artiste Exemple - Autre titre" in result.stdout
     assert "Album: Album X (2018-05-01)" in result.stdout
+
+
+def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
+    """Call AudD when AcoustID returns no match."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+    config_path = _fake_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=110.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+
+    fake_match = AcoustIDMatch(
+        score=0.95,
+        recording_id="audd-match",
+        title="Fallback Song",
+        artist="Fallback Artist",
+        release_group_title="Fallback Album",
+    )
+
+    class DummyAudDError(Exception):
+        pass
+
+    monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda token, path: [fake_match])
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--audd-token",
+            "secret-token",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Powered by AudD Music (fallback)." in result.stdout
+    assert "Fallback Artist - Fallback Song" in result.stdout
+    assert "Recording ID: audd-match" in result.stdout
+
+
+def test_identify_fallback_json_includes_source(monkeypatch, tmp_path: Path) -> None:
+    """Expose the source field and attribution when returning JSON."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+    config_path = _fake_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+
+    fake_match = AcoustIDMatch(
+        score=0.88,
+        recording_id="audd-json",
+        title="JSON Track",
+        artist="Artist",
+    )
+
+    class DummyAudDError(Exception):
+        pass
+
+    monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--audd-token",
+            "secret-token",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload[0]["source"] == "audd"
+    assert payload[0]["recording_id"] == "audd-json"
+    assert "Powered by AudD Music (fallback)." in result.stderr
 
 
 def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:

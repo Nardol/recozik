@@ -20,7 +20,7 @@ Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.or
 | ------------------------- | ----------------------------------------------------------------------------- |
 | `recozik inspect`         | Print basic metadata about an audio file.                                     |
 | `recozik fingerprint`     | Generate Chromaprint / `fpcalc` fingerprints.                                 |
-| `recozik identify`        | Look up a single file against the AcoustID API.                               |
+| `recozik identify`        | Look up a single file against the AcoustID API (AudD fallback optional).      |
 | `recozik identify-batch`  | Process an entire directory tree, cache results, and emit text or JSONL logs. |
 | `recozik rename-from-log` | Apply suggestions produced by the batch command and organise your library.    |
 | `recozik completion ...`  | Manage shell completion scripts for Bash, Zsh, Fish, or PowerShell.           |
@@ -74,6 +74,16 @@ The command above creates a project-local virtual environment and installs runti
 
 The config file supports additional settings (cache TTL, output templates, logging mode). See the [sample layout](#development-workflow) below.
 Never commit the generated `config.toml` or share your personal AcoustID key; treat it like any other secret credential.
+
+## Optional AudD fallback
+
+Recozik can also call the [AudD Music Recognition API](https://audd.io) when AcoustID does not return a match. The integration is strictly opt-in:
+
+1. Create an AudD account and generate an API token. Each user of Recozik needs to supply **their own** token and remains responsible for AudD’s usage limits and terms (the public “API Test License Agreement” only covers 90 days of evaluation).
+2. Store the token with `uv run recozik config set-audd-token`, export it via the `AUDD_API_TOKEN` environment variable, or pass it per command with `--audd-token`.
+3. When AudD recognises a track, Recozik prints `Powered by AudD Music (fallback)` in the console (and in JSON mode via `stderr`) so the required attribution is always visible. The JSON payloads also expose a `source` field (`acoustid` or `audd`) to help you trace the origin of each suggestion.
+
+Tip: keep the token disabled in shared scripts unless every user has accepted AudD’s terms and provided their own credentials.
 
 ## Usage examples
 
@@ -162,6 +172,9 @@ Sample configuration (`config.toml`):
 ```toml
 [acoustid]
 api_key = "your_api_key"
+
+[audd]
+# api_token = "your_audd_token"
 
 [cache]
 enabled = true

@@ -20,7 +20,7 @@ Application en ligne de commande conçue pour calculer des empreintes [Chromapri
 | ------------------------- | ----------------------------------------------------------------------------------------- |
 | `recozik inspect`         | Affiche les métadonnées de base d'un fichier audio.                                       |
 | `recozik fingerprint`     | Génère les empreintes Chromaprint via `fpcalc`.                                           |
-| `recozik identify`        | Identifie un fichier unique auprès du service AcoustID.                                   |
+| `recozik identify`        | Identifie un fichier unique via AcoustID (fallback AudD optionnel).                       |
 | `recozik identify-batch`  | Traite un répertoire entier, met en cache les résultats et exporte un log texte ou JSONL. |
 | `recozik rename-from-log` | Applique les propositions issues du log pour organiser la bibliothèque.                   |
 | `recozik completion …`    | Gère les scripts de complétion shell (Bash, Zsh, Fish, PowerShell).                       |
@@ -61,6 +61,16 @@ La commande crée un environnement virtuel local et installe les dépendances (r
    ```
 
 Le fichier peut contenir d'autres options (TTL du cache, modèle d'affichage, mode de log). Un exemple figure dans la section [Workflow de développement](#workflow-de-développement).
+
+## Fallback AudD optionnel
+
+Recozik peut interroger l'API [AudD Music Recognition](https://audd.io) quand AcoustID ne retourne aucun résultat. Cette fonctionnalité reste entièrement facultative :
+
+1. Créez un compte AudD et générez un token API. Chaque utilisateur de Recozik doit fournir son propre token et respecter les conditions d'AudD (l'accord public « API Test License Agreement » limite l'évaluation à 90 jours).
+2. Enregistrez le token avec `uv run recozik config set-audd-token`, exportez la variable `AUDD_API_TOKEN` ou passez `--audd-token` lors de l'exécution.
+3. Quand AudD identifie un titre, Recozik affiche `Powered by AudD Music (fallback)` dans la console (et, en mode JSON, via `stderr`). Le flux JSON ajoute également un champ `source` (`acoustid` ou `audd`) pour tracer l'origine de la proposition.
+
+Conseil : laissez le fallback désactivé dans les scripts partagés tant que chaque personne n'a pas accepté les conditions AudD et fourni son jeton.
 
 ## Exemples d'utilisation
 
@@ -144,6 +154,9 @@ Exemple de `config.toml` :
 ```toml
 [acoustid]
 api_key = "votre_cle"
+
+[audd]
+# api_token = "votre_token_audd"
 
 [cache]
 enabled = true

@@ -41,6 +41,9 @@ from .commands.config import (
     config_path as config_path_command,
 )
 from .commands.config import (
+    config_set_audd_token as config_set_audd_token_command,
+)
+from .commands.config import (
     config_set_key as config_set_key_command,
 )
 from .commands.config import (
@@ -227,6 +230,39 @@ def config_set_key(
         api_key_arg=api_key_arg,
         api_key_opt=api_key_opt,
         skip_validation=skip_validation,
+        config_path=config_path,
+    )
+
+
+@config_app.command(
+    "set-audd-token",
+    help=_("Store or remove the AudD API token used for the fallback."),
+)
+def config_set_audd_token(
+    ctx: typer.Context,
+    token_arg: str | None = typer.Argument(
+        None,
+        help=_("AudD API token to record."),
+    ),
+    token_opt: str | None = typer.Option(
+        None,
+        "--token",
+        "-t",
+        help=_("AudD API token to record (alternative to the positional argument)."),
+    ),
+    clear: bool = typer.Option(
+        False,
+        "--clear",
+        help=_("Remove the stored AudD token."),
+    ),
+    config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
+) -> None:
+    """Persist the AudD token via the shared config handler."""
+    config_set_audd_token_command(
+        ctx,
+        token_arg=token_arg,
+        token_opt=token_opt,
+        clear=clear,
         config_path=config_path,
     )
 
