@@ -667,6 +667,19 @@ msgstr "non"
 msgid "relative"
 msgstr "relatifs"
 
+msgid "Skip matches missing values required by the rename template."
+msgstr ""
+"Ignorer les correspondances dépourvues des valeurs requises par le modèle "
+"de renommage."
+
+msgid "Match skipped for {name}: missing template values ({fields})."
+msgstr ""
+"Correspondance ignorée pour {name} : valeurs manquantes pour le modèle "
+"({fields})."
+
+msgid "The field rename.require_template_fields must be a boolean."
+msgstr "Le champ rename.require_template_fields doit être un booléen."
+
 msgid "yes"
 msgstr "oui"
 
