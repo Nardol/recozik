@@ -34,6 +34,7 @@ class AppConfig:
     metadata_fallback_enabled: bool = True
     locale: str | None = None
     rename_log_cleanup: str = "ask"
+    rename_require_template_fields: bool = False
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
@@ -59,6 +60,7 @@ class AppConfig:
             "general": {},
             "rename": {
                 "log_cleanup": cleanup_mode,
+                "require_template_fields": self.rename_require_template_fields,
             },
         }
 
@@ -152,6 +154,12 @@ def load_config(path: Path | None = None) -> AppConfig:
     if cleanup_value not in {"ask", "always", "never"}:
         raise RuntimeError(_("The field rename.log_cleanup must be ask, always, or never."))
 
+    require_template_fields = rename_section.get("require_template_fields", False)
+    if require_template_fields is None:
+        require_template_fields = False
+    if not isinstance(require_template_fields, bool):
+        raise RuntimeError(_("The field rename.require_template_fields must be a boolean."))
+
     return AppConfig(
         acoustid_api_key=api_key,
         audd_api_token=audd_token,
@@ -163,6 +171,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         metadata_fallback_enabled=metadata_fallback,
         locale=locale_value,
         rename_log_cleanup=cleanup_value,
+        rename_require_template_fields=require_template_fields,
     )
 
 
@@ -224,6 +233,8 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append("[rename]")
     cleanup_mode = data["rename"]["log_cleanup"]
     lines.append(f'log_cleanup = "{cleanup_mode}"')
+    require_template_fields = data["rename"]["require_template_fields"]
+    lines.append(f"require_template_fields = {str(require_template_fields).lower()}")
     lines.append("")
 
     lines.append("[general]")

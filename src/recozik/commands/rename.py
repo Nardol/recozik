@@ -11,7 +11,12 @@ import typer
 
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
-from ..cli_support.logs import load_jsonl_log, render_log_template
+from ..cli_support.logs import (
+    extract_template_fields,
+    format_score,
+    load_jsonl_log,
+    render_log_template,
+)
 from ..cli_support.metadata import build_metadata_match, coerce_metadata_dict
 from ..cli_support.paths import (
     compute_backup_path,
@@ -26,6 +31,56 @@ from ..cli_support.prompts import (
     prompt_yes_no,
 )
 from ..i18n import _
+
+_TEMPLATE_FIELDS_SUPPORTED = {
+    "artist",
+    "title",
+    "album",
+    "score",
+    "recording_id",
+    "release_group_id",
+    "release_id",
+    "ext",
+    "stem",
+}
+
+
+def _normalize_template_value(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    try:
+        text = str(value).strip()
+    except Exception:
+        return None
+    return text or None
+
+
+def _missing_template_fields(
+    match: dict[str, object],
+    required_fields: set[str],
+    source_path: Path,
+) -> set[str]:
+    missing: set[str] = set()
+    if not required_fields:
+        return missing
+
+    for field in required_fields:
+        if field == "ext":
+            candidate = _normalize_template_value(source_path.suffix)
+        elif field == "stem":
+            candidate = _normalize_template_value(source_path.stem)
+        elif field == "score":
+            candidate = _normalize_template_value(format_score(match.get("score")))
+        else:
+            candidate = _normalize_template_value(match.get(field))
+
+        if candidate is None:
+            missing.add(field)
+
+    return missing
 
 
 def rename_from_log(
@@ -43,6 +98,11 @@ def rename_from_log(
         None,
         "--template",
         help=_("Rename template ({artist}, {title}, {album}, {score}, ...)."),
+    ),
+    require_template_fields: bool | None = typer.Option(
+        None,
+        "--require-template-fields/--allow-missing-template-fields",
+        help=_("Skip matches missing values required by the rename template."),
     ),
     dry_run: bool = typer.Option(
         True,
@@ -116,6 +176,16 @@ def rename_from_log(
     apply_locale(ctx, config=config)
 
     template_value = resolve_template(template, config)
+    require_template_fields_enabled = (
+        config.rename_require_template_fields
+        if require_template_fields is None
+        else require_template_fields
+    )
+    template_fields_used = extract_template_fields(template_value)
+    template_fields_to_check = {
+        field for field in template_fields_used if field in _TEMPLATE_FIELDS_SUPPORTED
+    }
+
     conflict_strategy = on_conflict.lower()
     if conflict_strategy not in {"append", "skip", "overwrite"}:
         typer.echo(_("Invalid --on-conflict value. Choose append, skip, or overwrite."))
@@ -136,6 +206,27 @@ def rename_from_log(
     cleanup_mode = cleanup_choice or getattr(config, "rename_log_cleanup", "ask")
     if cleanup_mode not in valid_cleanup_modes:
         cleanup_mode = "ask"
+
+    def filter_template_matches(
+        matches: list[dict[str, object]], source_path: Path
+    ) -> list[dict[str, object]]:
+        if not require_template_fields_enabled or not template_fields_to_check:
+            return list(matches)
+
+        accepted: list[dict[str, object]] = []
+        for match in matches:
+            missing = _missing_template_fields(match, template_fields_to_check, source_path)
+            if missing:
+                field_list = ", ".join(sorted(missing))
+                typer.echo(
+                    _("Match skipped for {name}: missing template values ({fields}).").format(
+                        name=source_path.name,
+                        fields=field_list,
+                    )
+                )
+                continue
+            accepted.append(match)
+        return accepted
 
     try:
         entries = load_jsonl_log(resolved_log)
@@ -178,7 +269,7 @@ def rename_from_log(
         error_message = entry.get("error")
         note = entry.get("note")
 
-        matches = entry.get("matches") or []
+        matches = filter_template_matches(list(entry.get("matches") or []), source_path)
         metadata_entry = coerce_metadata_dict(entry.get("metadata"))
 
         if status == "unmatched" and not matches:
@@ -188,7 +279,10 @@ def rename_from_log(
                         path=source_path
                     )
                 )
-                matches = [build_metadata_match(metadata_entry)]
+                matches = filter_template_matches(
+                    [build_metadata_match(metadata_entry)],
+                    source_path,
+                )
             else:
                 skipped += 1
                 context = f" ({note})" if note else ""
@@ -212,7 +306,10 @@ def rename_from_log(
                         path=source_path
                     )
                 )
-                matches = [build_metadata_match(metadata_entry)]
+                matches = filter_template_matches(
+                    [build_metadata_match(metadata_entry)],
+                    source_path,
+                )
                 error_message = None
             else:
                 skipped += 1
@@ -230,7 +327,10 @@ def rename_from_log(
                         path=source_path
                     )
                 )
-                matches = [build_metadata_match(metadata_entry)]
+                matches = filter_template_matches(
+                    [build_metadata_match(metadata_entry)],
+                    source_path,
+                )
             else:
                 skipped += 1
                 typer.echo(_("No proposal for: {path}").format(path=source_path))

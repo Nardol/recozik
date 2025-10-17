@@ -78,3 +78,42 @@ def test_rename_from_log_dry_run_then_apply(
     assert (root / "Artist - Demo.flac").exists()
     assert "DRY-RUN" in result.stdout
     assert "RENAMED" in result.stdout
+
+
+def test_rename_requires_template_fields_when_requested(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
+    """Skip entries whose matches do not satisfy the rename template."""
+    root = rename_env.make_root("require-template")
+    src = rename_env.create_source(root, "missing.mp3")
+
+    log_path = rename_env.write_log(
+        "require-template.jsonl",
+        [
+            make_entry(
+                "missing.mp3",
+                matches=[
+                    make_match(
+                        artist="",
+                        title="Song",
+                        score=0.75,
+                        recording_id="missing-artist",
+                    )
+                ],
+            )
+        ],
+    )
+
+    result = invoke_rename(
+        cli_runner,
+        build_rename_command(
+            log_path,
+            root,
+            extra_args=["--require-template-fields", "--apply"],
+        ),
+    )
+
+    assert result.exit_code == 0
+    assert src.exists()
+    assert "Match skipped for missing.mp3: missing template values (artist)" in result.stdout
+    assert "No rename performed" in result.stdout

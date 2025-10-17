@@ -21,6 +21,7 @@ def test_write_and_load_config(tmp_path: Path) -> None:
         log_format="jsonl",
         log_absolute_paths=True,
         metadata_fallback_enabled=False,
+        rename_require_template_fields=True,
     )
 
     write_config(config, target)
@@ -35,6 +36,7 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     assert loaded.log_format == "jsonl"
     assert loaded.log_absolute_paths is True
     assert loaded.metadata_fallback_enabled is False
+    assert loaded.rename_require_template_fields is True
 
 
 def test_load_config_missing_returns_default(tmp_path: Path) -> None:
@@ -51,6 +53,7 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
     assert config.log_format == "text"
     assert config.log_absolute_paths is False
     assert config.metadata_fallback_enabled is True
+    assert config.rename_require_template_fields is False
 
 
 def test_write_config_with_audd_token(tmp_path: Path) -> None:

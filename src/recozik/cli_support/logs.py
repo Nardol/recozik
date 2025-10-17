@@ -19,6 +19,20 @@ class _SafeDict(dict):
         return ""
 
 
+def extract_template_fields(template: str) -> set[str]:
+    """Return the placeholder field names used by ``template``."""
+    formatter = Formatter()
+    fields: set[str] = set()
+    for _literal, field_name, _format_spec, _conversion in formatter.parse(template):
+        if not field_name:
+            continue
+        normalized = field_name.split(".", 1)[0]
+        normalized = normalized.split("[", 1)[0]
+        if normalized:
+            fields.add(normalized)
+    return fields
+
+
 def format_match_template(match: AcoustIDMatch, template: str) -> str:
     """Render the template with the match context."""
     context = _build_match_context(match)

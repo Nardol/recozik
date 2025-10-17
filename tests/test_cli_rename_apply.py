@@ -45,6 +45,40 @@ def test_rename_from_log_apply(cli_runner: CliRunner, rename_env: RenameTestEnv)
     assert log_path.exists()
 
 
+def test_rename_missing_template_values_allowed_by_default(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
+    """Keep the legacy behaviour when template fields are optional."""
+    root = rename_env.make_root("allow-missing")
+    src = rename_env.create_source(root, "source.mp3")
+
+    log_path = rename_env.write_log(
+        "allow-missing.jsonl",
+        [
+            make_entry(
+                "source.mp3",
+                matches=[
+                    make_match(
+                        artist="",
+                        title="Demo",
+                        score=0.82,
+                        recording_id="missing-artist",
+                    )
+                ],
+            )
+        ],
+    )
+
+    result = invoke_rename(
+        cli_runner,
+        [*build_rename_command(log_path, root), "--apply", "--log-cleanup", "never"],
+    )
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert (root / "Unknown artist - Demo.mp3").exists()
+
+
 @pytest.mark.parametrize(
     ("extra_args", "input_text", "config_cleanup", "expect_deleted", "expect_prompt"),
     [
