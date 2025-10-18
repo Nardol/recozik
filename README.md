@@ -67,6 +67,7 @@ The command above creates a project-local virtual environment and installs runti
    Default configuration paths:
    - Linux/macOS: `~/.config/recozik/config.toml`
    - Windows: `%APPDATA%\recozik\config.toml`
+   - Override: set the environment variable `RECOZIK_CONFIG_FILE=/path/to/config.toml` before running the CLI.
 3. Inspect the current configuration:
    ```bash
    uv run recozik config show
@@ -122,6 +123,10 @@ uv run recozik rename-from-log logs/recozik.jsonl --root music/ --apply
 ```
 
 Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use embedded tags when AcoustID fails, and `--backup-dir` to keep a copy of originals.
+The rename workflow also honours two configuration keys under `[rename]`:
+
+- `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or `never`). You can override it per command with `--log-cleanup`.
+- `require_template_fields`: skips matches that are missing values referenced by the template (`true`/`false`). Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
 
 Install shell completion:
 
@@ -193,6 +198,26 @@ absolute_paths = false
 [general]
 locale = "en"
 ```
+
+## Configuration reference
+
+| Scope                    | Name                      | Type / Values                | Description                                                           | How to configure                                                                       |
+| ------------------------ | ------------------------- | ---------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Config file `[acoustid]` | `api_key`                 | string                       | AcoustID client key used for lookups.                                 | `uv run recozik config set-key` or edit `config.toml`.                                 |
+| Config file `[audd]`     | `api_token`               | string                       | AudD fallback token when AcoustID has no match.                       | `uv run recozik config set-audd-token` or edit `config.toml`.                          |
+| Config file `[cache]`    | `enabled`                 | boolean                      | Enables the local lookup cache.                                       | Edit `config.toml`.                                                                    |
+| Config file `[cache]`    | `ttl_hours`               | integer                      | Cache time-to-live in hours (minimum 1).                              | Edit `config.toml`.                                                                    |
+| Config file `[output]`   | `template`                | string                       | Default template for identify/rename output.                          | Edit `config.toml` or pass `--template`.                                               |
+| Config file `[metadata]` | `fallback`                | boolean                      | Whether rename uses embedded tags when no match is available.         | Edit `config.toml` or toggle `--metadata-fallback/--no-metadata-fallback`.             |
+| Config file `[logging]`  | `format`                  | `text` \| `jsonl`            | Log output format.                                                    | Edit `config.toml`.                                                                    |
+| Config file `[logging]`  | `absolute_paths`          | boolean                      | Emit absolute paths in rename logs.                                   | Edit `config.toml`.                                                                    |
+| Config file `[general]`  | `locale`                  | string (e.g. `en`, `fr_FR`)  | Preferred locale when CLI option/env var are unset.                   | Edit `config.toml`.                                                                    |
+| Config file `[rename]`   | `log_cleanup`             | `ask` \| `always` \| `never` | Cleanup policy for JSONL logs after `rename-from-log --apply`.        | Edit `config.toml` or pass `--log-cleanup`.                                            |
+| Config file `[rename]`   | `require_template_fields` | boolean                      | Reject matches missing placeholders required by the template.         | Edit `config.toml` or use `--require-template-fields/--allow-missing-template-fields`. |
+| Environment              | `RECOZIK_CONFIG_FILE`     | path                         | Absolute or relative path to a custom `config.toml`.                  | Export before running the CLI.                                                         |
+| Environment              | `RECOZIK_LOCALE`          | locale string                | Forces the active locale (higher priority than config file).          | Export before running the CLI.                                                         |
+| Environment              | `AUDD_API_TOKEN`          | string                       | AudD token used when `--audd-token` is omitted.                       | Export before running the CLI.                                                         |
+| Environment (auto)       | `_RECOZIK_COMPLETE`       | internal                     | Shell-completion hook managed by Typer; not meant to be set manually. | Set automatically by generated completion scripts.                                     |
 
 ## Code structure
 

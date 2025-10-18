@@ -55,6 +55,7 @@ La commande crée un environnement virtuel local et installe les dépendances (r
    Le fichier `config.toml` est stocké par défaut :
    - Linux/macOS : `~/.config/recozik/config.toml`
    - Windows : `%APPDATA%\recozik\config.toml`
+   - Surcharge : définissez `RECOZIK_CONFIG_FILE=/chemin/vers/config.toml` avant d'exécuter la CLI.
 3. Vérifier la configuration active :
    ```bash
    uv run recozik config show
@@ -109,6 +110,10 @@ uv run recozik rename-from-log logs/recozik.jsonl --root musique/ --apply
 ```
 
 Ajouter `--interactive` pour choisir la proposition à la volée, `--metadata-fallback` pour se rabattre sur les tags embarqués, `--backup-dir` pour conserver une copie.
+Le flux de renommage respecte également deux clés sous `[rename]` :
+
+- `log_cleanup` : politique de nettoyage du journal JSONL après `--apply` (`ask`, `always` ou `never`). Surchargez-la par commande avec `--log-cleanup`.
+- `require_template_fields` : ignore les propositions qui n’ont pas toutes les valeurs exigées par le modèle (`true`/`false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
 
 Completions shell :
 
@@ -175,6 +180,26 @@ absolute_paths = false
 [general]
 locale = "fr"
 ```
+
+## Référence de configuration
+
+| Portée               | Nom                       | Type / Valeurs               | Description                                                                | Méthode de configuration                                                                 |
+| -------------------- | ------------------------- | ---------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Fichier `[acoustid]` | `api_key`                 | chaîne                       | Clé cliente AcoustID utilisée pour les requêtes.                           | `uv run recozik config set-key` ou édition de `config.toml`.                             |
+| Fichier `[audd]`     | `api_token`               | chaîne                       | Jeton AudD utilisé en fallback.                                            | `uv run recozik config set-audd-token` ou édition de `config.toml`.                      |
+| Fichier `[cache]`    | `enabled`                 | booléen                      | Active le cache local des correspondances.                                 | Édition de `config.toml`.                                                                |
+| Fichier `[cache]`    | `ttl_hours`               | entier                       | Durée de vie du cache en heures (minimum 1).                               | Édition de `config.toml`.                                                                |
+| Fichier `[output]`   | `template`                | chaîne                       | Modèle par défaut pour l'affichage/renommage.                              | Édition de `config.toml` ou option `--template`.                                         |
+| Fichier `[metadata]` | `fallback`                | booléen                      | Autorise le repli sur les métadonnées embarquées.                          | Édition de `config.toml` ou `--metadata-fallback/--no-metadata-fallback`.                |
+| Fichier `[logging]`  | `format`                  | `text` \| `jsonl`            | Format du journal généré.                                                  | Édition de `config.toml`.                                                                |
+| Fichier `[logging]`  | `absolute_paths`          | booléen                      | Force l'utilisation de chemins absolus dans les journaux.                  | Édition de `config.toml`.                                                                |
+| Fichier `[general]`  | `locale`                  | chaîne (ex. `fr`, `fr_FR`)   | Locale préférée si l'option CLI et l'env sont absents.                     | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`   | `log_cleanup`             | `ask` \| `always` \| `never` | Politique de nettoyage du log après `rename-from-log --apply`.             | Édition de `config.toml` ou option `--log-cleanup`.                                      |
+| Fichier `[rename]`   | `require_template_fields` | booléen                      | Rejette les correspondances sans toutes les valeurs du modèle.             | Édition de `config.toml` ou `--require-template-fields/--allow-missing-template-fields`. |
+| Environnement        | `RECOZIK_CONFIG_FILE`     | chemin                       | Chemin alternatif vers `config.toml`.                                      | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement        | `RECOZIK_LOCALE`          | chaîne locale                | Force la locale active (prioritaire sur le fichier).                       | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement        | `AUDD_API_TOKEN`          | chaîne                       | Jeton AudD utilisé quand `--audd-token` est omis.                          | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement (auto) | `_RECOZIK_COMPLETE`       | interne                      | Variable gérée par les scripts de complétion, ne pas la définir à la main. | Configurée automatiquement lors du chargement de la complétion.                          |
 
 ## Tests
 
