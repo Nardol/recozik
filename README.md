@@ -123,8 +123,11 @@ uv run recozik rename-from-log logs/recozik.jsonl --root music/ --apply
 ```
 
 Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use embedded tags when AcoustID fails, and `--backup-dir` to keep a copy of originals.
-The rename workflow also honours two configuration keys under `[rename]`:
+The rename workflow also honours configuration keys under `[rename]`:
 
+- `default_mode`: selects the implicit behaviour for `--dry-run/--apply` (`dry-run` by default, set to `apply` to skip the preview step).
+- `interactive`: toggles interactive selection without passing `--interactive` (`true`/`false`).
+- `confirm_each`: requests confirmation before each rename when set to `true`.
 - `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or `never`). You can override it per command with `--log-cleanup`.
 - `require_template_fields`: skips matches that are missing values referenced by the template (`true`/`false`). Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
 
@@ -195,6 +198,13 @@ fallback = true
 format = "text"
 absolute_paths = false
 
+[rename]
+# default_mode = "dry-run"
+# interactive = false
+# confirm_each = false
+log_cleanup = "ask"
+require_template_fields = false
+
 [general]
 locale = "en"
 ```
@@ -212,6 +222,9 @@ locale = "en"
 | Config file `[logging]`  | `format`                  | `text` \| `jsonl`            | Log output format.                                                    | Edit `config.toml`.                                                                    |
 | Config file `[logging]`  | `absolute_paths`          | boolean                      | Emit absolute paths in rename logs.                                   | Edit `config.toml`.                                                                    |
 | Config file `[general]`  | `locale`                  | string (e.g. `en`, `fr_FR`)  | Preferred locale when CLI option/env var are unset.                   | Edit `config.toml`.                                                                    |
+| Config file `[rename]`   | `default_mode`            | `dry-run` \| `apply`         | Default behaviour when neither `--dry-run` nor `--apply` is provided. | Edit `config.toml`.                                                                    |
+| Config file `[rename]`   | `interactive`             | boolean                      | Enables interactive selection without `--interactive`.                | Edit `config.toml`.                                                                    |
+| Config file `[rename]`   | `confirm_each`            | boolean                      | Asks for confirmation before each rename by default.                  | Edit `config.toml`.                                                                    |
 | Config file `[rename]`   | `log_cleanup`             | `ask` \| `always` \| `never` | Cleanup policy for JSONL logs after `rename-from-log --apply`.        | Edit `config.toml` or pass `--log-cleanup`.                                            |
 | Config file `[rename]`   | `require_template_fields` | boolean                      | Reject matches missing placeholders required by the template.         | Edit `config.toml` or use `--require-template-fields/--allow-missing-template-fields`. |
 | Environment              | `RECOZIK_CONFIG_FILE`     | path                         | Absolute or relative path to a custom `config.toml`.                  | Export before running the CLI.                                                         |

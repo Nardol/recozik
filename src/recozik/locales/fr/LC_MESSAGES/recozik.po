@@ -219,8 +219,8 @@ msgstr "Affiche les principaux paramètres de configuration."
 msgid "Display the path to the configuration file in use."
 msgstr "Affiche le chemin du fichier de configuration utilisé."
 
-msgid "Preview rename operations only (default). Use --apply to commit changes."
-msgstr "Prévisualise uniquement les renommages (par défaut). Utilisez --apply pour valider les changements."
+msgid "Preview rename operations only (default unless changed in config). Use --apply to commit changes."
+msgstr "Prévisualise uniquement les renommages (par défaut sauf configuration contraire). Utilisez --apply pour valider les changements."
 
 msgid "Display the results as JSON (useful for scripting or screen readers)."
 msgstr "Affiche les résultats au format JSON (utile pour les scripts ou les lecteurs d'écran)."
@@ -676,6 +676,18 @@ msgid "Match skipped for {name}: missing template values ({fields})."
 msgstr ""
 "Correspondance ignorée pour {name} : valeurs manquantes pour le modèle "
 "({fields})."
+
+msgid "The field rename.default_mode must be a string."
+msgstr "Le champ rename.default_mode doit être une chaîne."
+
+msgid "The field rename.default_mode must be dry-run or apply."
+msgstr "Le champ rename.default_mode doit valoir dry-run ou apply."
+
+msgid "The field rename.interactive must be a boolean."
+msgstr "Le champ rename.interactive doit être un booléen."
+
+msgid "The field rename.confirm_each must be a boolean."
+msgstr "Le champ rename.confirm_each doit être un booléen."
 
 msgid "The field rename.require_template_fields must be a boolean."
 msgstr "Le champ rename.require_template_fields doit être un booléen."

@@ -35,12 +35,19 @@ class AppConfig:
     locale: str | None = None
     rename_log_cleanup: str = "ask"
     rename_require_template_fields: bool = False
+    rename_default_mode: str = "dry-run"
+    rename_default_interactive: bool = False
+    rename_default_confirm_each: bool = False
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
         cleanup_mode = self.rename_log_cleanup
         if cleanup_mode not in {"ask", "always", "never"}:
             cleanup_mode = "ask"
+
+        default_mode = self.rename_default_mode
+        if default_mode not in {"dry-run", "apply"}:
+            default_mode = "dry-run"
 
         data: dict[str, dict] = {
             "acoustid": {},
@@ -61,6 +68,9 @@ class AppConfig:
             "rename": {
                 "log_cleanup": cleanup_mode,
                 "require_template_fields": self.rename_require_template_fields,
+                "default_mode": default_mode,
+                "interactive": self.rename_default_interactive,
+                "confirm_each": self.rename_default_confirm_each,
             },
         }
 
@@ -160,6 +170,27 @@ def load_config(path: Path | None = None) -> AppConfig:
     if not isinstance(require_template_fields, bool):
         raise RuntimeError(_("The field rename.require_template_fields must be a boolean."))
 
+    default_mode_value = rename_section.get("default_mode", "dry-run")
+    if default_mode_value is None:
+        default_mode_value = "dry-run"
+    if not isinstance(default_mode_value, str):
+        raise RuntimeError(_("The field rename.default_mode must be a string."))
+    default_mode_value = default_mode_value.lower()
+    if default_mode_value not in {"dry-run", "apply"}:
+        raise RuntimeError(_("The field rename.default_mode must be dry-run or apply."))
+
+    interactive_default = rename_section.get("interactive", False)
+    if interactive_default is None:
+        interactive_default = False
+    if not isinstance(interactive_default, bool):
+        raise RuntimeError(_("The field rename.interactive must be a boolean."))
+
+    confirm_each_default = rename_section.get("confirm_each", False)
+    if confirm_each_default is None:
+        confirm_each_default = False
+    if not isinstance(confirm_each_default, bool):
+        raise RuntimeError(_("The field rename.confirm_each must be a boolean."))
+
     return AppConfig(
         acoustid_api_key=api_key,
         audd_api_token=audd_token,
@@ -172,6 +203,9 @@ def load_config(path: Path | None = None) -> AppConfig:
         locale=locale_value,
         rename_log_cleanup=cleanup_value,
         rename_require_template_fields=require_template_fields,
+        rename_default_mode=default_mode_value,
+        rename_default_interactive=interactive_default,
+        rename_default_confirm_each=confirm_each_default,
     )
 
 
@@ -235,6 +269,9 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f'log_cleanup = "{cleanup_mode}"')
     require_template_fields = data["rename"]["require_template_fields"]
     lines.append(f"require_template_fields = {str(require_template_fields).lower()}")
+    lines.append(f'default_mode = "{data["rename"]["default_mode"]}"')
+    lines.append(f"interactive = {str(data['rename']['interactive']).lower()}")
+    lines.append(f"confirm_each = {str(data['rename']['confirm_each']).lower()}")
     lines.append("")
 
     lines.append("[general]")

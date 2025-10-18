@@ -246,3 +246,120 @@ def test_rename_from_log_export(cli_runner: CliRunner, rename_env: RenameTestEnv
     payload = json.loads(export_file.read_text(encoding="utf-8"))
     assert payload[0]["applied"] is True
     assert payload[0]["target"].endswith("Artist - Export.mp3")
+
+
+def test_rename_from_log_respects_config_default_mode(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
+    """Apply renames without --apply when the config switches the default mode."""
+    root = rename_env.make_root("config-default-apply")
+    src = rename_env.create_source(root, "default.wav")
+
+    log_path = rename_env.write_log(
+        "config-apply.jsonl",
+        [
+            make_entry(
+                "default.wav",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Default",
+                        score=0.9,
+                        recording_id="apply-default",
+                    )
+                ],
+            )
+        ],
+    )
+
+    config_path = rename_env.base / "config-default.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[rename]",
+                'default_mode = "apply"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    command = build_rename_command(
+        log_path,
+        root,
+        extra_args=[
+            "--log-cleanup",
+            "never",
+            "--config-path",
+            str(config_path),
+        ],
+    )
+
+    result = invoke_rename(cli_runner, command)
+
+    assert result.exit_code == 0
+    assert not src.exists()
+    assert (root / "Artist - Default.wav").exists()
+    assert "RENAMED" in result.stdout
+    assert "DRY-RUN" not in result.stdout
+
+
+def test_rename_from_log_confirm_each_via_config(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
+    """Ask for per-file confirmation when enabled through the configuration."""
+    root = rename_env.make_root("config-confirm")
+    src = rename_env.create_source(root, "confirm.flac")
+
+    log_path = rename_env.write_log(
+        "config-confirm.jsonl",
+        [
+            make_entry(
+                "confirm.flac",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Confirm",
+                        score=0.88,
+                        recording_id="config-confirm",
+                    )
+                ],
+            )
+        ],
+    )
+
+    config_path = rename_env.base / "config-confirm.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[rename]",
+                "confirm_each = true",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = invoke_rename(
+        cli_runner,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--apply",
+            "--log-cleanup",
+            "never",
+            "--config-path",
+            str(config_path),
+        ],
+        input="y\n",
+    )
+
+    assert result.exit_code == 0
+    prompt = "Rename confirm.flac -> Artist - Confirm.flac?"
+    assert prompt in result.stdout
+    assert not src.exists()
+    assert (root / "Artist - Confirm.flac").exists()

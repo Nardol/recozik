@@ -104,18 +104,20 @@ def rename_from_log(
         "--require-template-fields/--allow-missing-template-fields",
         help=_("Skip matches missing values required by the rename template."),
     ),
-    dry_run: bool = typer.Option(
-        True,
+    dry_run: bool | None = typer.Option(
+        None,
         "--dry-run/--apply",
-        help=_("Preview rename operations only (default). Use --apply to commit changes."),
+        help=_(
+            "Preview rename operations only (default, configurable). Use --apply to commit changes."
+        ),
     ),
-    interactive: bool = typer.Option(
-        False,
+    interactive: bool | None = typer.Option(
+        None,
         "--interactive/--no-interactive",
         help=_("Offer an interactive choice when multiple matches are available."),
     ),
-    confirm: bool = typer.Option(
-        False,
+    confirm: bool | None = typer.Option(
+        None,
         "--confirm/--no-confirm",
         help=_("Ask for confirmation before renaming each file."),
     ),
@@ -194,6 +196,10 @@ def rename_from_log(
     metadata_fallback_enabled = (
         config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
     )
+
+    dry_run = config.rename_default_mode == "dry-run" if dry_run is None else dry_run
+    interactive = config.rename_default_interactive if interactive is None else interactive
+    confirm = config.rename_default_confirm_each if confirm is None else confirm
 
     valid_cleanup_modes = {"ask", "always", "never"}
     cleanup_choice = None
