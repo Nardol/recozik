@@ -115,8 +115,15 @@ Le flux de renommage respecte également plusieurs clés sous `[rename]` :
 - `default_mode` : définit le comportement implicite de `--dry-run/--apply` (`dry-run` par défaut, `apply` pour appliquer directement).
 - `interactive` : active la sélection interactive sans ajouter `--interactive` (`true`/`false`).
 - `confirm_each` : demande une confirmation avant chaque renommage lorsque réglé à `true`.
+- `conflict_strategy` : politique de collision par défaut (`append`, `skip` ou `overwrite`).
+- `metadata_confirm` : impose (ou non) la confirmation des renommages basés sur les métadonnées (`true`/`false`).
 - `log_cleanup` : politique de nettoyage du journal JSONL après `--apply` (`ask`, `always` ou `never`). Surchargez-la par commande avec `--log-cleanup`.
 - `require_template_fields` : ignore les propositions qui n’ont pas toutes les valeurs exigées par le modèle (`true`/`false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
+
+Deux sections optionnelles permettent aussi d’ajuster les commandes d’identification :
+
+- `[identify]` configure la limite de résultats, la sortie JSON et le rafraîchissement du cache pour `identify`.
+- `[identify_batch]` règle la limite par fichier, `best_only`, la récursivité et le journal par défaut de `identify-batch`.
 
 Completions shell :
 
@@ -180,10 +187,23 @@ fallback = true
 format = "text"
 absolute_paths = false
 
+[identify]
+limit = 3
+json = false
+refresh = false
+
+[identify_batch]
+limit = 3
+best_only = false
+recursive = false
+# log_file = "recozik-batch.log"
+
 [rename]
 # default_mode = "dry-run"
 # interactive = false
 # confirm_each = false
+conflict_strategy = "append"
+metadata_confirm = true
 log_cleanup = "ask"
 require_template_fields = false
 
@@ -193,26 +213,35 @@ locale = "fr"
 
 ## Référence de configuration
 
-| Portée               | Nom                       | Type / Valeurs               | Description                                                                | Méthode de configuration                                                                 |
-| -------------------- | ------------------------- | ---------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Fichier `[acoustid]` | `api_key`                 | chaîne                       | Clé cliente AcoustID utilisée pour les requêtes.                           | `uv run recozik config set-key` ou édition de `config.toml`.                             |
-| Fichier `[audd]`     | `api_token`               | chaîne                       | Jeton AudD utilisé en fallback.                                            | `uv run recozik config set-audd-token` ou édition de `config.toml`.                      |
-| Fichier `[cache]`    | `enabled`                 | booléen                      | Active le cache local des correspondances.                                 | Édition de `config.toml`.                                                                |
-| Fichier `[cache]`    | `ttl_hours`               | entier                       | Durée de vie du cache en heures (minimum 1).                               | Édition de `config.toml`.                                                                |
-| Fichier `[output]`   | `template`                | chaîne                       | Modèle par défaut pour l'affichage/renommage.                              | Édition de `config.toml` ou option `--template`.                                         |
-| Fichier `[metadata]` | `fallback`                | booléen                      | Autorise le repli sur les métadonnées embarquées.                          | Édition de `config.toml` ou `--metadata-fallback/--no-metadata-fallback`.                |
-| Fichier `[logging]`  | `format`                  | `text` \| `jsonl`            | Format du journal généré.                                                  | Édition de `config.toml`.                                                                |
-| Fichier `[logging]`  | `absolute_paths`          | booléen                      | Force l'utilisation de chemins absolus dans les journaux.                  | Édition de `config.toml`.                                                                |
-| Fichier `[general]`  | `locale`                  | chaîne (ex. `fr`, `fr_FR`)   | Locale préférée si l'option CLI et l'env sont absents.                     | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`   | `default_mode`            | `dry-run` \| `apply`         | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.      | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`   | `interactive`             | booléen                      | Active l'interactif sans ajouter l'option `--interactive`.                 | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`   | `confirm_each`            | booléen                      | Demande confirmation avant chaque renommage par défaut.                    | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`   | `log_cleanup`             | `ask` \| `always` \| `never` | Politique de nettoyage du log après `rename-from-log --apply`.             | Édition de `config.toml` ou option `--log-cleanup`.                                      |
-| Fichier `[rename]`   | `require_template_fields` | booléen                      | Rejette les correspondances sans toutes les valeurs du modèle.             | Édition de `config.toml` ou `--require-template-fields/--allow-missing-template-fields`. |
-| Environnement        | `RECOZIK_CONFIG_FILE`     | chemin                       | Chemin alternatif vers `config.toml`.                                      | Exporter avant d'exécuter la CLI.                                                        |
-| Environnement        | `RECOZIK_LOCALE`          | chaîne locale                | Force la locale active (prioritaire sur le fichier).                       | Exporter avant d'exécuter la CLI.                                                        |
-| Environnement        | `AUDD_API_TOKEN`          | chaîne                       | Jeton AudD utilisé quand `--audd-token` est omis.                          | Exporter avant d'exécuter la CLI.                                                        |
-| Environnement (auto) | `_RECOZIK_COMPLETE`       | interne                      | Variable gérée par les scripts de complétion, ne pas la définir à la main. | Configurée automatiquement lors du chargement de la complétion.                          |
+| Portée                     | Nom                       | Type / Valeurs                    | Description                                                                | Méthode de configuration                                                                 |
+| -------------------------- | ------------------------- | --------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Fichier `[acoustid]`       | `api_key`                 | chaîne                            | Clé cliente AcoustID utilisée pour les requêtes.                           | `uv run recozik config set-key` ou édition de `config.toml`.                             |
+| Fichier `[audd]`           | `api_token`               | chaîne                            | Jeton AudD utilisé en fallback.                                            | `uv run recozik config set-audd-token` ou édition de `config.toml`.                      |
+| Fichier `[cache]`          | `enabled`                 | booléen                           | Active le cache local des correspondances.                                 | Édition de `config.toml`.                                                                |
+| Fichier `[cache]`          | `ttl_hours`               | entier                            | Durée de vie du cache en heures (minimum 1).                               | Édition de `config.toml`.                                                                |
+| Fichier `[output]`         | `template`                | chaîne                            | Modèle par défaut pour l'affichage/renommage.                              | Édition de `config.toml` ou option `--template`.                                         |
+| Fichier `[metadata]`       | `fallback`                | booléen                           | Autorise le repli sur les métadonnées embarquées.                          | Édition de `config.toml` ou `--metadata-fallback/--no-metadata-fallback`.                |
+| Fichier `[logging]`        | `format`                  | `text` \| `jsonl`                 | Format du journal généré.                                                  | Édition de `config.toml`.                                                                |
+| Fichier `[logging]`        | `absolute_paths`          | booléen                           | Force l'utilisation de chemins absolus dans les journaux.                  | Édition de `config.toml`.                                                                |
+| Fichier `[general]`        | `locale`                  | chaîne (ex. `fr`, `fr_FR`)        | Locale préférée si l'option CLI et l'env sont absents.                     | Édition de `config.toml`.                                                                |
+| Fichier `[identify]`       | `limit`                   | entier >= 1                       | Nombre de résultats retournés par défaut par `identify`.                   | Édition de `config.toml`.                                                                |
+| Fichier `[identify]`       | `json`                    | booléen                           | Affiche du JSON par défaut.                                                | Édition de `config.toml`.                                                                |
+| Fichier `[identify]`       | `refresh`                 | booléen                           | Ignore le cache sauf désactivation explicite.                              | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `limit`                   | entier >= 1                       | Maximum de propositions conservées par fichier.                            | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `best_only`               | booléen                           | Conserve uniquement la meilleure proposition.                              | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `recursive`               | booléen                           | Analyse les sous-dossiers par défaut.                                      | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `log_file`                | chaîne (chemin)                   | Destination par défaut des journaux batch.                                 | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | Politique de nettoyage du log après `rename-from-log --apply`.             | Édition de `config.toml` ou option `--log-cleanup`.                                      |
+| Fichier `[rename]`         | `require_template_fields` | booléen                           | Rejette les correspondances sans toutes les valeurs du modèle.             | Édition de `config.toml` ou `--require-template-fields/--allow-missing-template-fields`. |
+| Fichier `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.      | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `interactive`             | booléen                           | Active l'interactif sans ajouter l'option `--interactive`.                 | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `confirm_each`            | booléen                           | Demande confirmation avant chaque renommage par défaut.                    | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `conflict_strategy`       | `append` \| `skip` \| `overwrite` | Politique de collision appliquée par défaut.                               | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `metadata_confirm`        | booléen                           | Imposer une confirmation pour les métadonnées.                             | Édition de `config.toml`.                                                                |
+| Environnement              | `RECOZIK_CONFIG_FILE`     | chemin                            | Chemin alternatif vers `config.toml`.                                      | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement              | `RECOZIK_LOCALE`          | chaîne locale                     | Force la locale active (prioritaire sur le fichier).                       | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement              | `AUDD_API_TOKEN`          | chaîne                            | Jeton AudD utilisé quand `--audd-token` est omis.                          | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement (auto)       | `_RECOZIK_COMPLETE`       | interne                           | Variable gérée par les scripts de complétion, ne pas la définir à la main. | Configurée automatiquement lors du chargement de la complétion.                          |
 
 ## Tests
 

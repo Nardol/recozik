@@ -8,6 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import typer
+from click.core import ParameterSource
 
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
@@ -99,6 +100,21 @@ def identify(
     env_audd_token = os.environ.get("AUDD_API_TOKEN", "")
     fallback_audd_token = (audd_token or env_audd_token or (config.audd_api_token or "")).strip()
 
+    limit_source = ctx.get_parameter_source("limit")
+    limit_value = (
+        config.identify_default_limit if limit_source is ParameterSource.DEFAULT else max(limit, 1)
+    )
+
+    json_source = ctx.get_parameter_source("json_output")
+    json_value = (
+        config.identify_output_json if json_source is ParameterSource.DEFAULT else json_output
+    )
+
+    refresh_source = ctx.get_parameter_source("refresh")
+    refresh_value = (
+        config.identify_refresh_cache if refresh_source is ParameterSource.DEFAULT else refresh
+    )
+
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
         typer.echo(_("No AcoustID API key configured."))
@@ -132,7 +148,7 @@ def identify(
     )
 
     matches = None
-    if config.cache_enabled and not refresh:
+    if config.cache_enabled and not refresh_value:
         matches = cache.get(fingerprint_result.fingerprint, fingerprint_result.duration_seconds)
 
     if matches is None:
@@ -166,9 +182,9 @@ def identify(
         cache.save()
         return
 
-    matches = matches[:limit]
+    matches = matches[:limit_value]
 
-    if json_output:
+    if json_value:
         if match_source == "audd":
             typer.echo(_("Powered by AudD Music (fallback)."), err=True)
         payload = []
@@ -237,6 +253,15 @@ def configure_api_key_interactively(
         rename_default_mode=existing.rename_default_mode,
         rename_default_interactive=existing.rename_default_interactive,
         rename_default_confirm_each=existing.rename_default_confirm_each,
+        rename_conflict_strategy=existing.rename_conflict_strategy,
+        rename_metadata_confirm=existing.rename_metadata_confirm,
+        identify_default_limit=existing.identify_default_limit,
+        identify_output_json=existing.identify_output_json,
+        identify_refresh_cache=existing.identify_refresh_cache,
+        identify_batch_limit=existing.identify_batch_limit,
+        identify_batch_best_only=existing.identify_batch_best_only,
+        identify_batch_recursive=existing.identify_batch_recursive,
+        identify_batch_log_file=existing.identify_batch_log_file,
     )
 
     target = config_module.write_config(updated, config_path)

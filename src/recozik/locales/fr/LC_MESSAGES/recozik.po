@@ -219,8 +219,8 @@ msgstr "Affiche les principaux paramètres de configuration."
 msgid "Display the path to the configuration file in use."
 msgstr "Affiche le chemin du fichier de configuration utilisé."
 
-msgid "Preview rename operations only (default unless changed in config). Use --apply to commit changes."
-msgstr "Prévisualise uniquement les renommages (par défaut sauf configuration contraire). Utilisez --apply pour valider les changements."
+msgid "Preview rename operations only (default, configurable). Use --apply to commit changes."
+msgstr "Prévisualise uniquement les renommages (par défaut, valeur configurable). Utilisez --apply pour valider les changements."
 
 msgid "Display the results as JSON (useful for scripting or screen readers)."
 msgstr "Affiche les résultats au format JSON (utile pour les scripts ou les lecteurs d'écran)."
@@ -691,6 +691,24 @@ msgstr "Le champ rename.confirm_each doit être un booléen."
 
 msgid "The field rename.require_template_fields must be a boolean."
 msgstr "Le champ rename.require_template_fields doit être un booléen."
+
+msgid "The field rename.conflict_strategy must be a string."
+msgstr "Le champ rename.conflict_strategy doit être une chaîne."
+
+msgid "The field rename.conflict_strategy must be append, skip, or overwrite."
+msgstr "Le champ rename.conflict_strategy doit valoir append, skip ou overwrite."
+
+msgid "The field rename.metadata_confirm must be a boolean."
+msgstr "Le champ rename.metadata_confirm doit être un booléen."
+
+msgid "The field identify.limit must be an integer."
+msgstr "Le champ identify.limit doit être un entier."
+
+msgid "The field identify_batch.limit must be an integer."
+msgstr "Le champ identify_batch.limit doit être un entier."
+
+msgid "The field identify_batch.log_file must be a string."
+msgstr "Le champ identify_batch.log_file doit être une chaîne."
 
 msgid "yes"
 msgstr "oui"

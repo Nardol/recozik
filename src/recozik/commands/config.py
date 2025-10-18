@@ -136,6 +136,15 @@ def config_set_key(
         rename_default_mode=existing.rename_default_mode,
         rename_default_interactive=existing.rename_default_interactive,
         rename_default_confirm_each=existing.rename_default_confirm_each,
+        rename_conflict_strategy=existing.rename_conflict_strategy,
+        rename_metadata_confirm=existing.rename_metadata_confirm,
+        identify_default_limit=existing.identify_default_limit,
+        identify_output_json=existing.identify_output_json,
+        identify_refresh_cache=existing.identify_refresh_cache,
+        identify_batch_limit=existing.identify_batch_limit,
+        identify_batch_best_only=existing.identify_batch_best_only,
+        identify_batch_recursive=existing.identify_batch_recursive,
+        identify_batch_log_file=existing.identify_batch_log_file,
     )
 
     target = config_module.write_config(updated, config_path)
@@ -200,6 +209,15 @@ def config_set_audd_token(
         rename_default_mode=existing.rename_default_mode,
         rename_default_interactive=existing.rename_default_interactive,
         rename_default_confirm_each=existing.rename_default_confirm_each,
+        rename_conflict_strategy=existing.rename_conflict_strategy,
+        rename_metadata_confirm=existing.rename_metadata_confirm,
+        identify_default_limit=existing.identify_default_limit,
+        identify_output_json=existing.identify_output_json,
+        identify_refresh_cache=existing.identify_refresh_cache,
+        identify_batch_limit=existing.identify_batch_limit,
+        identify_batch_best_only=existing.identify_batch_best_only,
+        identify_batch_recursive=existing.identify_batch_recursive,
+        identify_batch_log_file=existing.identify_batch_log_file,
     )
 
     target = config_module.write_config(updated, config_path)
