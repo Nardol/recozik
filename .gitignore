@@ -18,14 +18,17 @@ wheels/
 *.log
 *.sql
 *.txt
-*.{mp3,wav,ogg,flac,aac,m4a,wma,aiff,alac,opus,amr}
+*.mp3
+*.wav
+*.ogg
+*.aac
+*.m4a
+*.wma
+*.aiff
+*.alac
+*.opus
+*.amr
 *.flac
-
-# Version file
-src/mama_freeze/_version.py
-
-# Windows specific version info file
-version_info.txt
 
 # Coverage database
 .coverage
