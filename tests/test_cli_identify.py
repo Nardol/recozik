@@ -49,6 +49,84 @@ def _fake_config(tmp_path: Path, api_key: str = "token") -> Path:
     return config_path
 
 
+def test_identify_respects_config_defaults(monkeypatch, tmp_path: Path) -> None:
+    """Apply config-provided defaults for limit, JSON rendering, and refresh."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[acoustid]",
+                'api_key = "token"',
+                "",
+                "[identify]",
+                "limit = 1",
+                "json = true",
+                "refresh = true",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=102.0),
+    )
+
+    def fake_lookup(api_key, fingerprint_result, meta=None, timeout=None):
+        assert api_key == "token"
+        return [
+            AcoustIDMatch(
+                score=0.9,
+                recording_id="id-1",
+                title="First",
+                artist="Artist",
+            ),
+            AcoustIDMatch(
+                score=0.8,
+                recording_id="id-2",
+                title="Second",
+                artist="Artist",
+            ),
+        ]
+
+    monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
+
+    cache_instances: list[DummyCache] = []
+
+    class TrackingCache(DummyCache):
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            self.get_called = False
+            cache_instances.append(self)
+
+        def get(self, fingerprint: str, duration: float):
+            self.get_called = True
+            return super().get(fingerprint, duration)
+
+    monkeypatch.setattr(cli, "LookupCache", TrackingCache)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert len(payload) == 1
+    assert payload[0]["recording_id"] == "id-1"
+    assert cache_instances and cache_instances[0].get_called is False
+
+
 def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
     """Return JSON payload when --json flag is provided."""
     audio_path = tmp_path / "song.wav"

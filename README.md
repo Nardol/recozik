@@ -128,8 +128,15 @@ The rename workflow also honours configuration keys under `[rename]`:
 - `default_mode`: selects the implicit behaviour for `--dry-run/--apply` (`dry-run` by default, set to `apply` to skip the preview step).
 - `interactive`: toggles interactive selection without passing `--interactive` (`true`/`false`).
 - `confirm_each`: requests confirmation before each rename when set to `true`.
+- `conflict_strategy`: default collision behaviour (`append`, `skip`, or `overwrite`).
+- `metadata_confirm`: controls whether metadata fallbacks require confirmation (`true`/`false`).
 - `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or `never`). You can override it per command with `--log-cleanup`.
 - `require_template_fields`: skips matches that are missing values referenced by the template (`true`/`false`). Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
+
+Two optional sections also tune the identification commands:
+
+- `[identify]` sets the default limit, JSON output mode, and cache refresh behaviour for `identify`.
+- `[identify_batch]` controls the per-file result limit, `best_only` mode, recursion, and default log destination for `identify-batch`.
 
 Install shell completion:
 
@@ -198,10 +205,23 @@ fallback = true
 format = "text"
 absolute_paths = false
 
+[identify]
+limit = 3
+json = false
+refresh = false
+
+[identify_batch]
+limit = 3
+best_only = false
+recursive = false
+# log_file = "recozik-batch.log"
+
 [rename]
 # default_mode = "dry-run"
 # interactive = false
 # confirm_each = false
+conflict_strategy = "append"
+metadata_confirm = true
 log_cleanup = "ask"
 require_template_fields = false
 
@@ -211,26 +231,35 @@ locale = "en"
 
 ## Configuration reference
 
-| Scope                    | Name                      | Type / Values                | Description                                                           | How to configure                                                                       |
-| ------------------------ | ------------------------- | ---------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Config file `[acoustid]` | `api_key`                 | string                       | AcoustID client key used for lookups.                                 | `uv run recozik config set-key` or edit `config.toml`.                                 |
-| Config file `[audd]`     | `api_token`               | string                       | AudD fallback token when AcoustID has no match.                       | `uv run recozik config set-audd-token` or edit `config.toml`.                          |
-| Config file `[cache]`    | `enabled`                 | boolean                      | Enables the local lookup cache.                                       | Edit `config.toml`.                                                                    |
-| Config file `[cache]`    | `ttl_hours`               | integer                      | Cache time-to-live in hours (minimum 1).                              | Edit `config.toml`.                                                                    |
-| Config file `[output]`   | `template`                | string                       | Default template for identify/rename output.                          | Edit `config.toml` or pass `--template`.                                               |
-| Config file `[metadata]` | `fallback`                | boolean                      | Whether rename uses embedded tags when no match is available.         | Edit `config.toml` or toggle `--metadata-fallback/--no-metadata-fallback`.             |
-| Config file `[logging]`  | `format`                  | `text` \| `jsonl`            | Log output format.                                                    | Edit `config.toml`.                                                                    |
-| Config file `[logging]`  | `absolute_paths`          | boolean                      | Emit absolute paths in rename logs.                                   | Edit `config.toml`.                                                                    |
-| Config file `[general]`  | `locale`                  | string (e.g. `en`, `fr_FR`)  | Preferred locale when CLI option/env var are unset.                   | Edit `config.toml`.                                                                    |
-| Config file `[rename]`   | `default_mode`            | `dry-run` \| `apply`         | Default behaviour when neither `--dry-run` nor `--apply` is provided. | Edit `config.toml`.                                                                    |
-| Config file `[rename]`   | `interactive`             | boolean                      | Enables interactive selection without `--interactive`.                | Edit `config.toml`.                                                                    |
-| Config file `[rename]`   | `confirm_each`            | boolean                      | Asks for confirmation before each rename by default.                  | Edit `config.toml`.                                                                    |
-| Config file `[rename]`   | `log_cleanup`             | `ask` \| `always` \| `never` | Cleanup policy for JSONL logs after `rename-from-log --apply`.        | Edit `config.toml` or pass `--log-cleanup`.                                            |
-| Config file `[rename]`   | `require_template_fields` | boolean                      | Reject matches missing placeholders required by the template.         | Edit `config.toml` or use `--require-template-fields/--allow-missing-template-fields`. |
-| Environment              | `RECOZIK_CONFIG_FILE`     | path                         | Absolute or relative path to a custom `config.toml`.                  | Export before running the CLI.                                                         |
-| Environment              | `RECOZIK_LOCALE`          | locale string                | Forces the active locale (higher priority than config file).          | Export before running the CLI.                                                         |
-| Environment              | `AUDD_API_TOKEN`          | string                       | AudD token used when `--audd-token` is omitted.                       | Export before running the CLI.                                                         |
-| Environment (auto)       | `_RECOZIK_COMPLETE`       | internal                     | Shell-completion hook managed by Typer; not meant to be set manually. | Set automatically by generated completion scripts.                                     |
+| Scope                          | Name                      | Type / Values                     | Description                                                           | How to configure                                                                       |
+| ------------------------------ | ------------------------- | --------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Config file `[acoustid]`       | `api_key`                 | string                            | AcoustID client key used for lookups.                                 | `uv run recozik config set-key` or edit `config.toml`.                                 |
+| Config file `[audd]`           | `api_token`               | string                            | AudD fallback token when AcoustID has no match.                       | `uv run recozik config set-audd-token` or edit `config.toml`.                          |
+| Config file `[cache]`          | `enabled`                 | boolean                           | Enables the local lookup cache.                                       | Edit `config.toml`.                                                                    |
+| Config file `[cache]`          | `ttl_hours`               | integer                           | Cache time-to-live in hours (minimum 1).                              | Edit `config.toml`.                                                                    |
+| Config file `[output]`         | `template`                | string                            | Default template for identify/rename output.                          | Edit `config.toml` or pass `--template`.                                               |
+| Config file `[metadata]`       | `fallback`                | boolean                           | Whether rename uses embedded tags when no match is available.         | Edit `config.toml` or toggle `--metadata-fallback/--no-metadata-fallback`.             |
+| Config file `[logging]`        | `format`                  | `text` \| `jsonl`                 | Log output format.                                                    | Edit `config.toml`.                                                                    |
+| Config file `[logging]`        | `absolute_paths`          | boolean                           | Emit absolute paths in rename logs.                                   | Edit `config.toml`.                                                                    |
+| Config file `[general]`        | `locale`                  | string (e.g. `en`, `fr_FR`)       | Preferred locale when CLI option/env var are unset.                   | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `limit`                   | integer >= 1                      | Default number of results returned by `identify`.                     | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `json`                    | boolean                           | Show JSON output by default.                                          | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `refresh`                 | boolean                           | Ignore the cache unless explicitly disabled.                          | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `limit`                   | integer >= 1                      | Maximum results stored per file in batch mode.                        | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `best_only`               | boolean                           | Record only the top proposal for each file.                           | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `recursive`               | boolean                           | Include sub-directories by default.                                   | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `log_file`                | string (path)                     | Default destination for batch logs.                                   | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | Default behaviour when neither `--dry-run` nor `--apply` is provided. | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `interactive`             | boolean                           | Enables interactive selection without `--interactive`.                | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `confirm_each`            | boolean                           | Asks for confirmation before each rename by default.                  | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `conflict_strategy`       | `append` \| `skip` \| `overwrite` | Collision policy applied when no CLI flag is passed.                  | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `metadata_confirm`        | boolean                           | Request confirmation for metadata-based renames.                      | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | Cleanup policy for JSONL logs after `rename-from-log --apply`.        | Edit `config.toml` or pass `--log-cleanup`.                                            |
+| Config file `[rename]`         | `require_template_fields` | boolean                           | Reject matches missing placeholders required by the template.         | Edit `config.toml` or use `--require-template-fields/--allow-missing-template-fields`. |
+| Environment                    | `RECOZIK_CONFIG_FILE`     | path                              | Absolute or relative path to a custom `config.toml`.                  | Export before running the CLI.                                                         |
+| Environment                    | `RECOZIK_LOCALE`          | locale string                     | Forces the active locale (higher priority than config file).          | Export before running the CLI.                                                         |
+| Environment                    | `AUDD_API_TOKEN`          | string                            | AudD token used when `--audd-token` is omitted.                       | Export before running the CLI.                                                         |
+| Environment (auto)             | `_RECOZIK_COMPLETE`       | internal                          | Shell-completion hook managed by Typer; not meant to be set manually. | Set automatically by generated completion scripts.                                     |
 
 ## Code structure
 

@@ -25,6 +25,15 @@ def test_write_and_load_config(tmp_path: Path) -> None:
         rename_default_mode="apply",
         rename_default_interactive=True,
         rename_default_confirm_each=True,
+        rename_conflict_strategy="overwrite",
+        rename_metadata_confirm=False,
+        identify_default_limit=5,
+        identify_output_json=True,
+        identify_refresh_cache=True,
+        identify_batch_limit=4,
+        identify_batch_best_only=True,
+        identify_batch_recursive=True,
+        identify_batch_log_file="logs/default.jsonl",
     )
 
     write_config(config, target)
@@ -43,6 +52,15 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     assert loaded.rename_default_mode == "apply"
     assert loaded.rename_default_interactive is True
     assert loaded.rename_default_confirm_each is True
+    assert loaded.rename_conflict_strategy == "overwrite"
+    assert loaded.rename_metadata_confirm is False
+    assert loaded.identify_default_limit == 5
+    assert loaded.identify_output_json is True
+    assert loaded.identify_refresh_cache is True
+    assert loaded.identify_batch_limit == 4
+    assert loaded.identify_batch_best_only is True
+    assert loaded.identify_batch_recursive is True
+    assert loaded.identify_batch_log_file == "logs/default.jsonl"
 
 
 def test_load_config_missing_returns_default(tmp_path: Path) -> None:
@@ -63,6 +81,15 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
     assert config.rename_default_mode == "dry-run"
     assert config.rename_default_interactive is False
     assert config.rename_default_confirm_each is False
+    assert config.rename_conflict_strategy == "append"
+    assert config.rename_metadata_confirm is True
+    assert config.identify_default_limit == 3
+    assert config.identify_output_json is False
+    assert config.identify_refresh_cache is False
+    assert config.identify_batch_limit == 3
+    assert config.identify_batch_best_only is False
+    assert config.identify_batch_recursive is False
+    assert config.identify_batch_log_file is None
 
 
 def test_write_config_with_audd_token(tmp_path: Path) -> None:
@@ -78,3 +105,4 @@ def test_write_config_with_audd_token(tmp_path: Path) -> None:
 
     assert loaded.audd_api_token == TEST_AUDD_TOKEN
     assert loaded.rename_default_mode == "dry-run"
+    assert loaded.identify_default_limit == 3

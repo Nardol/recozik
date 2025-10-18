@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import typer
+from click.core import ParameterSource
 
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
@@ -145,6 +146,36 @@ def identify_batch(
 
     apply_locale(ctx, config=config)
 
+    limit_source = ctx.get_parameter_source("limit")
+    limit_value = (
+        config.identify_batch_limit if limit_source is ParameterSource.DEFAULT else max(limit, 1)
+    )
+
+    best_only_source = ctx.get_parameter_source("best_only")
+    best_only_value = (
+        config.identify_batch_best_only
+        if best_only_source is ParameterSource.DEFAULT
+        else best_only
+    )
+
+    recursive_source = ctx.get_parameter_source("recursive")
+    recursive_value = (
+        config.identify_batch_recursive
+        if recursive_source is ParameterSource.DEFAULT
+        else recursive
+    )
+
+    log_file_source = ctx.get_parameter_source("log_file")
+    log_file_choice = (
+        config.identify_batch_log_file if log_file_source is ParameterSource.DEFAULT else log_file
+    )
+    if isinstance(log_file_choice, Path):
+        log_file_option: Path | None = log_file_choice
+    elif isinstance(log_file_choice, str) and log_file_choice:
+        log_file_option = Path(log_file_choice)
+    else:
+        log_file_option = None
+
     key = (api_key or config.acoustid_api_key or "").strip()
     if not key:
         typer.echo(_("No AcoustID API key configured."))
@@ -189,7 +220,7 @@ def identify_batch(
     files = list(
         discover_audio_files(
             resolved_dir,
-            recursive=recursive,
+            recursive=recursive_value,
             patterns=pattern,
             extensions=effective_extensions,
         )
@@ -211,9 +242,11 @@ def identify_batch(
         config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
     )
 
-    effective_limit = 1 if best_only else limit
+    effective_limit = 1 if best_only_value else limit_value
 
-    log_path = resolve_path(log_file) if log_file else Path.cwd() / "recozik-batch.log"
+    log_path = (
+        resolve_path(log_file_option) if log_file_option else Path.cwd() / "recozik-batch.log"
+    )
     log_path.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
 

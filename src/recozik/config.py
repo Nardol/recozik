@@ -38,6 +38,15 @@ class AppConfig:
     rename_default_mode: str = "dry-run"
     rename_default_interactive: bool = False
     rename_default_confirm_each: bool = False
+    rename_conflict_strategy: str = "append"
+    rename_metadata_confirm: bool = True
+    identify_default_limit: int = 3
+    identify_output_json: bool = False
+    identify_refresh_cache: bool = False
+    identify_batch_limit: int = 3
+    identify_batch_best_only: bool = False
+    identify_batch_recursive: bool = False
+    identify_batch_log_file: str | None = None
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
@@ -65,12 +74,26 @@ class AppConfig:
                 "fallback": self.metadata_fallback_enabled,
             },
             "general": {},
+            "identify": {
+                "limit": max(int(self.identify_default_limit), 1),
+                "json": self.identify_output_json,
+                "refresh": self.identify_refresh_cache,
+            },
+            "identify_batch": {
+                "limit": max(int(self.identify_batch_limit), 1),
+                "best_only": self.identify_batch_best_only,
+                "recursive": self.identify_batch_recursive,
+            },
             "rename": {
                 "log_cleanup": cleanup_mode,
                 "require_template_fields": self.rename_require_template_fields,
                 "default_mode": default_mode,
                 "interactive": self.rename_default_interactive,
                 "confirm_each": self.rename_default_confirm_each,
+                "conflict_strategy": self.rename_conflict_strategy
+                if self.rename_conflict_strategy in {"append", "skip", "overwrite"}
+                else "append",
+                "metadata_confirm": self.rename_metadata_confirm,
             },
         }
 
@@ -85,6 +108,9 @@ class AppConfig:
 
         if self.locale:
             data["general"]["locale"] = self.locale
+
+        if self.identify_batch_log_file:
+            data["identify_batch"]["log_file"] = self.identify_batch_log_file
 
         return data
 
@@ -191,6 +217,46 @@ def load_config(path: Path | None = None) -> AppConfig:
     if not isinstance(confirm_each_default, bool):
         raise RuntimeError(_("The field rename.confirm_each must be a boolean."))
 
+    conflict_strategy_value = rename_section.get("conflict_strategy", "append")
+    if conflict_strategy_value is None:
+        conflict_strategy_value = "append"
+    if not isinstance(conflict_strategy_value, str):
+        raise RuntimeError(_("The field rename.conflict_strategy must be a string."))
+    conflict_strategy_value = conflict_strategy_value.lower()
+    if conflict_strategy_value not in {"append", "skip", "overwrite"}:
+        raise RuntimeError(
+            _("The field rename.conflict_strategy must be append, skip, or overwrite.")
+        )
+
+    metadata_confirm_default = rename_section.get("metadata_confirm", True)
+    if metadata_confirm_default is None:
+        metadata_confirm_default = True
+    if not isinstance(metadata_confirm_default, bool):
+        raise RuntimeError(_("The field rename.metadata_confirm must be a boolean."))
+
+    identify_section = data.get("identify", {}) or {}
+    identify_limit_raw = identify_section.get("limit", 3)
+    try:
+        identify_limit_value = max(int(identify_limit_raw), 1)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(_("The field identify.limit must be an integer.")) from exc
+    identify_json_value = bool(identify_section.get("json", False))
+    identify_refresh_value = bool(identify_section.get("refresh", False))
+
+    identify_batch_section = data.get("identify_batch", {}) or {}
+    identify_batch_limit_raw = identify_batch_section.get("limit", 3)
+    try:
+        identify_batch_limit_value = max(int(identify_batch_limit_raw), 1)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(_("The field identify_batch.limit must be an integer.")) from exc
+    identify_batch_best_only_value = bool(identify_batch_section.get("best_only", False))
+    identify_batch_recursive_value = bool(identify_batch_section.get("recursive", False))
+    identify_batch_log_file_value = identify_batch_section.get("log_file")
+    if identify_batch_log_file_value is not None and not isinstance(
+        identify_batch_log_file_value, str
+    ):
+        raise RuntimeError(_("The field identify_batch.log_file must be a string."))
+
     return AppConfig(
         acoustid_api_key=api_key,
         audd_api_token=audd_token,
@@ -206,6 +272,15 @@ def load_config(path: Path | None = None) -> AppConfig:
         rename_default_mode=default_mode_value,
         rename_default_interactive=interactive_default,
         rename_default_confirm_each=confirm_each_default,
+        rename_conflict_strategy=conflict_strategy_value,
+        rename_metadata_confirm=metadata_confirm_default,
+        identify_default_limit=identify_limit_value,
+        identify_output_json=identify_json_value,
+        identify_refresh_cache=identify_refresh_value,
+        identify_batch_limit=identify_batch_limit_value,
+        identify_batch_best_only=identify_batch_best_only_value,
+        identify_batch_recursive=identify_batch_recursive_value,
+        identify_batch_log_file=identify_batch_log_file_value,
     )
 
 
@@ -264,6 +339,24 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f"absolute_paths = {str(data['logging']['absolute_paths']).lower()}")
     lines.append("")
 
+    lines.append("[identify]")
+    lines.append(f"limit = {data['identify']['limit']}")
+    lines.append(f"json = {str(data['identify']['json']).lower()}")
+    lines.append(f"refresh = {str(data['identify']['refresh']).lower()}")
+    lines.append("")
+
+    lines.append("[identify_batch]")
+    lines.append(f"limit = {data['identify_batch']['limit']}")
+    lines.append(f"best_only = {str(data['identify_batch']['best_only']).lower()}")
+    lines.append(f"recursive = {str(data['identify_batch']['recursive']).lower()}")
+    log_file_value = data["identify_batch"].get("log_file")
+    if log_file_value:
+        escaped_log = log_file_value.replace('"', '\\"')
+        lines.append(f'log_file = "{escaped_log}"')
+    else:
+        lines.append('# log_file = "recozik-batch.log"')
+    lines.append("")
+
     lines.append("[rename]")
     cleanup_mode = data["rename"]["log_cleanup"]
     lines.append(f'log_cleanup = "{cleanup_mode}"')
@@ -272,6 +365,8 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f'default_mode = "{data["rename"]["default_mode"]}"')
     lines.append(f"interactive = {str(data['rename']['interactive']).lower()}")
     lines.append(f"confirm_each = {str(data['rename']['confirm_each']).lower()}")
+    lines.append(f'conflict_strategy = "{data["rename"]["conflict_strategy"]}"')
+    lines.append(f"metadata_confirm = {str(data['rename']['metadata_confirm']).lower()}")
     lines.append("")
 
     lines.append("[general]")

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import click
 import typer
+from click.core import ParameterSource
 
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
@@ -188,7 +189,14 @@ def rename_from_log(
         field for field in template_fields_used if field in _TEMPLATE_FIELDS_SUPPORTED
     }
 
-    conflict_strategy = on_conflict.lower()
+    conflict_source = ctx.get_parameter_source("on_conflict")
+    conflict_choice = (
+        config.rename_conflict_strategy
+        if conflict_source is ParameterSource.DEFAULT
+        else on_conflict
+    )
+
+    conflict_strategy = conflict_choice.lower()
     if conflict_strategy not in {"append", "skip", "overwrite"}:
         typer.echo(_("Invalid --on-conflict value. Choose append, skip, or overwrite."))
         raise typer.Exit(code=1)
@@ -200,6 +208,13 @@ def rename_from_log(
     dry_run = config.rename_default_mode == "dry-run" if dry_run is None else dry_run
     interactive = config.rename_default_interactive if interactive is None else interactive
     confirm = config.rename_default_confirm_each if confirm is None else confirm
+
+    metadata_confirm_source = ctx.get_parameter_source("metadata_fallback_confirm")
+    metadata_fallback_confirm = (
+        config.rename_metadata_confirm
+        if metadata_confirm_source is ParameterSource.DEFAULT
+        else metadata_fallback_confirm
+    )
 
     valid_cleanup_modes = {"ask", "always", "never"}
     cleanup_choice = None

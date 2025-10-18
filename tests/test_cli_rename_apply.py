@@ -363,3 +363,122 @@ def test_rename_from_log_confirm_each_via_config(
     assert prompt in result.stdout
     assert not src.exists()
     assert (root / "Artist - Confirm.flac").exists()
+
+
+def test_rename_from_log_conflict_strategy_via_config(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
+    """Skip renames when the config requests the skip conflict strategy."""
+    root = rename_env.make_root("config-conflict")
+    existing = root / "Artist - Conflict.flac"
+    existing.write_bytes(b"existing")
+    src = rename_env.create_source(root, "source.flac")
+
+    log_path = rename_env.write_log(
+        "config-conflict.jsonl",
+        [
+            make_entry(
+                "source.flac",
+                matches=[
+                    make_match(
+                        artist="Artist",
+                        title="Conflict",
+                        score=0.91,
+                        recording_id="conflict",
+                    )
+                ],
+            )
+        ],
+    )
+
+    config_path = rename_env.base / "config-conflict.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[rename]",
+                'conflict_strategy = "skip"',
+                "metadata_confirm = true",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = invoke_rename(
+        cli_runner,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--apply",
+            "--log-cleanup",
+            "never",
+            "--config-path",
+            str(config_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Unresolved collision, file skipped" in result.stdout
+    assert src.exists()
+    assert existing.exists()
+
+
+def test_rename_from_log_metadata_confirm_via_config(
+    cli_runner: CliRunner, rename_env: RenameTestEnv
+) -> None:
+    """Apply metadata-based renames without prompting when configured."""
+    root = rename_env.make_root("config-metadata-confirm")
+    src = rename_env.create_source(root, "meta.flac")
+
+    log_path = rename_env.write_log(
+        "config-metadata.jsonl",
+        [
+            make_entry(
+                "meta.flac",
+                matches=[],
+                metadata={
+                    "artist": "Metadata Artist",
+                    "title": "Metadata Title",
+                },
+                status="unmatched",
+            )
+        ],
+    )
+
+    config_path = rename_env.base / "config-metadata.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[rename]",
+                "metadata_confirm = false",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = invoke_rename(
+        cli_runner,
+        [
+            "rename-from-log",
+            str(log_path),
+            "--root",
+            str(root),
+            "--template",
+            "{artist} - {title}",
+            "--apply",
+            "--log-cleanup",
+            "never",
+            "--config-path",
+            str(config_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Confirm rename based on embedded metadata" not in result.stdout
+    assert not src.exists()
+    assert (root / "Metadata Artist - Metadata Title.flac").exists()
