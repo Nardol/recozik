@@ -132,6 +132,10 @@ def config_set_key(
         metadata_fallback_enabled=existing.metadata_fallback_enabled,
         locale=existing.locale,
         rename_log_cleanup=existing.rename_log_cleanup,
+        rename_require_template_fields=existing.rename_require_template_fields,
+        rename_default_mode=existing.rename_default_mode,
+        rename_default_interactive=existing.rename_default_interactive,
+        rename_default_confirm_each=existing.rename_default_confirm_each,
     )
 
     target = config_module.write_config(updated, config_path)
@@ -192,6 +196,10 @@ def config_set_audd_token(
         metadata_fallback_enabled=existing.metadata_fallback_enabled,
         locale=existing.locale,
         rename_log_cleanup=existing.rename_log_cleanup,
+        rename_require_template_fields=existing.rename_require_template_fields,
+        rename_default_mode=existing.rename_default_mode,
+        rename_default_interactive=existing.rename_default_interactive,
+        rename_default_confirm_each=existing.rename_default_confirm_each,
     )
 
     target = config_module.write_config(updated, config_path)

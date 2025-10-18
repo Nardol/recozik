@@ -110,8 +110,11 @@ uv run recozik rename-from-log logs/recozik.jsonl --root musique/ --apply
 ```
 
 Ajouter `--interactive` pour choisir la proposition à la volée, `--metadata-fallback` pour se rabattre sur les tags embarqués, `--backup-dir` pour conserver une copie.
-Le flux de renommage respecte également deux clés sous `[rename]` :
+Le flux de renommage respecte également plusieurs clés sous `[rename]` :
 
+- `default_mode` : définit le comportement implicite de `--dry-run/--apply` (`dry-run` par défaut, `apply` pour appliquer directement).
+- `interactive` : active la sélection interactive sans ajouter `--interactive` (`true`/`false`).
+- `confirm_each` : demande une confirmation avant chaque renommage lorsque réglé à `true`.
 - `log_cleanup` : politique de nettoyage du journal JSONL après `--apply` (`ask`, `always` ou `never`). Surchargez-la par commande avec `--log-cleanup`.
 - `require_template_fields` : ignore les propositions qui n’ont pas toutes les valeurs exigées par le modèle (`true`/`false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
 
@@ -177,6 +180,13 @@ fallback = true
 format = "text"
 absolute_paths = false
 
+[rename]
+# default_mode = "dry-run"
+# interactive = false
+# confirm_each = false
+log_cleanup = "ask"
+require_template_fields = false
+
 [general]
 locale = "fr"
 ```
@@ -194,6 +204,9 @@ locale = "fr"
 | Fichier `[logging]`  | `format`                  | `text` \| `jsonl`            | Format du journal généré.                                                  | Édition de `config.toml`.                                                                |
 | Fichier `[logging]`  | `absolute_paths`          | booléen                      | Force l'utilisation de chemins absolus dans les journaux.                  | Édition de `config.toml`.                                                                |
 | Fichier `[general]`  | `locale`                  | chaîne (ex. `fr`, `fr_FR`)   | Locale préférée si l'option CLI et l'env sont absents.                     | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`   | `default_mode`            | `dry-run` \| `apply`         | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.      | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`   | `interactive`             | booléen                      | Active l'interactif sans ajouter l'option `--interactive`.                 | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`   | `confirm_each`            | booléen                      | Demande confirmation avant chaque renommage par défaut.                    | Édition de `config.toml`.                                                                |
 | Fichier `[rename]`   | `log_cleanup`             | `ask` \| `always` \| `never` | Politique de nettoyage du log après `rename-from-log --apply`.             | Édition de `config.toml` ou option `--log-cleanup`.                                      |
 | Fichier `[rename]`   | `require_template_fields` | booléen                      | Rejette les correspondances sans toutes les valeurs du modèle.             | Édition de `config.toml` ou `--require-template-fields/--allow-missing-template-fields`. |
 | Environnement        | `RECOZIK_CONFIG_FILE`     | chemin                       | Chemin alternatif vers `config.toml`.                                      | Exporter avant d'exécuter la CLI.                                                        |

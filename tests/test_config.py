@@ -22,6 +22,9 @@ def test_write_and_load_config(tmp_path: Path) -> None:
         log_absolute_paths=True,
         metadata_fallback_enabled=False,
         rename_require_template_fields=True,
+        rename_default_mode="apply",
+        rename_default_interactive=True,
+        rename_default_confirm_each=True,
     )
 
     write_config(config, target)
@@ -37,6 +40,9 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     assert loaded.log_absolute_paths is True
     assert loaded.metadata_fallback_enabled is False
     assert loaded.rename_require_template_fields is True
+    assert loaded.rename_default_mode == "apply"
+    assert loaded.rename_default_interactive is True
+    assert loaded.rename_default_confirm_each is True
 
 
 def test_load_config_missing_returns_default(tmp_path: Path) -> None:
@@ -54,6 +60,9 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
     assert config.log_absolute_paths is False
     assert config.metadata_fallback_enabled is True
     assert config.rename_require_template_fields is False
+    assert config.rename_default_mode == "dry-run"
+    assert config.rename_default_interactive is False
+    assert config.rename_default_confirm_each is False
 
 
 def test_write_config_with_audd_token(tmp_path: Path) -> None:
@@ -68,3 +77,4 @@ def test_write_config_with_audd_token(tmp_path: Path) -> None:
     loaded = load_config(target)
 
     assert loaded.audd_api_token == TEST_AUDD_TOKEN
+    assert loaded.rename_default_mode == "dry-run"
