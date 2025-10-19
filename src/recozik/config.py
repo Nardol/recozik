@@ -43,10 +43,14 @@ class AppConfig:
     identify_default_limit: int = 3
     identify_output_json: bool = False
     identify_refresh_cache: bool = False
+    identify_audd_enabled: bool = True
+    identify_audd_prefer: bool = False
     identify_batch_limit: int = 3
     identify_batch_best_only: bool = False
     identify_batch_recursive: bool = False
     identify_batch_log_file: str | None = None
+    identify_batch_audd_enabled: bool = True
+    identify_batch_audd_prefer: bool = False
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
@@ -78,11 +82,15 @@ class AppConfig:
                 "limit": max(int(self.identify_default_limit), 1),
                 "json": self.identify_output_json,
                 "refresh": self.identify_refresh_cache,
+                "audd_enabled": self.identify_audd_enabled,
+                "prefer_audd": self.identify_audd_prefer,
             },
             "identify_batch": {
                 "limit": max(int(self.identify_batch_limit), 1),
                 "best_only": self.identify_batch_best_only,
                 "recursive": self.identify_batch_recursive,
+                "audd_enabled": self.identify_batch_audd_enabled,
+                "prefer_audd": self.identify_batch_audd_prefer,
             },
             "rename": {
                 "log_cleanup": cleanup_mode,
@@ -242,6 +250,20 @@ def load_config(path: Path | None = None) -> AppConfig:
         raise RuntimeError(_("The field identify.limit must be an integer.")) from exc
     identify_json_value = bool(identify_section.get("json", False))
     identify_refresh_value = bool(identify_section.get("refresh", False))
+    identify_audd_enabled_raw = identify_section.get("audd_enabled", True)
+    if identify_audd_enabled_raw is None:
+        identify_audd_enabled_value = True
+    elif isinstance(identify_audd_enabled_raw, bool):
+        identify_audd_enabled_value = identify_audd_enabled_raw
+    else:
+        raise RuntimeError(_("The field identify.audd_enabled must be a boolean."))
+    identify_prefer_raw = identify_section.get("prefer_audd", False)
+    if identify_prefer_raw is None:
+        identify_prefer_value = False
+    elif isinstance(identify_prefer_raw, bool):
+        identify_prefer_value = identify_prefer_raw
+    else:
+        raise RuntimeError(_("The field identify.prefer_audd must be a boolean."))
 
     identify_batch_section = data.get("identify_batch", {}) or {}
     identify_batch_limit_raw = identify_batch_section.get("limit", 3)
@@ -251,6 +273,20 @@ def load_config(path: Path | None = None) -> AppConfig:
         raise RuntimeError(_("The field identify_batch.limit must be an integer.")) from exc
     identify_batch_best_only_value = bool(identify_batch_section.get("best_only", False))
     identify_batch_recursive_value = bool(identify_batch_section.get("recursive", False))
+    identify_batch_audd_enabled_raw = identify_batch_section.get("audd_enabled", True)
+    if identify_batch_audd_enabled_raw is None:
+        identify_batch_audd_enabled_value = True
+    elif isinstance(identify_batch_audd_enabled_raw, bool):
+        identify_batch_audd_enabled_value = identify_batch_audd_enabled_raw
+    else:
+        raise RuntimeError(_("The field identify_batch.audd_enabled must be a boolean."))
+    identify_batch_prefer_raw = identify_batch_section.get("prefer_audd", False)
+    if identify_batch_prefer_raw is None:
+        identify_batch_prefer_value = False
+    elif isinstance(identify_batch_prefer_raw, bool):
+        identify_batch_prefer_value = identify_batch_prefer_raw
+    else:
+        raise RuntimeError(_("The field identify_batch.prefer_audd must be a boolean."))
     identify_batch_log_file_value = identify_batch_section.get("log_file")
     if identify_batch_log_file_value is not None and not isinstance(
         identify_batch_log_file_value, str
@@ -277,10 +313,14 @@ def load_config(path: Path | None = None) -> AppConfig:
         identify_default_limit=identify_limit_value,
         identify_output_json=identify_json_value,
         identify_refresh_cache=identify_refresh_value,
+        identify_audd_enabled=identify_audd_enabled_value,
+        identify_audd_prefer=identify_prefer_value,
         identify_batch_limit=identify_batch_limit_value,
         identify_batch_best_only=identify_batch_best_only_value,
         identify_batch_recursive=identify_batch_recursive_value,
         identify_batch_log_file=identify_batch_log_file_value,
+        identify_batch_audd_enabled=identify_batch_audd_enabled_value,
+        identify_batch_audd_prefer=identify_batch_prefer_value,
     )
 
 
@@ -343,12 +383,16 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f"limit = {data['identify']['limit']}")
     lines.append(f"json = {str(data['identify']['json']).lower()}")
     lines.append(f"refresh = {str(data['identify']['refresh']).lower()}")
+    lines.append(f"audd_enabled = {str(data['identify']['audd_enabled']).lower()}")
+    lines.append(f"prefer_audd = {str(data['identify']['prefer_audd']).lower()}")
     lines.append("")
 
     lines.append("[identify_batch]")
     lines.append(f"limit = {data['identify_batch']['limit']}")
     lines.append(f"best_only = {str(data['identify_batch']['best_only']).lower()}")
     lines.append(f"recursive = {str(data['identify_batch']['recursive']).lower()}")
+    lines.append(f"audd_enabled = {str(data['identify_batch']['audd_enabled']).lower()}")
+    lines.append(f"prefer_audd = {str(data['identify_batch']['prefer_audd']).lower()}")
     log_file_value = data["identify_batch"].get("log_file")
     if log_file_value:
         escaped_log = log_file_value.replace('"', '\\"')

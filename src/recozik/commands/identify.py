@@ -43,6 +43,16 @@ def identify(
         "--audd-token",
         help=_("AudD API token to use as a fallback when AcoustID returns no match."),
     ),
+    use_audd: bool | None = typer.Option(
+        None,
+        "--use-audd/--no-audd",
+        help=_("Enable or disable the AudD integration for this run."),
+    ),
+    prefer_audd: bool | None = typer.Option(
+        None,
+        "--prefer-audd/--prefer-acoustid",
+        help=_("Try AudD before AcoustID when the integration is enabled."),
+    ),
     limit: int = typer.Option(
         3,
         "--limit",
@@ -99,6 +109,9 @@ def identify(
 
     env_audd_token = os.environ.get("AUDD_API_TOKEN", "")
     fallback_audd_token = (audd_token or env_audd_token or (config.audd_api_token or "")).strip()
+    audd_enabled_setting = use_audd if use_audd is not None else config.identify_audd_enabled
+    audd_prefer_setting = prefer_audd if prefer_audd is not None else config.identify_audd_prefer
+    audd_available = bool(fallback_audd_token) and audd_enabled_setting
 
     limit_source = ctx.get_parameter_source("limit")
     limit_value = (
@@ -148,8 +161,34 @@ def identify(
     )
 
     matches = None
+    match_source = None
     if config.cache_enabled and not refresh_value:
-        matches = cache.get(fingerprint_result.fingerprint, fingerprint_result.duration_seconds)
+        cached = cache.get(fingerprint_result.fingerprint, fingerprint_result.duration_seconds)
+        if cached is not None:
+            matches = list(cached)
+            match_source = "acoustid"
+
+    audd_attempted = False
+
+    def run_audd() -> list:
+        nonlocal audd_attempted
+        audd_attempted = True
+        from ..audd import AudDLookupError as _AudDLookupError  # Local import for startup time
+        from ..audd import recognize_with_audd as _recognize_with_audd
+
+        try:
+            return _recognize_with_audd(fallback_audd_token, resolved_audio)
+        except _AudDLookupError as exc:
+            typer.echo(_("AudD lookup failed: {error}").format(error=exc))
+            return []
+
+    if audd_available and audd_prefer_setting and matches is None:
+        audd_results = run_audd()
+        if audd_results:
+            matches = audd_results
+            match_source = "audd"
+        else:
+            matches = None
 
     if matches is None:
         try:
@@ -160,22 +199,16 @@ def identify(
         if config.cache_enabled:
             cache.set(fingerprint_result.fingerprint, fingerprint_result.duration_seconds, matches)
             cache.save()
-    else:
-        matches = list(matches)
+        match_source = "acoustid" if matches else None
+    elif match_source is None:
+        # Matches may come from cache; assume they were produced by AcoustID.
+        match_source = "acoustid"
 
-    match_source = "acoustid"
-
-    if not matches and fallback_audd_token:
-        from ..audd import AudDLookupError, recognize_with_audd  # Local import to keep startup lean
-
-        try:
-            audd_matches = recognize_with_audd(fallback_audd_token, resolved_audio)
-        except AudDLookupError as exc:
-            typer.echo(_("AudD fallback failed: {error}").format(error=exc))
-        else:
-            if audd_matches:
-                matches = audd_matches
-                match_source = "audd"
+    if audd_available and not matches and not audd_attempted:
+        audd_results = run_audd()
+        if audd_results:
+            matches = audd_results
+            match_source = "audd"
 
     if not matches:
         typer.echo(_("No matches found."))
