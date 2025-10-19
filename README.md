@@ -81,8 +81,10 @@ Never commit the generated `config.toml` or share your personal AcoustID key; tr
 Recozik can also call the [AudD Music Recognition API](https://audd.io) when AcoustID does not return a match. The integration is strictly opt-in:
 
 1. Create an AudD account and generate an API token. Each user of Recozik needs to supply **their own** token and remains responsible for AudD’s usage limits and terms (the public “API Test License Agreement” only covers 90 days of evaluation).
-2. Store the token with `uv run recozik config set-audd-token`, export it via the `AUDD_API_TOKEN` environment variable, or pass it per command with `--audd-token`.
+2. Store the token with `uv run recozik config set-audd-token` (remove it later with `uv run recozik config set-audd-token --clear`), export it via the `AUDD_API_TOKEN` environment variable, or pass it per command with `--audd-token`.
 3. When AudD recognises a track, Recozik prints `Powered by AudD Music (fallback)` in the console (and in JSON mode via `stderr`) so the required attribution is always visible. The JSON payloads also expose a `source` field (`acoustid` or `audd`) to help you trace the origin of each suggestion.
+
+On a per-run basis you can disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Configuration defaults are available under `[identify]` and `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`).
 
 Tip: keep the token disabled in shared scripts unless every user has accepted AudD’s terms and provided their own credentials.
 
@@ -135,8 +137,8 @@ The rename workflow also honours configuration keys under `[rename]`:
 
 Two optional sections also tune the identification commands:
 
-- `[identify]` sets the default limit, JSON output mode, and cache refresh behaviour for `identify`.
-- `[identify_batch]` controls the per-file result limit, `best_only` mode, recursion, and default log destination for `identify-batch`.
+- `[identify]` sets the default limit, JSON output mode, cache refresh behaviour, and the AudD integration defaults (`audd_enabled`, `prefer_audd`) for `identify`.
+- `[identify_batch]` controls the per-file result limit, `best_only` mode, recursion, log destination, and the AudD defaults (`audd_enabled`, `prefer_audd`) for `identify-batch`.
 
 Install shell completion:
 
@@ -245,10 +247,14 @@ locale = "en"
 | Config file `[identify]`       | `limit`                   | integer >= 1                      | Default number of results returned by `identify`.                     | Edit `config.toml`.                                                                    |
 | Config file `[identify]`       | `json`                    | boolean                           | Show JSON output by default.                                          | Edit `config.toml`.                                                                    |
 | Config file `[identify]`       | `refresh`                 | boolean                           | Ignore the cache unless explicitly disabled.                          | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `audd_enabled`            | boolean                           | Enable AudD support when a token is configured.                       | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
+| Config file `[identify]`       | `prefer_audd`             | boolean                           | Try AudD before AcoustID when enabled.                                | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
 | Config file `[identify_batch]` | `limit`                   | integer >= 1                      | Maximum results stored per file in batch mode.                        | Edit `config.toml`.                                                                    |
 | Config file `[identify_batch]` | `best_only`               | boolean                           | Record only the top proposal for each file.                           | Edit `config.toml`.                                                                    |
 | Config file `[identify_batch]` | `recursive`               | boolean                           | Include sub-directories by default.                                   | Edit `config.toml`.                                                                    |
 | Config file `[identify_batch]` | `log_file`                | string (path)                     | Default destination for batch logs.                                   | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `audd_enabled`            | boolean                           | Enable AudD support during batch identification.                      | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
+| Config file `[identify_batch]` | `prefer_audd`             | boolean                           | Try AudD before AcoustID in batch runs.                               | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
 | Config file `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | Default behaviour when neither `--dry-run` nor `--apply` is provided. | Edit `config.toml`.                                                                    |
 | Config file `[rename]`         | `interactive`             | boolean                           | Enables interactive selection without `--interactive`.                | Edit `config.toml`.                                                                    |
 | Config file `[rename]`         | `confirm_each`            | boolean                           | Asks for confirmation before each rename by default.                  | Edit `config.toml`.                                                                    |

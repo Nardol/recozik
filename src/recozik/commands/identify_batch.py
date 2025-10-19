@@ -44,6 +44,16 @@ def identify_batch(
         "--audd-token",
         help=_("AudD API token to use as a fallback when AcoustID returns no match."),
     ),
+    use_audd: bool | None = typer.Option(
+        None,
+        "--use-audd/--no-audd",
+        help=_("Enable or disable the AudD integration for this run."),
+    ),
+    prefer_audd: bool | None = typer.Option(
+        None,
+        "--prefer-audd/--prefer-acoustid",
+        help=_("Try AudD before AcoustID when the integration is enabled."),
+    ),
     limit: int = typer.Option(
         3,
         "--limit",
@@ -196,9 +206,14 @@ def identify_batch(
 
     env_audd_token = os.environ.get("AUDD_API_TOKEN", "")
     fallback_audd_token = (audd_token or env_audd_token or (config.audd_api_token or "")).strip()
+    audd_enabled_setting = use_audd if use_audd is not None else config.identify_batch_audd_enabled
+    audd_prefer_setting = (
+        prefer_audd if prefer_audd is not None else config.identify_batch_audd_prefer
+    )
+    audd_available = bool(fallback_audd_token) and audd_enabled_setting
     audd_lookup_fn = None
     audd_lookup_exception = None
-    if fallback_audd_token:
+    if audd_available:
         from ..audd import AudDLookupError as _AudDLookupError
         from ..audd import recognize_with_audd as _recognize_with_audd
 
@@ -282,11 +297,44 @@ def identify_batch(
                 continue
 
             matches = None
+            match_source = None
             if config.cache_enabled and not refresh:
-                matches = cache.get(
+                cached = cache.get(
                     fingerprint_result.fingerprint,
                     fingerprint_result.duration_seconds,
                 )
+                if cached is not None:
+                    matches = list(cached)
+                    match_source = "acoustid"
+
+            audd_note: str | None = None
+            audd_error_message: str | None = None
+            audd_attempted = False
+
+            if audd_lookup_fn and audd_prefer_setting and not matches:
+                audd_attempted = True
+                try:
+                    audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
+                except audd_lookup_exception as exc:  # type: ignore[misc]
+                    audd_error_message = str(exc)
+                    typer.echo(
+                        _("AudD lookup failed for {path}: {error}").format(
+                            path=relative_display,
+                            error=audd_error_message,
+                        )
+                    )
+                else:
+                    if audd_candidates:
+                        matches = audd_candidates
+                        audd_note = _("Powered by AudD Music (fallback).")
+                        match_source = "audd"
+                        typer.echo(
+                            _("AudD fallback identified {path}. Powered by AudD Music.").format(
+                                path=relative_display
+                            )
+                        )
+                    else:
+                        matches = None
 
             if matches is None:
                 try:
@@ -311,19 +359,16 @@ def identify_batch(
                         fingerprint_result.duration_seconds,
                         matches,
                     )
-            else:
-                matches = list(matches)
+                if matches and match_source is None:
+                    match_source = "acoustid"
 
-            audd_note: str | None = None
-            audd_error_message: str | None = None
-
-            if not matches and audd_lookup_fn:
+            if audd_lookup_fn and audd_available and not matches and not audd_attempted:
                 try:
                     audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
                 except audd_lookup_exception as exc:  # type: ignore[misc]
                     audd_error_message = str(exc)
                     typer.echo(
-                        _("AudD fallback failed for {path}: {error}").format(
+                        _("AudD lookup failed for {path}: {error}").format(
                             path=relative_display,
                             error=audd_error_message,
                         )
@@ -332,6 +377,7 @@ def identify_batch(
                     if audd_candidates:
                         matches = audd_candidates
                         audd_note = _("Powered by AudD Music (fallback).")
+                        match_source = "audd"
                         typer.echo(
                             _("AudD fallback identified {path}. Powered by AudD Music.").format(
                                 path=relative_display

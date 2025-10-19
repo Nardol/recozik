@@ -141,10 +141,14 @@ def config_set_key(
         identify_default_limit=existing.identify_default_limit,
         identify_output_json=existing.identify_output_json,
         identify_refresh_cache=existing.identify_refresh_cache,
+        identify_audd_enabled=existing.identify_audd_enabled,
+        identify_audd_prefer=existing.identify_audd_prefer,
         identify_batch_limit=existing.identify_batch_limit,
         identify_batch_best_only=existing.identify_batch_best_only,
         identify_batch_recursive=existing.identify_batch_recursive,
         identify_batch_log_file=existing.identify_batch_log_file,
+        identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
+        identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
     )
 
     target = config_module.write_config(updated, config_path)
@@ -214,10 +218,14 @@ def config_set_audd_token(
         identify_default_limit=existing.identify_default_limit,
         identify_output_json=existing.identify_output_json,
         identify_refresh_cache=existing.identify_refresh_cache,
+        identify_audd_enabled=existing.identify_audd_enabled,
+        identify_audd_prefer=existing.identify_audd_prefer,
         identify_batch_limit=existing.identify_batch_limit,
         identify_batch_best_only=existing.identify_batch_best_only,
         identify_batch_recursive=existing.identify_batch_recursive,
         identify_batch_log_file=existing.identify_batch_log_file,
+        identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
+        identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
     )
 
     target = config_module.write_config(updated, config_path)

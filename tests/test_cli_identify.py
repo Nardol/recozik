@@ -309,6 +309,92 @@ def test_identify_fallback_json_includes_source(monkeypatch, tmp_path: Path) -> 
     assert "Powered by AudD Music (fallback)." in result.stderr
 
 
+def test_identify_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
+    """Skip AudD even when a token is provided."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+    config_path = _fake_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+
+    def _unexpected_audd(*_args, **_kwargs):
+        raise AssertionError("AudD should not be called when --no-audd is set.")
+
+    monkeypatch.setattr(audd, "recognize_with_audd", _unexpected_audd)
+    monkeypatch.setattr(audd, "AudDLookupError", RuntimeError)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--audd-token",
+            "secret-token",
+            "--no-audd",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "No matches found." in result.stdout
+
+
+def test_identify_prefer_audd(monkeypatch, tmp_path: Path) -> None:
+    """Use AudD before AcoustID when requested."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+    config_path = _fake_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
+    )
+
+    def _unexpected_lookup(*_args, **_kwargs):
+        raise AssertionError("AcoustID should not be called when AudD already returned matches.")
+
+    monkeypatch.setattr(cli, "lookup_recordings", _unexpected_lookup)
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+
+    fake_match = AcoustIDMatch(
+        score=0.91,
+        recording_id="audd-priority",
+        title="Priority Song",
+        artist="Priority Artist",
+    )
+
+    class DummyAudDError(Exception):
+        pass
+
+    monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--audd-token",
+            "secret-token",
+            "--prefer-audd",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Powered by AudD Music (fallback)." in result.stdout
+    assert "Priority Artist - Priority Song" in result.stdout
+
+
 def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
     """Abort when no API key is available and the user declines to configure it."""
     audio_path = tmp_path / "song.wav"

@@ -412,3 +412,112 @@ def test_identify_batch_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
     assert payload["note"] == "Powered by AudD Music (fallback)."
     assert payload["matches"][0]["recording_id"] == "audd-batch"
     assert "AudD fallback identified needs-fallback.mp3. Powered by AudD Music." in result.stdout
+
+
+def test_identify_batch_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
+    """Skip AudD when the user opts out."""
+    audio_dir = tmp_path / "music"
+    audio_dir.mkdir()
+    sample = audio_dir / "needs-fallback.mp3"
+    sample.write_bytes(b"sample")
+
+    config_path = _write_config(tmp_path, log_format="jsonl")
+    log_path = tmp_path / "no_audd.jsonl"
+
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="MISS", duration_seconds=180.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+
+    def _unexpected_audd(*_args, **_kwargs):
+        raise AssertionError("AudD should not be called when --no-audd is set.")
+
+    monkeypatch.setattr(audd, "AudDLookupError", RuntimeError)
+    monkeypatch.setattr(audd, "recognize_with_audd", _unexpected_audd)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify-batch",
+            str(audio_dir),
+            "--config-path",
+            str(config_path),
+            "--log-file",
+            str(log_path),
+            "--log-format",
+            "jsonl",
+            "--audd-token",
+            "secret",
+            "--no-audd",
+        ],
+    )
+
+    assert result.exit_code == 0
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload["note"] == "No match."
+    assert "AudD fallback identified" not in result.stdout
+
+
+def test_identify_batch_prefer_audd(monkeypatch, tmp_path: Path) -> None:
+    """Prioritise AudD when requested."""
+    audio_dir = tmp_path / "music"
+    audio_dir.mkdir()
+    sample = audio_dir / "priority.mp3"
+    sample.write_bytes(b"sample")
+
+    config_path = _write_config(tmp_path, log_format="jsonl")
+    log_path = tmp_path / "priority.jsonl"
+
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="MISS", duration_seconds=180.0),
+    )
+
+    def _unexpected_lookup(*_args, **_kwargs):
+        raise AssertionError("AcoustID should not be called when AudD already succeeded.")
+
+    monkeypatch.setattr(cli, "lookup_recordings", _unexpected_lookup)
+
+    fake_match = AcoustIDMatch(
+        score=0.9,
+        recording_id="audd-priority",
+        title="Priority Batch Song",
+        artist="AudD Artist",
+    )
+
+    class DummyAudDError(Exception):
+        pass
+
+    monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify-batch",
+            str(audio_dir),
+            "--config-path",
+            str(config_path),
+            "--log-file",
+            str(log_path),
+            "--log-format",
+            "jsonl",
+            "--audd-token",
+            "secret",
+            "--prefer-audd",
+        ],
+    )
+
+    assert result.exit_code == 0
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload["note"] == "Powered by AudD Music (fallback)."
+    assert payload["matches"][0]["recording_id"] == "audd-priority"
