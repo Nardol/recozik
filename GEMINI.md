@@ -10,7 +10,7 @@ The CLI is built using the Typer framework. It also includes an optional fallbac
 
 ### Key Technologies
 
-- **Language:** Python (3.10-3.12)
+- **Language:** Python (3.10-3.13; 3.14 pending upstream wheel support)
 - **CLI Framework:** Typer
 - **Dependency Management:** uv
 - **Code Style:** Ruff for formatting and linting

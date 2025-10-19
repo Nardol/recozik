@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Recozik is a terminal-first audio fingerprinting tool that computes Chromaprint fingerprints, queries the AcoustID service, and helps batch-identify or rename audio files. It's a Python CLI application built with Typer, currently in public alpha phase.
 
-**Important**: Python 3.10-3.12 only. Python 3.13+ is not yet supported due to Chromaprint/librosa compatibility.
+**Important**: Python 3.10-3.13 verified. Python 3.14 is under evaluation while we wait for stable librosa/numba wheels.
 
 ## Essential Commands
 

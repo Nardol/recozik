@@ -24,7 +24,7 @@
 
 ## Coding Style & Naming Conventions
 
-- Python 3.10–3.12, 4-space indentation, type hints encouraged.
+- Python 3.10–3.13, 4-space indentation, type hints encouraged. Python 3.14 remains experimental until upstream (librosa/numba) ships stable wheels.
 - CLI options use kebab-case (e.g., `--log-format`); internal functions use snake_case.
 - Keep Typer command logic inside the relevant module under `src/recozik/commands/`; `cli.py` should only register commands and surface compatibility wrappers.
 - When touching completion logic, update both `src/recozik/commands/completion.py` and the wrapper wiring in `cli.py` so tests that monkeypatch `recozik.cli` continue to work.
