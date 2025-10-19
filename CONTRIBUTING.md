@@ -4,7 +4,7 @@ Thanks for your interest in improving recozik! This guide summarizes how to get 
 
 ## Prerequisites
 
-- Python 3.10–3.12 installed on your machine.
+- Python 3.10–3.13 installed on your machine (3.14 is still experimental upstream).
 - The [Chromaprint](https://acoustid.org/chromaprint) tooling (`fpcalc`) available on your `PATH` for fingerprint generation.
 - [`uv`](https://docs.astral.sh/uv/) installed (`pip install uv`).
 

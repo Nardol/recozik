@@ -28,7 +28,7 @@ Application en ligne de commande conçue pour calculer des empreintes [Chromapri
 
 ## Prérequis
 
-- Python 3.10, 3.11 ou 3.12 (librosa/Chromaprint ne gèrent pas encore Python 3.13).
+- Python 3.10 à 3.13 (librosa >= 0.11 prend en charge 3.13 ; Recozik installe automatiquement les paquets de remplacement `standard-*`/`audioop-lts`).
 - [Chromaprint](https://acoustid.org/chromaprint) et son binaire `fpcalc` présents dans le `PATH`.
   - Linux : paquet `chromaprint` / `libchromaprint-tools` selon la distribution.
   - Windows : télécharger l'archive Chromaprint, extraire, ajouter le dossier contenant `fpcalc.exe` au `PATH`.
