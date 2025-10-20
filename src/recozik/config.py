@@ -40,6 +40,7 @@ class AppConfig:
     rename_default_confirm_each: bool = False
     rename_conflict_strategy: str = "append"
     rename_metadata_confirm: bool = True
+    rename_deduplicate_template: bool = True
     identify_default_limit: int = 3
     identify_output_json: bool = False
     identify_refresh_cache: bool = False
@@ -102,6 +103,7 @@ class AppConfig:
                 if self.rename_conflict_strategy in {"append", "skip", "overwrite"}
                 else "append",
                 "metadata_confirm": self.rename_metadata_confirm,
+                "deduplicate_template": self.rename_deduplicate_template,
             },
         }
 
@@ -242,6 +244,12 @@ def load_config(path: Path | None = None) -> AppConfig:
     if not isinstance(metadata_confirm_default, bool):
         raise RuntimeError(_("The field rename.metadata_confirm must be a boolean."))
 
+    deduplicate_template_default = rename_section.get("deduplicate_template", True)
+    if deduplicate_template_default is None:
+        deduplicate_template_default = True
+    if not isinstance(deduplicate_template_default, bool):
+        raise RuntimeError(_("The field rename.deduplicate_template must be a boolean."))
+
     identify_section = data.get("identify", {}) or {}
     identify_limit_raw = identify_section.get("limit", 3)
     try:
@@ -310,6 +318,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         rename_default_confirm_each=confirm_each_default,
         rename_conflict_strategy=conflict_strategy_value,
         rename_metadata_confirm=metadata_confirm_default,
+        rename_deduplicate_template=deduplicate_template_default,
         identify_default_limit=identify_limit_value,
         identify_output_json=identify_json_value,
         identify_refresh_cache=identify_refresh_value,
@@ -411,6 +420,7 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f"confirm_each = {str(data['rename']['confirm_each']).lower()}")
     lines.append(f'conflict_strategy = "{data["rename"]["conflict_strategy"]}"')
     lines.append(f"metadata_confirm = {str(data['rename']['metadata_confirm']).lower()}")
+    lines.append(f"deduplicate_template = {str(data['rename']['deduplicate_template']).lower()}")
     lines.append("")
 
     lines.append("[general]")

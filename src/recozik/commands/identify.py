@@ -215,9 +215,8 @@ def identify(
         cache.save()
         return
 
-    matches = matches[:limit_value]
-
     if json_value:
+        matches = matches[:limit_value]
         if match_source == "audd":
             typer.echo(_("Powered by AudD Music (fallback)."), err=True)
         payload = []
@@ -233,6 +232,8 @@ def identify(
         typer.echo(_("Powered by AudD Music (fallback)."))
 
     template_value = resolve_template(template, config)
+    matches = _deduplicate_by_template(matches, template_value)
+    matches = matches[:limit_value]
 
     for idx, match in enumerate(matches, start=1):
         typer.echo(_("Result {index}: score {score:.2f}").format(index=idx, score=match.score))
@@ -251,6 +252,22 @@ def identify(
             )
 
     cache.save()
+
+
+def _deduplicate_by_template(matches, template_value: str):
+    """Return matches preserving order but removing identical template outputs."""
+    seen: set[str] = set()
+    unique = []
+
+    for match in matches:
+        rendered = format_match_template(match, template_value)
+        fingerprint = rendered.casefold()
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        unique.append(match)
+
+    return unique
 
 
 def configure_api_key_interactively(
