@@ -216,6 +216,66 @@ def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
     assert "Album: Album X (2018-05-01)" in result.stdout
 
 
+def test_identify_deduplicates_by_template(monkeypatch, tmp_path: Path) -> None:
+    """Collapse matches that render to identical filenames."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+
+    config_path = _fake_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=101.4),
+    )
+
+    def fake_lookup(_key, _fingerprint, meta=None, timeout=None):
+        return [
+            AcoustIDMatch(
+                score=0.99,
+                recording_id="rec-1",
+                title="Titre",
+                artist="Artiste",
+                release_group_title="Album A",
+            ),
+            AcoustIDMatch(
+                score=0.98,
+                recording_id="rec-2",
+                title="Titre",
+                artist="Artiste",
+                release_group_title="Album B",
+            ),
+            AcoustIDMatch(
+                score=0.90,
+                recording_id="rec-3",
+                title="Autre titre",
+                artist="Artiste",
+            ),
+        ]
+
+    monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--limit",
+            "3",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout.count("Result ") == 2
+    assert "Recording ID: rec-1" in result.stdout
+    assert "Recording ID: rec-3" in result.stdout
+    assert "Recording ID: rec-2" not in result.stdout
+    assert "Result 3" not in result.stdout
+
+
 def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
     """Call AudD when AcoustID returns no match."""
     audio_path = tmp_path / "song.wav"

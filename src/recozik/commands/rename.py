@@ -147,6 +147,11 @@ def rename_from_log(
         "--metadata-fallback-confirm/--metadata-fallback-no-confirm",
         help=_("Confirm renames based on embedded metadata (use --metadata-fallback-no-confirm)."),
     ),
+    deduplicate_template: bool | None = typer.Option(
+        None,
+        "--deduplicate-template/--keep-template-duplicates",
+        help=_("Collapse matches that would lead to the same target filename."),
+    ),
     log_cleanup: str | None = typer.Option(
         None,
         "--log-cleanup",
@@ -216,6 +221,13 @@ def rename_from_log(
         else metadata_fallback_confirm
     )
 
+    deduplicate_source = ctx.get_parameter_source("deduplicate_template")
+    deduplicate_template_enabled = (
+        config.rename_deduplicate_template
+        if deduplicate_source is ParameterSource.DEFAULT
+        else bool(deduplicate_template)
+    )
+
     valid_cleanup_modes = {"ask", "always", "never"}
     cleanup_choice = None
     if log_cleanup is not None:
@@ -232,7 +244,7 @@ def rename_from_log(
         matches: list[dict[str, object]], source_path: Path
     ) -> list[dict[str, object]]:
         if not require_template_fields_enabled or not template_fields_to_check:
-            return list(matches)
+            return [dict(match) for match in matches]
 
         accepted: list[dict[str, object]] = []
         for match in matches:
@@ -246,8 +258,48 @@ def rename_from_log(
                     )
                 )
                 continue
-            accepted.append(match)
+            accepted.append(dict(match))
         return accepted
+
+    def render_target_filename(match: dict[str, object], source_path: Path) -> str:
+        rendered = render_log_template(match, template_value, source_path)
+        sanitized = sanitize_filename(rendered)
+        if not sanitized:
+            sanitized = source_path.stem
+
+        candidate = sanitized
+        ext = source_path.suffix
+        if ext and not candidate.lower().endswith(ext.lower()):
+            candidate = f"{candidate}{ext}"
+
+        return candidate
+
+    def deduplicate_template_matches(
+        matches: list[dict[str, object]], source_path: Path
+    ) -> list[dict[str, object]]:
+        if not deduplicate_template_enabled:
+            return list(matches)
+
+        unique: list[dict[str, object]] = []
+        seen: set[str] = set()
+
+        for match in matches:
+            candidate = render_target_filename(match, source_path)
+            fingerprint = candidate.casefold()
+            if fingerprint in seen:
+                continue
+            seen.add(fingerprint)
+            unique.append(match)
+
+        return unique
+
+    def prepare_matches(
+        raw_matches: list[dict[str, object]], source_path: Path
+    ) -> list[dict[str, object]]:
+        filtered = filter_template_matches(raw_matches, source_path)
+        if not filtered:
+            return filtered
+        return deduplicate_template_matches(filtered, source_path)
 
     try:
         entries = load_jsonl_log(resolved_log)
@@ -290,7 +342,7 @@ def rename_from_log(
         error_message = entry.get("error")
         note = entry.get("note")
 
-        matches = filter_template_matches(list(entry.get("matches") or []), source_path)
+        matches = prepare_matches(list(entry.get("matches") or []), source_path)
         metadata_entry = coerce_metadata_dict(entry.get("metadata"))
 
         if status == "unmatched" and not matches:
@@ -300,7 +352,7 @@ def rename_from_log(
                         path=source_path
                     )
                 )
-                matches = filter_template_matches(
+                matches = prepare_matches(
                     [build_metadata_match(metadata_entry)],
                     source_path,
                 )
@@ -327,7 +379,7 @@ def rename_from_log(
                         path=source_path
                     )
                 )
-                matches = filter_template_matches(
+                matches = prepare_matches(
                     [build_metadata_match(metadata_entry)],
                     source_path,
                 )
@@ -348,7 +400,7 @@ def rename_from_log(
                         path=source_path
                     )
                 )
-                matches = filter_template_matches(
+                matches = prepare_matches(
                     [build_metadata_match(metadata_entry)],
                     source_path,
                 )
@@ -386,16 +438,7 @@ def rename_from_log(
 
         match_data = matches[selected_match_index]
         is_metadata_match = match_data.get("source") == "metadata"
-        target_base = render_log_template(match_data, template_value, source_path)
-        sanitized = sanitize_filename(target_base)
-        if not sanitized:
-            sanitized = source_path.stem
-
-        ext = source_path.suffix
-        new_name = sanitized
-        if ext and not new_name.lower().endswith(ext.lower()):
-            new_name = f"{new_name}{ext}"
-
+        new_name = render_target_filename(match_data, source_path)
         target_path = source_path.with_name(new_name)
         if target_path == source_path:
             skipped += 1

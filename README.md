@@ -124,7 +124,7 @@ Rename files using a previous batch log (dry-run by default):
 uv run recozik rename-from-log logs/recozik.jsonl --root music/ --apply
 ```
 
-Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use embedded tags when AcoustID fails, and `--backup-dir` to keep a copy of originals.
+Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use embedded tags when AcoustID fails, `--backup-dir` to keep a copy of originals, and `--keep-template-duplicates` when you want to review proposals that render to the same filename.
 The rename workflow also honours configuration keys under `[rename]`:
 
 - `default_mode`: selects the implicit behaviour for `--dry-run/--apply` (`dry-run` by default, set to `apply` to skip the preview step).
@@ -132,6 +132,7 @@ The rename workflow also honours configuration keys under `[rename]`:
 - `confirm_each`: requests confirmation before each rename when set to `true`.
 - `conflict_strategy`: default collision behaviour (`append`, `skip`, or `overwrite`).
 - `metadata_confirm`: controls whether metadata fallbacks require confirmation (`true`/`false`).
+- `deduplicate_template`: collapses proposals that would generate the same target filename when `true` (default). Override with the CLI flag `--deduplicate-template/--keep-template-duplicates`.
 - `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or `never`). You can override it per command with `--log-cleanup`.
 - `require_template_fields`: skips matches that are missing values referenced by the template (`true`/`false`). Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
 
@@ -226,6 +227,7 @@ conflict_strategy = "append"
 metadata_confirm = true
 log_cleanup = "ask"
 require_template_fields = false
+deduplicate_template = true
 
 [general]
 locale = "en"
@@ -262,6 +264,7 @@ locale = "en"
 | Config file `[rename]`         | `metadata_confirm`        | boolean                           | Request confirmation for metadata-based renames.                      | Edit `config.toml`.                                                                    |
 | Config file `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | Cleanup policy for JSONL logs after `rename-from-log --apply`.        | Edit `config.toml` or pass `--log-cleanup`.                                            |
 | Config file `[rename]`         | `require_template_fields` | boolean                           | Reject matches missing placeholders required by the template.         | Edit `config.toml` or use `--require-template-fields/--allow-missing-template-fields`. |
+| Config file `[rename]`         | `deduplicate_template`    | boolean                           | Collapse proposals leading to the same target filename.               | Edit `config.toml` or use `--deduplicate-template/--keep-template-duplicates`.         |
 | Environment                    | `RECOZIK_CONFIG_FILE`     | path                              | Absolute or relative path to a custom `config.toml`.                  | Export before running the CLI.                                                         |
 | Environment                    | `RECOZIK_LOCALE`          | locale string                     | Forces the active locale (higher priority than config file).          | Export before running the CLI.                                                         |
 | Environment                    | `AUDD_API_TOKEN`          | string                            | AudD token used when `--audd-token` is omitted.                       | Export before running the CLI.                                                         |

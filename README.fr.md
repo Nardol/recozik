@@ -111,7 +111,7 @@ Renommage à partir d'un log JSONL :
 uv run recozik rename-from-log logs/recozik.jsonl --root musique/ --apply
 ```
 
-Ajouter `--interactive` pour choisir la proposition à la volée, `--metadata-fallback` pour se rabattre sur les tags embarqués, `--backup-dir` pour conserver une copie.
+Ajouter `--interactive` pour choisir la proposition à la volée, `--metadata-fallback` pour se rabattre sur les tags embarqués, `--backup-dir` pour conserver une copie et `--keep-template-duplicates` si vous souhaitez examiner toutes les propositions même lorsque plusieurs produisent le même nom final.
 Le flux de renommage respecte également plusieurs clés sous `[rename]` :
 
 - `default_mode` : définit le comportement implicite de `--dry-run/--apply` (`dry-run` par défaut, `apply` pour appliquer directement).
@@ -119,6 +119,7 @@ Le flux de renommage respecte également plusieurs clés sous `[rename]` :
 - `confirm_each` : demande une confirmation avant chaque renommage lorsque réglé à `true`.
 - `conflict_strategy` : politique de collision par défaut (`append`, `skip` ou `overwrite`).
 - `metadata_confirm` : impose (ou non) la confirmation des renommages basés sur les métadonnées (`true`/`false`).
+- `deduplicate_template` : fusionne les propositions qui aboutiraient au même nom de fichier final lorsqu'il est réglé à `true` (valeur par défaut). Surchagez-le via `--deduplicate-template/--keep-template-duplicates`.
 - `log_cleanup` : politique de nettoyage du journal JSONL après `--apply` (`ask`, `always` ou `never`). Surchargez-la par commande avec `--log-cleanup`.
 - `require_template_fields` : ignore les propositions qui n’ont pas toutes les valeurs exigées par le modèle (`true`/`false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
 
@@ -212,6 +213,7 @@ conflict_strategy = "append"
 metadata_confirm = true
 log_cleanup = "ask"
 require_template_fields = false
+deduplicate_template = true
 
 [general]
 locale = "fr"
@@ -243,6 +245,7 @@ locale = "fr"
 | Fichier `[identify_batch]` | `prefer_audd`             | booléen                           | Tente AudD avant AcoustID lors des traitements batch.                      | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                           |
 | Fichier `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | Politique de nettoyage du log après `rename-from-log --apply`.             | Édition de `config.toml` ou option `--log-cleanup`.                                      |
 | Fichier `[rename]`         | `require_template_fields` | booléen                           | Rejette les correspondances sans toutes les valeurs du modèle.             | Édition de `config.toml` ou `--require-template-fields/--allow-missing-template-fields`. |
+| Fichier `[rename]`         | `deduplicate_template`    | booléen                           | Fusionne les propositions menant au même nom final.                        | Édition de `config.toml` ou `--deduplicate-template/--keep-template-duplicates`.         |
 | Fichier `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.      | Édition de `config.toml`.                                                                |
 | Fichier `[rename]`         | `interactive`             | booléen                           | Active l'interactif sans ajouter l'option `--interactive`.                 | Édition de `config.toml`.                                                                |
 | Fichier `[rename]`         | `confirm_each`            | booléen                           | Demande confirmation avant chaque renommage par défaut.                    | Édition de `config.toml`.                                                                |
