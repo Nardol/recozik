@@ -84,6 +84,12 @@ msgstr "La recherche AudD a échoué : {error}. Repli vers AcoustID."
 msgid "AudD lookup failed for {path}: {error}. Falling back to AcoustID."
 msgstr "La recherche AudD a échoué pour {path} : {error}. Repli vers AcoustID."
 
+msgid "Preparing AudD snippet (~{seconds}s, mono 16 kHz) because the file exceeds {limit} MB."
+msgstr "Préparation d'un extrait AudD (~{seconds}s, mono 16 kHz) car le fichier dépasse {limit} Mo."
+
+msgid "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz); file exceeds {limit} MB."
+msgstr "Préparation d'un extrait AudD pour {path} (~{seconds}s, mono 16 kHz) ; le fichier dépasse {limit} Mo."
+
 msgid "AudD token removed from {path}"
 msgstr "Jeton AudD supprimé de {path}"
 
@@ -95,6 +101,27 @@ msgstr "Jeton AudD : non configuré"
 
 msgid "AudD token: {masked}"
 msgstr "Jeton AudD : {masked}"
+
+msgid "Unable to prepare audio for AudD: {error}"
+msgstr "Impossible de préparer l'audio pour AudD : {error}"
+
+msgid "Unable to access audio file: {error}"
+msgstr "Impossible d'accéder au fichier audio : {error}"
+
+msgid "AudD snippet still exceeds {limit} bytes (got {size})."
+msgstr "L'extrait AudD dépasse toujours {limit} octets (taille {size})."
+
+msgid "AudD snippet generation requires librosa: {error}"
+msgstr "La génération d'extraits AudD nécessite librosa : {error}"
+
+msgid "Failed to read audio for AudD snippet: {error}"
+msgstr "Lecture audio impossible pour l'extrait AudD : {error}"
+
+msgid "Failed to read audio for AudD snippet."
+msgstr "Lecture audio impossible pour l'extrait AudD."
+
+msgid "Audio file is empty."
+msgstr "Le fichier audio est vide."
 
 msgid "Add `{command}` to your `$PROFILE` (PowerShell) to load completion automatically."
 msgstr "Ajoutez `{command}` à votre `$PROFILE` (PowerShell) pour charger automatiquement la complétion."

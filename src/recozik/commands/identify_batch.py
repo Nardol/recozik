@@ -213,12 +213,29 @@ def identify_batch(
     audd_available = bool(fallback_audd_token) and audd_enabled_setting
     audd_lookup_fn = None
     audd_lookup_exception = None
+    audd_limit_mb = None
+    audd_snippet_seconds = None
     if audd_available:
-        from ..audd import AudDLookupError as _AudDLookupError
-        from ..audd import recognize_with_audd as _recognize_with_audd
+        from ..audd import (
+            MAX_AUDD_BYTES as _AUDD_LIMIT_BYTES,
+        )
+        from ..audd import (
+            SNIPPET_DURATION_SECONDS as _AUDD_SNIPPET_SECONDS,
+        )
+        from ..audd import (
+            AudDLookupError as _AudDLookupError,
+        )
+        from ..audd import (
+            needs_audd_snippet as _needs_audd_snippet,
+        )
+        from ..audd import (
+            recognize_with_audd as _recognize_with_audd,
+        )
 
         audd_lookup_fn = _recognize_with_audd
         audd_lookup_exception = _AudDLookupError
+        audd_limit_mb = int(_AUDD_LIMIT_BYTES / (1024 * 1024))
+        audd_snippet_seconds = int(_AUDD_SNIPPET_SECONDS)
 
     template_value = resolve_template(template, config)
     log_format_value = (log_format or config.log_format).lower()
@@ -314,6 +331,17 @@ def identify_batch(
             if audd_lookup_fn and audd_prefer_setting and not matches:
                 audd_attempted = True
                 try:
+                    if audd_snippet_seconds is not None and _needs_audd_snippet(file_path):
+                        typer.echo(
+                            _(
+                                "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz); "
+                                "file exceeds {limit} MB."
+                            ).format(
+                                path=relative_display,
+                                seconds=audd_snippet_seconds,
+                                limit=audd_limit_mb,
+                            )
+                        )
                     audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
                 except audd_lookup_exception as exc:  # type: ignore[misc]
                     audd_error_message = str(exc)
@@ -366,6 +394,17 @@ def identify_batch(
 
             if audd_lookup_fn and audd_available and not matches and not audd_attempted:
                 try:
+                    if audd_snippet_seconds is not None and _needs_audd_snippet(file_path):
+                        typer.echo(
+                            _(
+                                "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz); "
+                                "file exceeds {limit} MB."
+                            ).format(
+                                path=relative_display,
+                                seconds=audd_snippet_seconds,
+                                limit=audd_limit_mb,
+                            )
+                        )
                     audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
                 except audd_lookup_exception as exc:  # type: ignore[misc]
                     audd_error_message = str(exc)
