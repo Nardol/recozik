@@ -71,7 +71,7 @@ Recozik peut interroger l'API [AudD Music Recognition](https://audd.io) quand Ac
 2. Enregistrez le token avec `uv run recozik config set-audd-token` (supprimez-le ensuite avec `uv run recozik config set-audd-token --clear` si besoin), exportez la variable `AUDD_API_TOKEN` ou passez `--audd-token` lors de l'exécution.
 3. Quand AudD identifie un titre, Recozik affiche `Powered by AudD Music (fallback)` dans la console (et, en mode JSON, via `stderr`). Le flux JSON ajoute également un champ `source` (`acoustid` ou `audd`) pour tracer l'origine de la proposition.
 
-Selon les besoins, vous pouvez désactiver ponctuellement le fallback avec `--no-audd`, ou au contraire privilégier AudD avant AcoustID via `--prefer-audd`. Les valeurs par défaut sont pilotées dans `config.toml` sous `[identify]` et `[identify_batch]` (`audd_enabled`, `prefer_audd`).
+Selon les besoins, vous pouvez désactiver ponctuellement le fallback avec `--no-audd`, ou au contraire privilégier AudD avant AcoustID via `--prefer-audd`. Gardez en tête que chaque commande lit sa propre section : `identify` récupère ses réglages (dont `audd_enabled` et `prefer_audd`) dans `[identify]`, tandis que `identify-batch` ne tient compte que de `[identify_batch]`.
 
 Conseil : laissez le fallback désactivé dans les scripts partagés tant que chaque personne n'a pas accepté les conditions AudD et fourni son jeton.
 
@@ -115,18 +115,18 @@ Ajouter `--interactive` pour choisir la proposition à la volée, `--metadata-fa
 Le flux de renommage respecte également plusieurs clés sous `[rename]` :
 
 - `default_mode` : définit le comportement implicite de `--dry-run/--apply` (`dry-run` par défaut, `apply` pour appliquer directement).
-- `interactive` : active la sélection interactive sans ajouter `--interactive` (`true`/`false`).
-- `confirm_each` : demande une confirmation avant chaque renommage lorsque réglé à `true`.
-- `conflict_strategy` : politique de collision par défaut (`append`, `skip` ou `overwrite`).
-- `metadata_confirm` : impose (ou non) la confirmation des renommages basés sur les métadonnées (`true`/`false`).
+- `interactive` : active la sélection interactive sans ajouter `--interactive` (par défaut `false`).
+- `confirm_each` : demande une confirmation avant chaque renommage lorsque réglé à `true` (par défaut `false`).
+- `conflict_strategy` : politique de collision par défaut (`append`, `skip` ou `overwrite` ; valeur par défaut `append`).
+- `metadata_confirm` : impose (ou non) la confirmation des renommages basés sur les métadonnées (par défaut `true`).
 - `deduplicate_template` : fusionne les propositions qui aboutiraient au même nom de fichier final lorsqu'il est réglé à `true` (valeur par défaut). Surchagez-le via `--deduplicate-template/--keep-template-duplicates`.
-- `log_cleanup` : politique de nettoyage du journal JSONL après `--apply` (`ask`, `always` ou `never`). Surchargez-la par commande avec `--log-cleanup`.
-- `require_template_fields` : ignore les propositions qui n’ont pas toutes les valeurs exigées par le modèle (`true`/`false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
+- `log_cleanup` : politique de nettoyage du journal JSONL après `--apply` (`ask`, `always` ou `never` ; valeur par défaut `ask`). Surchargez-la par commande avec `--log-cleanup`.
+- `require_template_fields` : ignore les propositions qui n’ont pas toutes les valeurs exigées par le modèle (par défaut `false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
 
 Deux sections optionnelles permettent aussi d’ajuster les commandes d’identification :
 
-- `[identify]` configure la limite de résultats, la sortie JSON, le rafraîchissement du cache et les réglages AudD (`audd_enabled`, `prefer_audd`) pour `identify`.
-- `[identify_batch]` règle la limite par fichier, `best_only`, la récursivité, le journal par défaut et les réglages AudD (`audd_enabled`, `prefer_audd`) de `identify-batch`.
+- `[identify]` configure la limite de résultats (`3`), la sortie JSON (`false`), le rafraîchissement du cache (`false`) et les réglages AudD (`audd_enabled = true`, `prefer_audd = false`) uniquement pour `identify`.
+- `[identify_batch]` règle la limite par fichier (`3`), `best_only` (`false`), la récursivité (`false`), le journal par défaut (non défini → `recozik-batch.log` dans le répertoire courant) et les réglages AudD (`audd_enabled = true`, `prefer_audd = false`) exclusivement pour `identify-batch`.
 
 Completions shell :
 
@@ -190,6 +190,7 @@ fallback = true
 format = "text"
 absolute_paths = false
 
+# Les réglages de [identify] ne concernent que la commande `identify` (fichier unique).
 [identify]
 limit = 3
 json = false
@@ -197,6 +198,8 @@ refresh = false
 audd_enabled = true
 prefer_audd = false
 
+# La commande batch ne lit que la section [identify_batch]; aucune valeur n’est reprise
+# depuis [identify].
 [identify_batch]
 limit = 3
 best_only = false
@@ -221,40 +224,42 @@ locale = "fr"
 
 ## Référence de configuration
 
-| Portée                     | Nom                       | Type / Valeurs                    | Description                                                                | Méthode de configuration                                                                 |
-| -------------------------- | ------------------------- | --------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Fichier `[acoustid]`       | `api_key`                 | chaîne                            | Clé cliente AcoustID utilisée pour les requêtes.                           | `uv run recozik config set-key` ou édition de `config.toml`.                             |
-| Fichier `[audd]`           | `api_token`               | chaîne                            | Jeton AudD utilisé en fallback.                                            | `uv run recozik config set-audd-token` ou édition de `config.toml`.                      |
-| Fichier `[cache]`          | `enabled`                 | booléen                           | Active le cache local des correspondances.                                 | Édition de `config.toml`.                                                                |
-| Fichier `[cache]`          | `ttl_hours`               | entier                            | Durée de vie du cache en heures (minimum 1).                               | Édition de `config.toml`.                                                                |
-| Fichier `[output]`         | `template`                | chaîne                            | Modèle par défaut pour l'affichage/renommage.                              | Édition de `config.toml` ou option `--template`.                                         |
-| Fichier `[metadata]`       | `fallback`                | booléen                           | Autorise le repli sur les métadonnées embarquées.                          | Édition de `config.toml` ou `--metadata-fallback/--no-metadata-fallback`.                |
-| Fichier `[logging]`        | `format`                  | `text` \| `jsonl`                 | Format du journal généré.                                                  | Édition de `config.toml`.                                                                |
-| Fichier `[logging]`        | `absolute_paths`          | booléen                           | Force l'utilisation de chemins absolus dans les journaux.                  | Édition de `config.toml`.                                                                |
-| Fichier `[general]`        | `locale`                  | chaîne (ex. `fr`, `fr_FR`)        | Locale préférée si l'option CLI et l'env sont absents.                     | Édition de `config.toml`.                                                                |
-| Fichier `[identify]`       | `limit`                   | entier >= 1                       | Nombre de résultats retournés par défaut par `identify`.                   | Édition de `config.toml`.                                                                |
-| Fichier `[identify]`       | `json`                    | booléen                           | Affiche du JSON par défaut.                                                | Édition de `config.toml`.                                                                |
-| Fichier `[identify]`       | `refresh`                 | booléen                           | Ignore le cache sauf désactivation explicite.                              | Édition de `config.toml`.                                                                |
-| Fichier `[identify]`       | `audd_enabled`            | booléen                           | Active le fallback AudD lorsqu’un jeton est configuré.                     | `--use-audd/--no-audd` ou édition de `config.toml`.                                      |
-| Fichier `[identify]`       | `prefer_audd`             | booléen                           | Lance AudD avant AcoustID si activé.                                       | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                           |
-| Fichier `[identify_batch]` | `limit`                   | entier >= 1                       | Maximum de propositions conservées par fichier.                            | Édition de `config.toml`.                                                                |
-| Fichier `[identify_batch]` | `best_only`               | booléen                           | Conserve uniquement la meilleure proposition.                              | Édition de `config.toml`.                                                                |
-| Fichier `[identify_batch]` | `recursive`               | booléen                           | Analyse les sous-dossiers par défaut.                                      | Édition de `config.toml`.                                                                |
-| Fichier `[identify_batch]` | `log_file`                | chaîne (chemin)                   | Destination par défaut des journaux batch.                                 | Édition de `config.toml`.                                                                |
-| Fichier `[identify_batch]` | `audd_enabled`            | booléen                           | Active AudD pendant l’identification en lot.                               | `--use-audd/--no-audd` ou édition de `config.toml`.                                      |
-| Fichier `[identify_batch]` | `prefer_audd`             | booléen                           | Tente AudD avant AcoustID lors des traitements batch.                      | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                           |
-| Fichier `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | Politique de nettoyage du log après `rename-from-log --apply`.             | Édition de `config.toml` ou option `--log-cleanup`.                                      |
-| Fichier `[rename]`         | `require_template_fields` | booléen                           | Rejette les correspondances sans toutes les valeurs du modèle.             | Édition de `config.toml` ou `--require-template-fields/--allow-missing-template-fields`. |
-| Fichier `[rename]`         | `deduplicate_template`    | booléen                           | Fusionne les propositions menant au même nom final.                        | Édition de `config.toml` ou `--deduplicate-template/--keep-template-duplicates`.         |
-| Fichier `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.      | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`         | `interactive`             | booléen                           | Active l'interactif sans ajouter l'option `--interactive`.                 | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`         | `confirm_each`            | booléen                           | Demande confirmation avant chaque renommage par défaut.                    | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`         | `conflict_strategy`       | `append` \| `skip` \| `overwrite` | Politique de collision appliquée par défaut.                               | Édition de `config.toml`.                                                                |
-| Fichier `[rename]`         | `metadata_confirm`        | booléen                           | Imposer une confirmation pour les métadonnées.                             | Édition de `config.toml`.                                                                |
-| Environnement              | `RECOZIK_CONFIG_FILE`     | chemin                            | Chemin alternatif vers `config.toml`.                                      | Exporter avant d'exécuter la CLI.                                                        |
-| Environnement              | `RECOZIK_LOCALE`          | chaîne locale                     | Force la locale active (prioritaire sur le fichier).                       | Exporter avant d'exécuter la CLI.                                                        |
-| Environnement              | `AUDD_API_TOKEN`          | chaîne                            | Jeton AudD utilisé quand `--audd-token` est omis.                          | Exporter avant d'exécuter la CLI.                                                        |
-| Environnement (auto)       | `_RECOZIK_COMPLETE`       | interne                           | Variable gérée par les scripts de complétion, ne pas la définir à la main. | Configurée automatiquement lors du chargement de la complétion.                          |
+Chaque commande ne lit que la section qui porte son nom. Les valeurs définies sous `[identify]` ne servent jamais de repli pour `[identify_batch]`, et inversement. Si vous voulez un comportement identique (par exemple pour `limit`, `audd_enabled` ou `prefer_audd`), dupliquez les réglages dans les deux blocs.
+
+| Portée                     | Nom                       | Type / Valeurs                    | Valeur par défaut                | Description                                                                | Méthode de configuration                                                                 |
+| -------------------------- | ------------------------- | --------------------------------- | -------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Fichier `[acoustid]`       | `api_key`                 | chaîne                            | non défini                       | Clé cliente AcoustID utilisée pour les requêtes.                           | `uv run recozik config set-key` ou édition de `config.toml`.                             |
+| Fichier `[audd]`           | `api_token`               | chaîne                            | non défini                       | Jeton AudD utilisé en fallback.                                            | `uv run recozik config set-audd-token` ou édition de `config.toml`.                      |
+| Fichier `[cache]`          | `enabled`                 | booléen                           | `true`                           | Active le cache local des correspondances.                                 | Édition de `config.toml`.                                                                |
+| Fichier `[cache]`          | `ttl_hours`               | entier                            | `24`                             | Durée de vie du cache en heures (minimum 1).                               | Édition de `config.toml`.                                                                |
+| Fichier `[output]`         | `template`                | chaîne                            | `"{artist} - {title}"`           | Modèle par défaut pour l'affichage/renommage.                              | Édition de `config.toml` ou option `--template`.                                         |
+| Fichier `[metadata]`       | `fallback`                | booléen                           | `true`                           | Autorise le repli sur les métadonnées embarquées.                          | Édition de `config.toml` ou `--metadata-fallback/--no-metadata-fallback`.                |
+| Fichier `[logging]`        | `format`                  | `text` \| `jsonl`                 | `"text"`                         | Format du journal généré.                                                  | Édition de `config.toml`.                                                                |
+| Fichier `[logging]`        | `absolute_paths`          | booléen                           | `false`                          | Force l'utilisation de chemins absolus dans les journaux.                  | Édition de `config.toml`.                                                                |
+| Fichier `[general]`        | `locale`                  | chaîne (ex. `fr`, `fr_FR`)        | auto (locale système)            | Locale préférée si l'option CLI et l'env sont absents.                     | Édition de `config.toml`.                                                                |
+| Fichier `[identify]`       | `limit`                   | entier >= 1                       | `3`                              | Nombre de résultats retournés par défaut par `identify`.                   | Édition de `config.toml`.                                                                |
+| Fichier `[identify]`       | `json`                    | booléen                           | `false`                          | Affiche du JSON par défaut.                                                | Édition de `config.toml`.                                                                |
+| Fichier `[identify]`       | `refresh`                 | booléen                           | `false`                          | Ignore le cache sauf désactivation explicite.                              | Édition de `config.toml`.                                                                |
+| Fichier `[identify]`       | `audd_enabled`            | booléen                           | `true`                           | Active le fallback AudD lorsqu’un jeton est configuré.                     | `--use-audd/--no-audd` ou édition de `config.toml`.                                      |
+| Fichier `[identify]`       | `prefer_audd`             | booléen                           | `false`                          | Lance AudD avant AcoustID si activé.                                       | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                           |
+| Fichier `[identify_batch]` | `limit`                   | entier >= 1                       | `3`                              | Maximum de propositions conservées par fichier.                            | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `best_only`               | booléen                           | `false`                          | Conserve uniquement la meilleure proposition.                              | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `recursive`               | booléen                           | `false`                          | Analyse les sous-dossiers par défaut.                                      | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `log_file`                | chaîne (chemin)                   | non défini → `recozik-batch.log` | Destination par défaut des journaux batch.                                 | Édition de `config.toml`.                                                                |
+| Fichier `[identify_batch]` | `audd_enabled`            | booléen                           | `true`                           | Active AudD pendant l’identification en lot.                               | `--use-audd/--no-audd` ou édition de `config.toml`.                                      |
+| Fichier `[identify_batch]` | `prefer_audd`             | booléen                           | `false`                          | Tente AudD avant AcoustID lors des traitements batch.                      | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                           |
+| Fichier `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | `"dry-run"`                      | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.      | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `interactive`             | booléen                           | `false`                          | Active l'interactif sans ajouter l'option `--interactive`.                 | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `confirm_each`            | booléen                           | `false`                          | Demande confirmation avant chaque renommage par défaut.                    | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `conflict_strategy`       | `append` \| `skip` \| `overwrite` | `"append"`                       | Politique de collision appliquée par défaut.                               | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `metadata_confirm`        | booléen                           | `true`                           | Imposer une confirmation pour les métadonnées.                             | Édition de `config.toml`.                                                                |
+| Fichier `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | `"ask"`                          | Politique de nettoyage du log JSONL après `rename-from-log --apply`.       | Édition de `config.toml` ou option `--log-cleanup`.                                      |
+| Fichier `[rename]`         | `require_template_fields` | booléen                           | `false`                          | Rejette les correspondances sans toutes les valeurs du modèle.             | Édition de `config.toml` ou `--require-template-fields/--allow-missing-template-fields`. |
+| Fichier `[rename]`         | `deduplicate_template`    | booléen                           | `true`                           | Fusionne les propositions menant au même nom final.                        | Édition de `config.toml` ou `--deduplicate-template/--keep-template-duplicates`.         |
+| Environnement              | `RECOZIK_CONFIG_FILE`     | chemin                            | non défini                       | Chemin alternatif vers `config.toml`.                                      | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement              | `RECOZIK_LOCALE`          | chaîne locale                     | non défini                       | Force la locale active (prioritaire sur le fichier).                       | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement              | `AUDD_API_TOKEN`          | chaîne                            | non défini                       | Jeton AudD utilisé quand `--audd-token` est omis.                          | Exporter avant d'exécuter la CLI.                                                        |
+| Environnement (auto)       | `_RECOZIK_COMPLETE`       | interne                           | gérée automatiquement            | Variable gérée par les scripts de complétion, ne pas la définir à la main. | Configurée automatiquement lors du chargement de la complétion.                          |
 
 ## Tests
 

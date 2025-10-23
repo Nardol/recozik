@@ -84,7 +84,7 @@ Recozik can also call the [AudD Music Recognition API](https://audd.io) when Aco
 2. Store the token with `uv run recozik config set-audd-token` (remove it later with `uv run recozik config set-audd-token --clear`), export it via the `AUDD_API_TOKEN` environment variable, or pass it per command with `--audd-token`.
 3. When AudD recognises a track, Recozik prints `Powered by AudD Music (fallback)` in the console (and in JSON mode via `stderr`) so the required attribution is always visible. The JSON payloads also expose a `source` field (`acoustid` or `audd`) to help you trace the origin of each suggestion.
 
-On a per-run basis you can disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Configuration defaults are available under `[identify]` and `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`).
+On a per-run basis you can disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Remember that the two commands read separate configuration sections: `identify` pulls defaults from `[identify]`, while `identify-batch` only honours values defined under `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`).
 
 Tip: keep the token disabled in shared scripts unless every user has accepted AudD’s terms and provided their own credentials.
 
@@ -128,18 +128,18 @@ Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use 
 The rename workflow also honours configuration keys under `[rename]`:
 
 - `default_mode`: selects the implicit behaviour for `--dry-run/--apply` (`dry-run` by default, set to `apply` to skip the preview step).
-- `interactive`: toggles interactive selection without passing `--interactive` (`true`/`false`).
-- `confirm_each`: requests confirmation before each rename when set to `true`.
-- `conflict_strategy`: default collision behaviour (`append`, `skip`, or `overwrite`).
-- `metadata_confirm`: controls whether metadata fallbacks require confirmation (`true`/`false`).
+- `interactive`: toggles interactive selection without passing `--interactive` (defaults to `false`).
+- `confirm_each`: requests confirmation before each rename when set to `true` (defaults to `false`).
+- `conflict_strategy`: default collision behaviour (`append`, `skip`, or `overwrite`; default `append`).
+- `metadata_confirm`: controls whether metadata fallbacks require confirmation (defaults to `true`).
 - `deduplicate_template`: collapses proposals that would generate the same target filename when `true` (default). Override with the CLI flag `--deduplicate-template/--keep-template-duplicates`.
-- `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or `never`). You can override it per command with `--log-cleanup`.
-- `require_template_fields`: skips matches that are missing values referenced by the template (`true`/`false`). Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
+- `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or `never`; default `ask`). You can override it per command with `--log-cleanup`.
+- `require_template_fields`: skips matches that are missing values referenced by the template (defaults to `false`). Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
 
 Two optional sections also tune the identification commands:
 
-- `[identify]` sets the default limit, JSON output mode, cache refresh behaviour, and the AudD integration defaults (`audd_enabled`, `prefer_audd`) for `identify`.
-- `[identify_batch]` controls the per-file result limit, `best_only` mode, recursion, log destination, and the AudD defaults (`audd_enabled`, `prefer_audd`) for `identify-batch`.
+- `[identify]` sets the default limit (`3`), JSON output mode (`false`), cache refresh behaviour (`false`), and the AudD integration defaults (`audd_enabled = true`, `prefer_audd = false`) for the single-file `identify` command only.
+- `[identify_batch]` controls the per-file result limit (`3`), `best_only` mode (`false`), recursion (`false`), log destination (unset → `recozik-batch.log` in the current directory), and the AudD defaults (`audd_enabled = true`, `prefer_audd = false`) exclusively for `identify-batch`.
 
 Install shell completion:
 
@@ -208,11 +208,14 @@ fallback = true
 format = "text"
 absolute_paths = false
 
+# Settings in [identify] only affect the single-file `identify` command.
 [identify]
 limit = 3
 json = false
 refresh = false
 
+# The batch command reads only values defined under [identify_batch]; nothing leaks
+# over from [identify].
 [identify_batch]
 limit = 3
 best_only = false
@@ -235,40 +238,42 @@ locale = "en"
 
 ## Configuration reference
 
-| Scope                          | Name                      | Type / Values                     | Description                                                           | How to configure                                                                       |
-| ------------------------------ | ------------------------- | --------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Config file `[acoustid]`       | `api_key`                 | string                            | AcoustID client key used for lookups.                                 | `uv run recozik config set-key` or edit `config.toml`.                                 |
-| Config file `[audd]`           | `api_token`               | string                            | AudD fallback token when AcoustID has no match.                       | `uv run recozik config set-audd-token` or edit `config.toml`.                          |
-| Config file `[cache]`          | `enabled`                 | boolean                           | Enables the local lookup cache.                                       | Edit `config.toml`.                                                                    |
-| Config file `[cache]`          | `ttl_hours`               | integer                           | Cache time-to-live in hours (minimum 1).                              | Edit `config.toml`.                                                                    |
-| Config file `[output]`         | `template`                | string                            | Default template for identify/rename output.                          | Edit `config.toml` or pass `--template`.                                               |
-| Config file `[metadata]`       | `fallback`                | boolean                           | Whether rename uses embedded tags when no match is available.         | Edit `config.toml` or toggle `--metadata-fallback/--no-metadata-fallback`.             |
-| Config file `[logging]`        | `format`                  | `text` \| `jsonl`                 | Log output format.                                                    | Edit `config.toml`.                                                                    |
-| Config file `[logging]`        | `absolute_paths`          | boolean                           | Emit absolute paths in rename logs.                                   | Edit `config.toml`.                                                                    |
-| Config file `[general]`        | `locale`                  | string (e.g. `en`, `fr_FR`)       | Preferred locale when CLI option/env var are unset.                   | Edit `config.toml`.                                                                    |
-| Config file `[identify]`       | `limit`                   | integer >= 1                      | Default number of results returned by `identify`.                     | Edit `config.toml`.                                                                    |
-| Config file `[identify]`       | `json`                    | boolean                           | Show JSON output by default.                                          | Edit `config.toml`.                                                                    |
-| Config file `[identify]`       | `refresh`                 | boolean                           | Ignore the cache unless explicitly disabled.                          | Edit `config.toml`.                                                                    |
-| Config file `[identify]`       | `audd_enabled`            | boolean                           | Enable AudD support when a token is configured.                       | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
-| Config file `[identify]`       | `prefer_audd`             | boolean                           | Try AudD before AcoustID when enabled.                                | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
-| Config file `[identify_batch]` | `limit`                   | integer >= 1                      | Maximum results stored per file in batch mode.                        | Edit `config.toml`.                                                                    |
-| Config file `[identify_batch]` | `best_only`               | boolean                           | Record only the top proposal for each file.                           | Edit `config.toml`.                                                                    |
-| Config file `[identify_batch]` | `recursive`               | boolean                           | Include sub-directories by default.                                   | Edit `config.toml`.                                                                    |
-| Config file `[identify_batch]` | `log_file`                | string (path)                     | Default destination for batch logs.                                   | Edit `config.toml`.                                                                    |
-| Config file `[identify_batch]` | `audd_enabled`            | boolean                           | Enable AudD support during batch identification.                      | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
-| Config file `[identify_batch]` | `prefer_audd`             | boolean                           | Try AudD before AcoustID in batch runs.                               | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
-| Config file `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | Default behaviour when neither `--dry-run` nor `--apply` is provided. | Edit `config.toml`.                                                                    |
-| Config file `[rename]`         | `interactive`             | boolean                           | Enables interactive selection without `--interactive`.                | Edit `config.toml`.                                                                    |
-| Config file `[rename]`         | `confirm_each`            | boolean                           | Asks for confirmation before each rename by default.                  | Edit `config.toml`.                                                                    |
-| Config file `[rename]`         | `conflict_strategy`       | `append` \| `skip` \| `overwrite` | Collision policy applied when no CLI flag is passed.                  | Edit `config.toml`.                                                                    |
-| Config file `[rename]`         | `metadata_confirm`        | boolean                           | Request confirmation for metadata-based renames.                      | Edit `config.toml`.                                                                    |
-| Config file `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | Cleanup policy for JSONL logs after `rename-from-log --apply`.        | Edit `config.toml` or pass `--log-cleanup`.                                            |
-| Config file `[rename]`         | `require_template_fields` | boolean                           | Reject matches missing placeholders required by the template.         | Edit `config.toml` or use `--require-template-fields/--allow-missing-template-fields`. |
-| Config file `[rename]`         | `deduplicate_template`    | boolean                           | Collapse proposals leading to the same target filename.               | Edit `config.toml` or use `--deduplicate-template/--keep-template-duplicates`.         |
-| Environment                    | `RECOZIK_CONFIG_FILE`     | path                              | Absolute or relative path to a custom `config.toml`.                  | Export before running the CLI.                                                         |
-| Environment                    | `RECOZIK_LOCALE`          | locale string                     | Forces the active locale (higher priority than config file).          | Export before running the CLI.                                                         |
-| Environment                    | `AUDD_API_TOKEN`          | string                            | AudD token used when `--audd-token` is omitted.                       | Export before running the CLI.                                                         |
-| Environment (auto)             | `_RECOZIK_COMPLETE`       | internal                          | Shell-completion hook managed by Typer; not meant to be set manually. | Set automatically by generated completion scripts.                                     |
+Each command reads only the section that matches its name. Values under `[identify]` never fall back to `[identify_batch]`, and the batch command does not reuse single-file defaults. Duplicate keys (for example `audd_enabled`, `prefer_audd`, or `limit`) must therefore be set in both sections if you want the same behaviour across commands.
+
+| Scope                          | Name                      | Type / Values                     | Default                     | Description                                                           | How to configure                                                                       |
+| ------------------------------ | ------------------------- | --------------------------------- | --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Config file `[acoustid]`       | `api_key`                 | string                            | unset                       | AcoustID client key used for lookups.                                 | `uv run recozik config set-key` or edit `config.toml`.                                 |
+| Config file `[audd]`           | `api_token`               | string                            | unset                       | AudD fallback token when AcoustID has no match.                       | `uv run recozik config set-audd-token` or edit `config.toml`.                          |
+| Config file `[cache]`          | `enabled`                 | boolean                           | `true`                      | Enables the local lookup cache.                                       | Edit `config.toml`.                                                                    |
+| Config file `[cache]`          | `ttl_hours`               | integer                           | `24`                        | Cache time-to-live in hours (minimum 1).                              | Edit `config.toml`.                                                                    |
+| Config file `[output]`         | `template`                | string                            | `"{artist} - {title}"`      | Default template for identify/rename output.                          | Edit `config.toml` or pass `--template`.                                               |
+| Config file `[metadata]`       | `fallback`                | boolean                           | `true`                      | Whether rename uses embedded tags when no match is available.         | Edit `config.toml` or toggle `--metadata-fallback/--no-metadata-fallback`.             |
+| Config file `[logging]`        | `format`                  | `text` \| `jsonl`                 | `"text"`                    | Log output format.                                                    | Edit `config.toml`.                                                                    |
+| Config file `[logging]`        | `absolute_paths`          | boolean                           | `false`                     | Emit absolute paths in rename logs.                                   | Edit `config.toml`.                                                                    |
+| Config file `[general]`        | `locale`                  | string (e.g. `en`, `fr_FR`)       | auto (system locale)        | Preferred locale when CLI option/env var are unset.                   | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `limit`                   | integer >= 1                      | `3`                         | Default number of results returned by `identify`.                     | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `json`                    | boolean                           | `false`                     | Show JSON output by default.                                          | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `refresh`                 | boolean                           | `false`                     | Ignore the cache unless explicitly disabled.                          | Edit `config.toml`.                                                                    |
+| Config file `[identify]`       | `audd_enabled`            | boolean                           | `true`                      | Enable AudD support when a token is configured.                       | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
+| Config file `[identify]`       | `prefer_audd`             | boolean                           | `false`                     | Try AudD before AcoustID when enabled.                                | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
+| Config file `[identify_batch]` | `limit`                   | integer >= 1                      | `3`                         | Maximum results stored per file in batch mode.                        | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `best_only`               | boolean                           | `false`                     | Record only the top proposal for each file.                           | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `recursive`               | boolean                           | `false`                     | Include sub-directories by default.                                   | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `log_file`                | string (path)                     | unset → `recozik-batch.log` | Default destination for batch logs.                                   | Edit `config.toml`.                                                                    |
+| Config file `[identify_batch]` | `audd_enabled`            | boolean                           | `true`                      | Enable AudD support during batch identification.                      | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
+| Config file `[identify_batch]` | `prefer_audd`             | boolean                           | `false`                     | Try AudD before AcoustID in batch runs.                               | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
+| Config file `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | `"dry-run"`                 | Default behaviour when neither `--dry-run` nor `--apply` is provided. | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `interactive`             | boolean                           | `false`                     | Enables interactive selection without `--interactive`.                | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `confirm_each`            | boolean                           | `false`                     | Asks for confirmation before each rename by default.                  | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `conflict_strategy`       | `append` \| `skip` \| `overwrite` | `"append"`                  | Collision policy applied when no CLI flag is passed.                  | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `metadata_confirm`        | boolean                           | `true`                      | Request confirmation for metadata-based renames.                      | Edit `config.toml`.                                                                    |
+| Config file `[rename]`         | `log_cleanup`             | `ask` \| `always` \| `never`      | `"ask"`                     | Cleanup policy for JSONL logs after `rename-from-log --apply`.        | Edit `config.toml` or pass `--log-cleanup`.                                            |
+| Config file `[rename]`         | `require_template_fields` | boolean                           | `false`                     | Reject matches missing placeholders required by the template.         | Edit `config.toml` or use `--require-template-fields/--allow-missing-template-fields`. |
+| Config file `[rename]`         | `deduplicate_template`    | boolean                           | `true`                      | Collapse proposals leading to the same target filename.               | Edit `config.toml` or use `--deduplicate-template/--keep-template-duplicates`.         |
+| Environment                    | `RECOZIK_CONFIG_FILE`     | path                              | unset                       | Absolute or relative path to a custom `config.toml`.                  | Export before running the CLI.                                                         |
+| Environment                    | `RECOZIK_LOCALE`          | locale string                     | unset                       | Forces the active locale (higher priority than config file).          | Export before running the CLI.                                                         |
+| Environment                    | `AUDD_API_TOKEN`          | string                            | unset                       | AudD token used when `--audd-token` is omitted.                       | Export before running the CLI.                                                         |
+| Environment (auto)             | `_RECOZIK_COMPLETE`       | internal                          | auto-managed                | Shell-completion hook managed by Typer; not meant to be set manually. | Set automatically by generated completion scripts.                                     |
 
 ## Code structure
 
