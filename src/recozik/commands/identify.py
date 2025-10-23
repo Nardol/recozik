@@ -173,8 +173,37 @@ def identify(
     def run_audd(will_retry_acoustid: bool) -> list:
         nonlocal audd_attempted
         audd_attempted = True
-        from ..audd import AudDLookupError as _AudDLookupError  # Local import for startup time
-        from ..audd import recognize_with_audd as _recognize_with_audd
+        from ..audd import (
+            MAX_AUDD_BYTES as _AUDD_LIMIT_BYTES,
+        )
+        from ..audd import (
+            SNIPPET_DURATION_SECONDS as _AUDD_SNIPPET_SECONDS,
+        )
+        from ..audd import (
+            AudDLookupError as _AudDLookupError,  # Local import for startup time
+        )
+        from ..audd import (
+            needs_audd_snippet as _needs_audd_snippet,
+        )
+        from ..audd import (
+            recognize_with_audd as _recognize_with_audd,
+        )
+
+        try:
+            requires_snippet = _needs_audd_snippet(resolved_audio)
+        except _AudDLookupError as exc:
+            typer.echo(_("AudD lookup failed: {error}.").format(error=exc))
+            return []
+
+        if requires_snippet:
+            limit_mb = int(_AUDD_LIMIT_BYTES / (1024 * 1024))
+            snippet_seconds = int(_AUDD_SNIPPET_SECONDS)
+            typer.echo(
+                _(
+                    "Preparing AudD snippet (~{seconds}s, mono 16 kHz) "
+                    "because the file exceeds {limit} MB."
+                ).format(seconds=snippet_seconds, limit=limit_mb)
+            )
 
         try:
             return _recognize_with_audd(fallback_audd_token, resolved_audio)

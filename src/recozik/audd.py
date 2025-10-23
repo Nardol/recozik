@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import requests
+import soundfile
 
 from .fingerprint import AcoustIDMatch, ReleaseInfo
 from .i18n import _
 
 DEFAULT_ENDPOINT = "https://api.audd.io/"
+MAX_AUDD_BYTES = 10 * 1024 * 1024
+SNIPPET_DURATION_SECONDS = 45.0
+_AUDD_TARGET_SAMPLE_RATE = 16_000
+_AUDD_SNIPPET_SUFFIX = ".wav"
 
 
 class AudDLookupError(RuntimeError):
@@ -86,16 +95,26 @@ def recognize_with_audd(
         raise AudDLookupError(_("Audio file not found: {path}").format(path=audio_path))
 
     try:
-        with audio_path.open("rb") as handle:
-            files = {"file": (audio_path.name, handle, "application/octet-stream")}
-            data = {
-                "api_token": api_token,
-                # Request common catalog identifiers to enrich results if available.
-                "return": "apple_music,spotify,deezer",
-            }
-            response = requests.post(endpoint, data=data, files=files, timeout=timeout)
-    except requests.RequestException as exc:  # pragma: no cover - network failures
-        raise AudDLookupError(_("AudD request failed: {error}").format(error=exc)) from exc
+        payload_manager = _prepare_audd_payload(audio_path)
+    except AudDLookupError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        raise AudDLookupError(
+            _("Unable to prepare audio for AudD: {error}").format(error=exc)
+        ) from exc
+
+    with payload_manager as payload_path:
+        try:
+            with payload_path.open("rb") as handle:
+                files = {"file": (audio_path.name, handle, "application/octet-stream")}
+                data = {
+                    "api_token": api_token,
+                    # Request common catalog identifiers to enrich results if available.
+                    "return": "apple_music,spotify,deezer",
+                }
+                response = requests.post(endpoint, data=data, files=files, timeout=timeout)
+        except requests.RequestException as exc:  # pragma: no cover - network failures
+            raise AudDLookupError(_("AudD request failed: {error}").format(error=exc)) from exc
 
     if response.status_code != 200:
         raise AudDLookupError(
@@ -191,3 +210,84 @@ def _build_synthetic_identifier(artist: str | None, title: str | None) -> str:
     buffer = f"{artist or ''}::{title or ''}"
     digest = sha256(buffer.encode("utf-8")).hexdigest()
     return f"audd:{digest}"
+
+
+def needs_audd_snippet(audio_path: Path) -> bool:
+    """Return True when the audio file exceeds AudD's upload size limit."""
+    try:
+        return audio_path.stat().st_size > MAX_AUDD_BYTES
+    except OSError as exc:  # pragma: no cover - filesystem failures
+        raise AudDLookupError(_("Unable to access audio file: {error}").format(error=exc)) from exc
+
+
+@contextmanager
+def _prepare_audd_payload(audio_path: Path) -> Iterator[Path]:
+    """Return a context manager yielding the path to upload to AudD."""
+    if not needs_audd_snippet(audio_path):
+        yield audio_path
+        return
+
+    snippet_path = Path(tempfile.mkstemp(prefix="recozik-audd-", suffix=_AUDD_SNIPPET_SUFFIX)[1])
+    try:
+        _render_snippet(audio_path, snippet_path)
+        size = snippet_path.stat().st_size
+        if size > MAX_AUDD_BYTES:
+            raise AudDLookupError(
+                _("AudD snippet still exceeds {limit} bytes (got {size}).").format(
+                    limit=MAX_AUDD_BYTES,
+                    size=size,
+                )
+            )
+        yield snippet_path
+    finally:
+        snippet_path.unlink(missing_ok=True)
+
+
+def _render_snippet(
+    audio_path: Path,
+    destination: Path,
+    *,
+    snippet_seconds: float = SNIPPET_DURATION_SECONDS,
+    target_sample_rate: int = _AUDD_TARGET_SAMPLE_RATE,
+) -> None:
+    """Render a mono PCM snippet suitable for AudD uploads."""
+    try:
+        import librosa
+    except Exception as exc:  # pragma: no cover - dependency missing
+        raise AudDLookupError(
+            _("AudD snippet generation requires librosa: {error}").format(error=exc)
+        ) from exc
+
+    try:
+        with soundfile.SoundFile(audio_path, "r") as source:
+            source_frames = source.frames
+            source_rate = source.samplerate
+            duration_frames = min(
+                int(snippet_seconds * source_rate),
+                source_frames,
+            )
+            if duration_frames <= 0:
+                raise AudDLookupError(_("Audio file is empty."))
+            source.seek(0)
+            buffer = source.read(duration_frames, dtype="float32", always_2d=True)
+    except RuntimeError as exc:
+        raise AudDLookupError(
+            _("Failed to read audio for AudD snippet: {error}").format(error=exc)
+        ) from exc
+
+    if buffer.size == 0:
+        raise AudDLookupError(_("Failed to read audio for AudD snippet."))
+
+    mono = buffer.mean(axis=1)
+    if source_rate != target_sample_rate:
+        mono = librosa.resample(mono, orig_sr=source_rate, target_sr=target_sample_rate)
+        output_rate = target_sample_rate
+    else:
+        output_rate = source_rate
+
+    mono = np.clip(mono, -1.0, 1.0)
+    max_samples = int((MAX_AUDD_BYTES - 1024) / 2)
+    if len(mono) > max_samples:
+        mono = mono[:max_samples]
+
+    soundfile.write(destination, mono, output_rate, subtype="PCM_16")

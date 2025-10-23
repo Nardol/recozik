@@ -455,6 +455,52 @@ def test_identify_prefer_audd(monkeypatch, tmp_path: Path) -> None:
     assert "Priority Artist - Priority Song" in result.stdout
 
 
+def test_identify_announces_audd_snippet(monkeypatch, tmp_path: Path) -> None:
+    """Let users know when a snippet is prepared for AudD uploads."""
+    audio_path = tmp_path / "long.wav"
+    audio_path.write_bytes(b"0" * 2048)
+    config_path = _fake_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+
+    fake_match = AcoustIDMatch(
+        score=0.91,
+        recording_id="audd-snippet",
+        title="Snippet Title",
+        artist="Snippet Artist",
+    )
+
+    class DummyAudDError(Exception):
+        pass
+
+    monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
+    monkeypatch.setattr(audd, "MAX_AUDD_BYTES", 1)
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--audd-token",
+            "secret-token",
+            "--prefer-audd",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Preparing AudD snippet" in result.stdout
+    assert "Snippet Artist - Snippet Title" in result.stdout
+
+
 def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
     """Abort when no API key is available and the user declines to configure it."""
     audio_path = tmp_path / "song.wav"
