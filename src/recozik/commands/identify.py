@@ -170,7 +170,7 @@ def identify(
 
     audd_attempted = False
 
-    def run_audd() -> list:
+    def run_audd(will_retry_acoustid: bool) -> list:
         nonlocal audd_attempted
         audd_attempted = True
         from ..audd import AudDLookupError as _AudDLookupError  # Local import for startup time
@@ -179,11 +179,16 @@ def identify(
         try:
             return _recognize_with_audd(fallback_audd_token, resolved_audio)
         except _AudDLookupError as exc:
-            typer.echo(_("AudD lookup failed: {error}").format(error=exc))
+            message = _("AudD lookup failed: {error}.").format(error=exc)
+            if will_retry_acoustid:
+                message = _("AudD lookup failed: {error}. Falling back to AcoustID.").format(
+                    error=exc
+                )
+            typer.echo(message)
             return []
 
     if audd_available and audd_prefer_setting and matches is None:
-        audd_results = run_audd()
+        audd_results = run_audd(will_retry_acoustid=True)
         if audd_results:
             matches = audd_results
             match_source = "audd"
@@ -205,7 +210,7 @@ def identify(
         match_source = "acoustid"
 
     if audd_available and not matches and not audd_attempted:
-        audd_results = run_audd()
+        audd_results = run_audd(will_retry_acoustid=False)
         if audd_results:
             matches = audd_results
             match_source = "audd"

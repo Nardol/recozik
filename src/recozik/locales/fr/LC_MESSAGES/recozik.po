@@ -75,6 +75,15 @@ msgstr "Le fallback AudD a échoué : {error}"
 msgid "AudD fallback identified {path}. Powered by AudD Music."
 msgstr "Le fallback AudD a identifié {path}. Powered by AudD Music."
 
+msgid "AudD lookup failed: {error}."
+msgstr "La recherche AudD a échoué : {error}."
+
+msgid "AudD lookup failed: {error}. Falling back to AcoustID."
+msgstr "La recherche AudD a échoué : {error}. Repli vers AcoustID."
+
+msgid "AudD lookup failed for {path}: {error}. Falling back to AcoustID."
+msgstr "La recherche AudD a échoué pour {path} : {error}. Repli vers AcoustID."
+
 msgid "AudD token removed from {path}"
 msgstr "Jeton AudD supprimé de {path}"
 

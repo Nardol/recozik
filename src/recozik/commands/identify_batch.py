@@ -317,12 +317,14 @@ def identify_batch(
                     audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
                 except audd_lookup_exception as exc:  # type: ignore[misc]
                     audd_error_message = str(exc)
-                    typer.echo(
-                        _("AudD lookup failed for {path}: {error}").format(
-                            path=relative_display,
-                            error=audd_error_message,
-                        )
+                    message_template = _(
+                        "AudD lookup failed for {path}: {error}. Falling back to AcoustID."
                     )
+                    message = message_template.format(
+                        path=relative_display,
+                        error=audd_error_message,
+                    )
+                    typer.echo(message)
                 else:
                     if audd_candidates:
                         matches = audd_candidates
@@ -414,6 +416,14 @@ def identify_batch(
                 continue
 
             selected = matches[:effective_limit]
+            note_parts: list[str] = []
+            if match_source == "audd" and audd_note:
+                note_parts.append(audd_note)
+            if audd_error_message and match_source != "audd":
+                note_parts.append(
+                    _("AudD fallback failed: {error}").format(error=audd_error_message)
+                )
+            success_note = " ".join(note_parts) if note_parts else None
             write_log_entry(
                 handle,
                 log_format_value,
@@ -422,7 +432,7 @@ def identify_batch(
                 None,
                 template_value,
                 fingerprint_result,
-                note=audd_note,
+                note=success_note,
                 metadata=None,
             )
             success += 1
