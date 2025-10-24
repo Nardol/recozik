@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -279,13 +280,84 @@ def _render_snippet(
     target_sample_rate: int = _AUDD_TARGET_SAMPLE_RATE,
 ) -> None:
     """Render a mono PCM snippet suitable for AudD uploads."""
+    ffmpeg_ready = _ffmpeg_support_ready()
+    prefer_ffmpeg = _should_prefer_ffmpeg(audio_path) and ffmpeg_ready
+
+    ffmpeg_error: AudDLookupError | None = None
+    soundfile_error: Exception | None = None
+    tried_ffmpeg = False
+
+    if prefer_ffmpeg:
+        tried_ffmpeg = True
+        try:
+            _render_snippet_with_ffmpeg(
+                audio_path,
+                destination,
+                snippet_seconds=snippet_seconds,
+                target_sample_rate=target_sample_rate,
+            )
+            return
+        except AudDLookupError as exc:
+            ffmpeg_error = exc
+
+    try:
+        _render_snippet_with_soundfile(
+            audio_path,
+            destination,
+            snippet_seconds=snippet_seconds,
+            target_sample_rate=target_sample_rate,
+        )
+        return
+    except AudDLookupError:
+        raise
+    except Exception as exc:
+        soundfile_error = exc
+
+    if not tried_ffmpeg and ffmpeg_ready:
+        tried_ffmpeg = True
+        try:
+            _render_snippet_with_ffmpeg(
+                audio_path,
+                destination,
+                snippet_seconds=snippet_seconds,
+                target_sample_rate=target_sample_rate,
+            )
+            return
+        except AudDLookupError as exc:
+            ffmpeg_error = exc
+
+    messages: list[str] = []
+    if soundfile_error is not None:
+        messages.append(str(soundfile_error))
+    if ffmpeg_error is not None:
+        messages.append(str(ffmpeg_error))
+
+    if messages:
+        details = "; ".join(messages)
+    else:
+        details = "unknown error"
+
+    message = _redact_audd_token(
+        _("Failed to read audio for AudD snippet: {error}").format(error=details)
+    )
+    raise AudDLookupError(message)
+
+
+def _render_snippet_with_soundfile(
+    audio_path: Path,
+    destination: Path,
+    *,
+    snippet_seconds: float,
+    target_sample_rate: int,
+) -> None:
+    """Try to render the AudD snippet via libsndfile/librosa."""
     try:
         import librosa
     except Exception as exc:  # pragma: no cover - dependency missing
         message = _redact_audd_token(
             _("AudD snippet generation requires librosa: {error}").format(error=exc)
         )
-        raise AudDLookupError(message) from exc
+        raise RuntimeError(message) from exc
 
     try:
         with soundfile.SoundFile(audio_path, "r") as source:
@@ -303,7 +375,7 @@ def _render_snippet(
         message = _redact_audd_token(
             _("Failed to read audio for AudD snippet: {error}").format(error=exc)
         )
-        raise AudDLookupError(message) from exc
+        raise RuntimeError(message) from exc
 
     if buffer.size == 0:
         raise AudDLookupError(_("Failed to read audio for AudD snippet."))
@@ -321,3 +393,103 @@ def _render_snippet(
         mono = mono[:max_samples]
 
     soundfile.write(destination, mono, output_rate, subtype="PCM_16")
+
+
+def _render_snippet_with_ffmpeg(
+    audio_path: Path,
+    destination: Path,
+    *,
+    snippet_seconds: float,
+    target_sample_rate: int,
+) -> None:
+    """Render the AudD snippet via ffmpeg when libsndfile cannot decode the file."""
+    ffmpeg_executable = shutil.which("ffmpeg")
+    if not ffmpeg_executable:
+        raise AudDLookupError(
+            _("FFmpeg executable not found. Install ffmpeg to enable AudD fallback.")
+        )
+
+    try:  # pragma: no cover - optional dependency
+        import ffmpeg  # type: ignore
+    except Exception as exc:
+        message = _redact_audd_token(
+            _(
+                "FFmpeg Python bindings are missing. Install recozik[ffmpeg-support]: {error}"
+            ).format(error=exc)
+        )
+        raise AudDLookupError(message) from exc
+
+    try:
+        (
+            ffmpeg.input(str(audio_path))
+            .output(
+                str(destination),
+                ac=1,
+                ar=target_sample_rate,
+                t=snippet_seconds,
+                format="wav",
+            )
+            .overwrite_output()
+            .global_args("-loglevel", "error")
+            .run(cmd=ffmpeg_executable, capture_stdout=True, capture_stderr=True)  # type: ignore[call-arg]
+        )
+    except ffmpeg.Error as exc:  # type: ignore[attr-defined]
+        stderr = ""
+        if getattr(exc, "stderr", b""):
+            try:
+                stderr = exc.stderr.decode("utf-8", "ignore")
+            except Exception:  # pragma: no cover - defensive
+                stderr = str(exc)
+        else:
+            stderr = str(exc)
+        message = _redact_audd_token(
+            _("FFmpeg failed to render AudD snippet: {error}").format(error=stderr)
+        )
+        raise AudDLookupError(message) from exc
+
+    try:
+        size = destination.stat().st_size
+    except OSError as exc:  # pragma: no cover - filesystem race
+        raise AudDLookupError(
+            _("Failed to read audio for AudD snippet: {error}").format(error=exc)
+        ) from exc
+
+    if size > MAX_AUDD_BYTES:
+        raise AudDLookupError(
+            _("AudD snippet still exceeds {limit} bytes (got {size}).").format(
+                limit=MAX_AUDD_BYTES,
+                size=size,
+            )
+        )
+
+
+def _ffmpeg_support_ready() -> bool:
+    """Return True when the FFmpeg executable and Python bindings are available."""
+    if not shutil.which("ffmpeg"):
+        return False
+    try:  # pragma: no cover - optional dependency
+        import ffmpeg  # type: ignore  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+_FFMPEG_PREFERRED_SUFFIXES = {
+    ".mp3",
+    ".aac",
+    ".m4a",
+    ".m4b",
+    ".ogg",
+    ".opus",
+    ".wma",
+    ".ac3",
+    ".amr",
+}
+
+
+def _should_prefer_ffmpeg(audio_path: Path) -> bool:
+    """Return True when FFmpeg should be attempted before libsndfile."""
+    suffix = audio_path.suffix.lower()
+    if suffix in _FFMPEG_PREFERRED_SUFFIXES:
+        return True
+    return False

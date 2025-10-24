@@ -45,6 +45,11 @@ dependencies = [
     "requests>=2.31"
 ]
 
+[project.optional-dependencies]
+ffmpeg-support = [
+    "ffmpeg-python>=0.2"
+]
+
 [dependency-groups]
 test = [
     "pytest>=8.3",

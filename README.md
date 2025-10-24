@@ -37,6 +37,7 @@ Recozik is currently in a public alpha phase. Interfaces and outputs may change 
   - Linux: install the `chromaprint`/`libchromaprint-tools` package from your distribution.
   - Windows: download the Chromaprint zip, extract it, and add the folder with `fpcalc.exe` to `PATH`.
 - Optional build tooling (`msgfmt`) if you modify translations.
+- Optional FFmpeg CLI + `pip install recozik[ffmpeg-support]` to let the AudD fallback and `recozik inspect` decode formats unsupported by libsndfile (for example large WMA files).
 
 ## Installation
 
@@ -83,6 +84,7 @@ Recozik can also call the [AudD Music Recognition API](https://audd.io) when Aco
 1. Create an AudD account and generate an API token. Each user of Recozik needs to supply **their own** token and remains responsible for AudD’s usage limits and terms (the public “API Test License Agreement” only covers 90 days of evaluation).
 2. Store the token with `uv run recozik config set-audd-token` (remove it later with `uv run recozik config set-audd-token --clear`), export it via the `AUDD_API_TOKEN` environment variable, or pass it per command with `--audd-token`.
 3. When AudD recognises a track, Recozik prints `Powered by AudD Music (fallback)` in the console (and in JSON mode via `stderr`) so the required attribution is always visible. The JSON payloads also expose a `source` field (`acoustid` or `audd`) to help you trace the origin of each suggestion.
+4. For formats that libsndfile cannot decode (e.g. WMA > 10 MB), install `ffmpeg` and the optional extra `pip install recozik[ffmpeg-support]`. Recozik will retry the snippet extraction through FFmpeg before giving up on AudD.
 
 On a per-run basis you can disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Remember that the two commands read separate configuration sections: `identify` pulls defaults from `[identify]`, while `identify-batch` only honours values defined under `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`).
 

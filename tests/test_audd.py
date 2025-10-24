@@ -97,3 +97,58 @@ def test_recognize_with_audd_redacts_token_in_errors(
     message = str(excinfo.value)
     assert token not in message
     assert "***redacted***" in message
+
+
+def test_render_snippet_falls_back_to_ffmpeg(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Use the FFmpeg path when libsndfile/librosa cannot decode the source."""
+    audio_path = tmp_path / "track.wma"
+    audio_path.write_bytes(b"dummy")
+    destination = tmp_path / "snippet.wav"
+
+    def fail_soundfile(*_args, **_kwargs) -> None:
+        raise RuntimeError("unsupported format")
+
+    fallback_called: dict[str, bool] = {"value": False}
+
+    def fake_ffmpeg(*_args, **_kwargs) -> None:
+        fallback_called["value"] = True
+        destination.write_bytes(b"RIFFdata")
+
+    monkeypatch.setattr(audd, "_ffmpeg_support_ready", lambda: True)
+    monkeypatch.setattr(audd, "_should_prefer_ffmpeg", lambda _path: True)
+    monkeypatch.setattr(audd, "_render_snippet_with_soundfile", fail_soundfile)
+    monkeypatch.setattr(audd, "_render_snippet_with_ffmpeg", fake_ffmpeg)
+
+    audd._render_snippet(audio_path, destination)
+
+    assert fallback_called["value"] is True
+    assert destination.exists()
+
+
+def test_render_snippet_reports_ffmpeg_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Aggregate failures from both decoding strategies in the final error message."""
+    audio_path = tmp_path / "clip.wma"
+    audio_path.write_bytes(b"data")
+    destination = tmp_path / "snippet.wav"
+
+    def fail_soundfile(*_args, **_kwargs) -> None:
+        raise RuntimeError("libsndfile does not support this format")
+
+    def fail_ffmpeg(*_args, **_kwargs) -> None:
+        raise audd.AudDLookupError("ffmpeg pipeline unavailable")
+
+    monkeypatch.setattr(audd, "_ffmpeg_support_ready", lambda: True)
+    monkeypatch.setattr(audd, "_should_prefer_ffmpeg", lambda _path: False)
+    monkeypatch.setattr(audd, "_render_snippet_with_soundfile", fail_soundfile)
+    monkeypatch.setattr(audd, "_render_snippet_with_ffmpeg", fail_ffmpeg)
+
+    with pytest.raises(audd.AudDLookupError) as excinfo:
+        audd._render_snippet(audio_path, destination)
+
+    message = str(excinfo.value)
+    assert "libsndfile" in message
+    assert "ffmpeg pipeline unavailable" in message
