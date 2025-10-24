@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -227,7 +228,12 @@ def _prepare_audd_payload(audio_path: Path) -> Iterator[Path]:
         yield audio_path
         return
 
-    snippet_path = Path(tempfile.mkstemp(prefix="recozik-audd-", suffix=_AUDD_SNIPPET_SUFFIX)[1])
+    fd, raw_path = tempfile.mkstemp(prefix="recozik-audd-", suffix=_AUDD_SNIPPET_SUFFIX)
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+    snippet_path = Path(raw_path)
     try:
         _render_snippet(audio_path, snippet_path)
         size = snippet_path.stat().st_size
