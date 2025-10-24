@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import requests
 import soundfile
 
 from recozik import audd
@@ -71,3 +72,28 @@ def test_recognize_with_audd_uses_snippet_when_large(
     assert captured["name"] == audio_path.name
     assert matches[0].artist == "Snippet Artist"
     assert matches[0].title == "Snippet Track"
+
+
+def test_recognize_with_audd_redacts_token_in_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Ensure failure messages replace the AudD token with a placeholder."""
+    audio_path = tmp_path / "tone.wav"
+    duration = 0.1
+    sample_rate = 8000
+    tone = np.zeros(int(sample_rate * duration), dtype="float32")
+    soundfile.write(audio_path, tone, sample_rate)
+
+    def fake_post(url, data, files, timeout):
+        raise requests.RequestException(f"error sending {data}")
+
+    monkeypatch.setattr(audd.requests, "post", fake_post)
+
+    token = "super-secret-token"  # noqa: S105 - test fixture value
+    with pytest.raises(audd.AudDLookupError) as excinfo:
+        audd.recognize_with_audd(token, audio_path)
+
+    message = str(excinfo.value)
+    assert token not in message
+    assert "***redacted***" in message

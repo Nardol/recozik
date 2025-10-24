@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -23,6 +24,24 @@ MAX_AUDD_BYTES = 10 * 1024 * 1024
 SNIPPET_DURATION_SECONDS = 45.0
 _AUDD_TARGET_SAMPLE_RATE = 16_000
 _AUDD_SNIPPET_SUFFIX = ".wav"
+_TOKEN_PATTERN = re.compile(r"(?i)(['\"]?api_token['\"]?\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^&\s]+)")
+_REDACTED_VALUE = "***redacted***"
+
+
+def _redact_audd_token(text: str | Any) -> str:
+    """Mask occurrences of the AudD token in diagnostic messages."""
+    if text is None:
+        return ""
+    message = str(text)
+
+    def _replacement(match: re.Match[str]) -> str:
+        prefix = match.group(1)
+        value = match.group(2)
+        if len(value) >= 2 and value[0] in {"'", '"'} and value[-1] == value[0]:
+            return f"{prefix}{value[0]}{_REDACTED_VALUE}{value[-1]}"
+        return f"{prefix}{_REDACTED_VALUE}"
+
+    return _TOKEN_PATTERN.sub(_replacement, message)
 
 
 class AudDLookupError(RuntimeError):
@@ -100,9 +119,10 @@ def recognize_with_audd(
     except AudDLookupError:
         raise
     except Exception as exc:  # pragma: no cover - defensive
-        raise AudDLookupError(
+        message = _redact_audd_token(
             _("Unable to prepare audio for AudD: {error}").format(error=exc)
-        ) from exc
+        )
+        raise AudDLookupError(message) from exc
 
     with payload_manager as payload_path:
         try:
@@ -115,7 +135,8 @@ def recognize_with_audd(
                 }
                 response = requests.post(endpoint, data=data, files=files, timeout=timeout)
         except requests.RequestException as exc:  # pragma: no cover - network failures
-            raise AudDLookupError(_("AudD request failed: {error}").format(error=exc)) from exc
+            message = _redact_audd_token(_("AudD request failed: {error}").format(error=exc))
+            raise AudDLookupError(message) from exc
 
     if response.status_code != 200:
         raise AudDLookupError(
@@ -181,12 +202,12 @@ def _extract_error_message(payload: dict[str, Any]) -> str:
     if isinstance(error, dict):
         message = error.get("error_message") or error.get("message")
         if message:
-            return str(message)
+            return _redact_audd_token(message)
     if isinstance(error, str):
-        return error
+        return _redact_audd_token(error)
     result = payload.get("result")
     if isinstance(result, str):
-        return result
+        return _redact_audd_token(result)
     return _("AudD reported an error without details.")
 
 
@@ -218,7 +239,8 @@ def needs_audd_snippet(audio_path: Path) -> bool:
     try:
         return audio_path.stat().st_size > MAX_AUDD_BYTES
     except OSError as exc:  # pragma: no cover - filesystem failures
-        raise AudDLookupError(_("Unable to access audio file: {error}").format(error=exc)) from exc
+        message = _redact_audd_token(_("Unable to access audio file: {error}").format(error=exc))
+        raise AudDLookupError(message) from exc
 
 
 @contextmanager
@@ -260,9 +282,10 @@ def _render_snippet(
     try:
         import librosa
     except Exception as exc:  # pragma: no cover - dependency missing
-        raise AudDLookupError(
+        message = _redact_audd_token(
             _("AudD snippet generation requires librosa: {error}").format(error=exc)
-        ) from exc
+        )
+        raise AudDLookupError(message) from exc
 
     try:
         with soundfile.SoundFile(audio_path, "r") as source:
@@ -277,9 +300,10 @@ def _render_snippet(
             source.seek(0)
             buffer = source.read(duration_frames, dtype="float32", always_2d=True)
     except RuntimeError as exc:
-        raise AudDLookupError(
+        message = _redact_audd_token(
             _("Failed to read audio for AudD snippet: {error}").format(error=exc)
-        ) from exc
+        )
+        raise AudDLookupError(message) from exc
 
     if buffer.size == 0:
         raise AudDLookupError(_("Failed to read audio for AudD snippet."))
