@@ -103,6 +103,8 @@ Traitement d'un dossier complet :
 uv run recozik identify-batch musique/ --recursive --log-format jsonl --log-file logs/recozik.jsonl
 ```
 
+Par défaut, la commande parcourt les fichiers avec les extensions `.mp3`, `.flac`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.opus` et `.wma`. Ajoutez des options `--ext` pour remplacer cette sélection.
+
 Options utiles : `--pattern`, `--ext`, `--best-only`, `--refresh`, `--template "{artist} - {title}"`.
 
 Renommage à partir d'un log JSONL :

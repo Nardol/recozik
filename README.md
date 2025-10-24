@@ -116,6 +116,8 @@ Batch-identify a folder and write results to JSONL:
 uv run recozik identify-batch music/ --recursive --log-format jsonl --log-file logs/recozik.jsonl
 ```
 
+By default the batch command scans files with `.mp3`, `.flac`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.opus`, and `.wma` extensions. Add `--ext` flags to override the selection.
+
 Useful options: `--pattern`, `--ext`, `--best-only`, `--refresh`, `--template "{artist} - {title}"`.
 
 Rename files using a previous batch log (dry-run by default):
