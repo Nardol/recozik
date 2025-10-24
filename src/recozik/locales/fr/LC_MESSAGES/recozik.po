@@ -120,6 +120,15 @@ msgstr "Lecture audio impossible pour l'extrait AudD : {error}"
 msgid "Failed to read audio for AudD snippet."
 msgstr "Lecture audio impossible pour l'extrait AudD."
 
+msgid "FFmpeg executable not found. Install ffmpeg to enable AudD fallback."
+msgstr "Exécutable FFmpeg introuvable. Installez ffmpeg pour activer le fallback AudD."
+
+msgid "FFmpeg Python bindings are missing. Install recozik[ffmpeg-support]: {error}"
+msgstr "Les bindings Python FFmpeg sont absents. Installez recozik[ffmpeg-support] : {error}"
+
+msgid "FFmpeg failed to render AudD snippet: {error}"
+msgstr "FFmpeg n'a pas pu générer l'extrait AudD : {error}"
+
 msgid "Audio file is empty."
 msgstr "Le fichier audio est vide."
 

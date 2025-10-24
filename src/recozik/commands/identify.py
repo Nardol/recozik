@@ -17,7 +17,16 @@ from ..cli_support.paths import resolve_path
 from ..cli_support.prompts import prompt_api_key, prompt_yes_no
 from ..i18n import _
 
-DEFAULT_AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".opus"}
+DEFAULT_AUDIO_EXTENSIONS = {
+    ".mp3",
+    ".flac",
+    ".wav",
+    ".ogg",
+    ".m4a",
+    ".aac",
+    ".opus",
+    ".wma",
+}
 _VALIDATION_TRACK_ID = "9ff43b6a-4f16-427c-93c2-92307ca505e0"
 _VALIDATION_ENDPOINT = "https://api.acoustid.org/v2/lookup"
 
