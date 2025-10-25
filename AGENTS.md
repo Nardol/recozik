@@ -31,6 +31,7 @@
 - Sanitize filenames using `_sanitize_filename`; reuse helpers instead of ad-hoc logic.
 - Route every user-facing string through `recozik.i18n._` using an English msgid. Update the relevant `.po` file under `src/recozik/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.
 - Honor locale precedence in this order: CLI option `--locale` > environment variable `RECOZIK_LOCALE` > config `[general].locale` > system locale.
+- Favor readability-first helpers. Prefer `cli_support.options.resolve_option` for CLI/config reconciliation, `cli_support.audd_helpers.get_audd_support` for AudD fallbacks, and other shared utilities so new code stays maintainable and avoids redundant, slow logic.
 
 ## Testing Guidelines
 
@@ -54,3 +55,4 @@
 - Request the user's approval before running any `uv …` command and rerun with `with_escalated_permissions: true` once granted (it unlocks workspace access, not sudo).
 - See `TRANSLATION.md` for the translation workflow (extraction, `.mo` compilation, multi-locale testing).
 - When adding new commands, create a dedicated module under `src/recozik/commands/`, surface any required backward-compatible aliases via `cli.py`, and extend `AGENTS.md`/README as needed.
+- Always sanity-check execution costs: keep lazy imports intact, avoid unnecessary `Path.resolve()` churn in hot paths, and document any trade-offs if a feature must slow things down.

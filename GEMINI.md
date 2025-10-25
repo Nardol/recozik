@@ -1,6 +1,6 @@
 # Gemini Code Assistant Context
 
-This document provides context for the Gemini Code Assistant to understand the `recozik` project.
+This document summarizes the repository context for code assistants working on `recozik`.
 
 ## Project Overview
 
@@ -83,3 +83,9 @@ The project uses `uv` to manage dependencies and virtual environments.
       ```
 
 - **Configuration:** Application configuration (e.g., API keys) is stored in `config.toml` in a platform-specific user config directory. The `recozik config` subcommand group provides an interface for managing these settings.
+
+## Expectations for Gemini Contributions
+
+- Keep additions easy to read and maintain. Lean on existing helpers—most CLI/config reconciliation now lives in `src/recozik/cli_support/options.py:resolve_option`, and AudD fallbacks should go through `cli_support/audd_helpers.py:get_audd_support`.
+- Preserve fast startup and execution paths. Avoid redundant filesystem resolution or eager imports; prefer lazy loading patterns already in the codebase.
+- When you introduce new logic, call out performance implications in the PR description and add targeted tests if the change alters behaviour or timing.

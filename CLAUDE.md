@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for working with code in this repository when using the Claude coding environment.
 
 ## Project Overview
 
@@ -131,6 +131,12 @@ The codebase is structured for **fast import times** and **maintainability**:
 - Use `cli_runner` fixture from `conftest.py` for Typer CLI testing
 - Use `rename_env` fixture for rename command tests (provides helper methods)
 - Mock external services (AcoustID, AudD) in tests to avoid network calls
+
+## Claude Coding Checklist
+
+- **Clarity first.** New code should be easy to scan. Reuse shared helpers such as `cli_support.options.resolve_option` and `cli_support.audd_helpers.get_audd_support` instead of duplicating parameter or AudD logic.
+- **Think about runtime.** Maintain lazy import patterns and avoid heavy `Path.resolve()` loops in hot paths. If a feature introduces measurable overhead, justify it and add coverage.
+- **Leave the trail tidy.** Update docs/tests alongside behaviour changes, and explain notable trade-offs in the PR summary so humans can follow your reasoning.
 
 ## Configuration Management
 
