@@ -8,10 +8,8 @@ from typer.testing import CliRunner
 
 from recozik import cli
 
-runner = CliRunner()
 
-
-def test_completion_install(monkeypatch, tmp_path: Path) -> None:
+def test_completion_install(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Install the completion script for an explicit shell."""
     script_path = tmp_path / "recozik-completion.sh"
 
@@ -22,7 +20,7 @@ def test_completion_install(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "install_completion", fake_install)
 
-    result = runner.invoke(cli.app, ["completion", "install", "--shell", "bash"])
+    result = cli_runner.invoke(cli.app, ["completion", "install", "--shell", "bash"])
 
     assert result.exit_code == 0
     assert "Completion installed for bash." in result.stdout
@@ -30,7 +28,7 @@ def test_completion_install(monkeypatch, tmp_path: Path) -> None:
     assert "Command to add" in result.stdout
 
 
-def test_completion_show(monkeypatch) -> None:
+def test_completion_show(monkeypatch, cli_runner: CliRunner) -> None:
     """Show the generated completion script for the detected shell."""
 
     def fake_detect_shell(shell_option):
@@ -45,13 +43,13 @@ def test_completion_show(monkeypatch) -> None:
     monkeypatch.setattr(cli, "_detect_shell", lambda shell: "zsh")
     monkeypatch.setattr(cli, "generate_completion_script", fake_script)
 
-    result = runner.invoke(cli.app, ["completion", "show"])
+    result = cli_runner.invoke(cli.app, ["completion", "show"])
 
     assert result.exit_code == 0
     assert "#comp" in result.stdout
 
 
-def test_completion_uninstall(monkeypatch, tmp_path: Path) -> None:
+def test_completion_uninstall(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Remove the existing completion script for the detected shell."""
     target_script = tmp_path / "script"
     target_script.write_text("echo")
@@ -59,14 +57,16 @@ def test_completion_uninstall(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(cli, "_detect_shell", lambda shell: "bash")
     monkeypatch.setattr(cli, "_completion_script_path", lambda shell: target_script)
 
-    result = runner.invoke(cli.app, ["completion", "uninstall"])
+    result = cli_runner.invoke(cli.app, ["completion", "uninstall"])
 
     assert result.exit_code == 0
     assert "Completion script removed" in result.stdout
     assert not target_script.exists()
 
 
-def test_completion_install_print_command(monkeypatch, tmp_path: Path) -> None:
+def test_completion_install_print_command(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Print the sourcing command instead of writing the script to disk."""
     script_path = tmp_path / "recozik.sh"
 
@@ -76,7 +76,7 @@ def test_completion_install_print_command(monkeypatch, tmp_path: Path) -> None:
         lambda shell=None, prog_name=None: ("bash", script_path),
     )
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         ["completion", "install", "--shell", "bash", "--print-command"],
     )
@@ -85,7 +85,7 @@ def test_completion_install_print_command(monkeypatch, tmp_path: Path) -> None:
     assert result.stdout.strip() == f"source {script_path}"
 
 
-def test_completion_install_no_write(monkeypatch) -> None:
+def test_completion_install_no_write(monkeypatch, cli_runner: CliRunner) -> None:
     """Return the generated script when --no-write is used."""
     monkeypatch.setattr(
         cli,
@@ -94,7 +94,7 @@ def test_completion_install_no_write(monkeypatch) -> None:
     )
     monkeypatch.setattr(cli, "generate_completion_script", lambda **kwargs: "# script")
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         ["completion", "install", "--shell", "bash", "--no-write"],
     )
@@ -103,7 +103,7 @@ def test_completion_install_no_write(monkeypatch) -> None:
     assert result.stdout.strip() == "# script"
 
 
-def test_completion_install_shell_auto(monkeypatch, tmp_path: Path) -> None:
+def test_completion_install_shell_auto(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Detect the shell automatically when "auto" is provided."""
     script_path = tmp_path / "recozik.zsh"
 
@@ -115,7 +115,7 @@ def test_completion_install_shell_auto(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "install_completion", fake_install)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         ["completion", "install", "--shell", "auto"],
     )
@@ -124,7 +124,7 @@ def test_completion_install_shell_auto(monkeypatch, tmp_path: Path) -> None:
     assert captured["shell"] is None
 
 
-def test_completion_install_output(monkeypatch, tmp_path: Path) -> None:
+def test_completion_install_output(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Write the generated script to a custom location."""
     target = tmp_path / "custom" / "script.sh"
 
@@ -139,7 +139,7 @@ def test_completion_install_output(monkeypatch, tmp_path: Path) -> None:
         lambda **kwargs: "# out",
     )
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "completion",
@@ -156,9 +156,9 @@ def test_completion_install_output(monkeypatch, tmp_path: Path) -> None:
     assert "Completion script written" in result.stdout
 
 
-def test_completion_install_conflicting_flags(tmp_path: Path) -> None:
+def test_completion_install_conflicting_flags(tmp_path: Path, cli_runner: CliRunner) -> None:
     """Refuse to combine --no-write and --print-command flags."""
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "completion",

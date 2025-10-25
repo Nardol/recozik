@@ -109,7 +109,8 @@ def test_rename_requires_template_fields_when_requested(
         build_rename_command(
             log_path,
             root,
-            extra_args=["--require-template-fields", "--apply"],
+            apply=True,
+            extra_args=["--require-template-fields"],
         ),
     )
 

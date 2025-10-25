@@ -50,13 +50,13 @@ def test_rename_from_log_interactive_interrupt_cancel(
 
     result = invoke_rename(
         cli_runner,
-        [
-            *build_rename_command(log_path, root),
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            interactive=True,
+            apply=True,
+            log_cleanup="never",
+        ),
     )
 
     assert result.exit_code == 1
@@ -110,13 +110,13 @@ def test_rename_from_log_interactive_interrupt_apply(
 
     result = invoke_rename(
         cli_runner,
-        [
-            *build_rename_command(log_path, root),
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            interactive=True,
+            apply=True,
+            log_cleanup="never",
+        ),
     )
 
     assert result.exit_code == 0
@@ -162,13 +162,13 @@ def test_rename_from_log_interactive_interrupt_resume(
 
     result = invoke_rename(
         cli_runner,
-        [
-            *build_rename_command(log_path, root),
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            interactive=True,
+            apply=True,
+            log_cleanup="never",
+        ),
     )
 
     assert result.exit_code == 0
@@ -271,13 +271,13 @@ def test_rename_from_log_rename_interrupt_behaviour(
 
     result = invoke_rename(
         cli_runner,
-        [
-            *build_rename_command(log_path, root),
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            interactive=True,
+            apply=True,
+            log_cleanup="never",
+        ),
     )
 
     monkeypatch.setattr(cli.typer, "prompt", original_prompt)

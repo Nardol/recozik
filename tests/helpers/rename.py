@@ -113,6 +113,9 @@ def build_rename_command(
     root: Path,
     *,
     template: str = "{artist} - {title}",
+    apply: bool = False,
+    interactive: bool = False,
+    log_cleanup: str | None = None,
     extra_args: Sequence[object] | None = None,
 ) -> list[object]:
     """Return a base rename-from-log CLI command for convenience."""
@@ -124,6 +127,12 @@ def build_rename_command(
         "--template",
         template,
     ]
+    if interactive:
+        command.append("--interactive")
+    if apply:
+        command.append("--apply")
+    if log_cleanup is not None:
+        command.extend(["--log-cleanup", log_cleanup])
     if extra_args:
         command.extend(extra_args)
     return command

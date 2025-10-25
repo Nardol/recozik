@@ -57,13 +57,14 @@ def test_rename_from_log_metadata_fallback_modes(
         ],
     )
 
-    command = [
-        *build_rename_command(log_path, root, template="{artist} - {title}"),
-        "--apply",
-        "--log-cleanup",
-        "never",
-        *extra_args,
-    ]
+    command = build_rename_command(
+        log_path,
+        root,
+        template="{artist} - {title}",
+        apply=True,
+        log_cleanup="never",
+        extra_args=extra_args,
+    )
 
     result = invoke_rename(cli_runner, command, input=input_text)
 
@@ -119,13 +120,14 @@ def test_rename_from_log_confirm_prompt(
 
     result = invoke_rename(
         cli_runner,
-        [
-            *build_rename_command(log_path, root, template="{artist} - {title}"),
-            "--confirm",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            template="{artist} - {title}",
+            apply=True,
+            log_cleanup="never",
+            extra_args=["--confirm"],
+        ),
         input=input_text,
     )
 

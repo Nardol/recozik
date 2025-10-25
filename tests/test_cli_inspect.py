@@ -10,8 +10,6 @@ from typer.testing import CliRunner
 from recozik import cli
 from recozik.commands import inspect as inspect_cmd
 
-runner = CliRunner()
-
 
 class _FakeInfo:
     format = "WAV"
@@ -29,7 +27,7 @@ class _FakeSoundFileModule:
         return _FakeInfo()
 
 
-def test_inspect_displays_metadata(monkeypatch, tmp_path: Path) -> None:
+def test_inspect_displays_metadata(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Print tags extracted from embedded metadata when available."""
     audio_path = tmp_path / "sample.wav"
     audio_path.write_bytes(b"data")
@@ -41,7 +39,7 @@ def test_inspect_displays_metadata(monkeypatch, tmp_path: Path) -> None:
         lambda _path: {"artist": "Tagged Artist", "title": "Tagged Title", "album": "Tagged Album"},
     )
 
-    result = runner.invoke(cli.app, ["inspect", str(audio_path)])
+    result = cli_runner.invoke(cli.app, ["inspect", str(audio_path)])
 
     assert result.exit_code == 0
     assert "Artist: Tagged Artist" in result.stdout
@@ -49,7 +47,7 @@ def test_inspect_displays_metadata(monkeypatch, tmp_path: Path) -> None:
     assert "Album: Tagged Album" in result.stdout
 
 
-def test_inspect_uses_ffmpeg_fallback(monkeypatch, tmp_path: Path) -> None:
+def test_inspect_uses_ffmpeg_fallback(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Probe file metadata with ffprobe when soundfile cannot open the file."""
     audio_path = tmp_path / "sample.wma"
     audio_path.write_bytes(b"data")
@@ -76,7 +74,7 @@ def test_inspect_uses_ffmpeg_fallback(monkeypatch, tmp_path: Path) -> None:
         lambda _path: {},
     )
 
-    result = runner.invoke(cli.app, ["inspect", str(audio_path)])
+    result = cli_runner.invoke(cli.app, ["inspect", str(audio_path)])
 
     assert result.exit_code == 0
     assert "Format: WMA" in result.stdout
