@@ -7,12 +7,13 @@ from datetime import timedelta
 from pathlib import Path
 
 import typer
-from click.core import ParameterSource
 
+from ..cli_support.audd_helpers import get_audd_support
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import write_log_entry
 from ..cli_support.metadata import extract_audio_metadata
+from ..cli_support.options import resolve_option
 from ..cli_support.paths import (
     discover_audio_files,
     normalize_extensions,
@@ -156,28 +157,33 @@ def identify_batch(
 
     apply_locale(ctx, config=config)
 
-    limit_source = ctx.get_parameter_source("limit")
-    limit_value = (
-        config.identify_batch_limit if limit_source is ParameterSource.DEFAULT else max(limit, 1)
+    limit_value = resolve_option(
+        ctx,
+        "limit",
+        limit,
+        config.identify_batch_limit,
+        transform=lambda value: max(value, 1),
     )
 
-    best_only_source = ctx.get_parameter_source("best_only")
-    best_only_value = (
-        config.identify_batch_best_only
-        if best_only_source is ParameterSource.DEFAULT
-        else best_only
+    best_only_value = resolve_option(
+        ctx,
+        "best_only",
+        best_only,
+        config.identify_batch_best_only,
     )
 
-    recursive_source = ctx.get_parameter_source("recursive")
-    recursive_value = (
-        config.identify_batch_recursive
-        if recursive_source is ParameterSource.DEFAULT
-        else recursive
+    recursive_value = resolve_option(
+        ctx,
+        "recursive",
+        recursive,
+        config.identify_batch_recursive,
     )
 
-    log_file_source = ctx.get_parameter_source("log_file")
-    log_file_choice = (
-        config.identify_batch_log_file if log_file_source is ParameterSource.DEFAULT else log_file
+    log_file_choice = resolve_option(
+        ctx,
+        "log_file",
+        log_file,
+        config.identify_batch_log_file,
     )
     if isinstance(log_file_choice, Path):
         log_file_option: Path | None = log_file_choice
@@ -212,30 +218,17 @@ def identify_batch(
     )
     audd_available = bool(fallback_audd_token) and audd_enabled_setting
     audd_lookup_fn = None
-    audd_lookup_exception = None
+    audd_error_cls = None
     audd_limit_mb = None
     audd_snippet_seconds = None
+    audd_needs_snippet = None
     if audd_available:
-        from ..audd import (
-            MAX_AUDD_BYTES as _AUDD_LIMIT_BYTES,
-        )
-        from ..audd import (
-            SNIPPET_DURATION_SECONDS as _AUDD_SNIPPET_SECONDS,
-        )
-        from ..audd import (
-            AudDLookupError as _AudDLookupError,
-        )
-        from ..audd import (
-            needs_audd_snippet as _needs_audd_snippet,
-        )
-        from ..audd import (
-            recognize_with_audd as _recognize_with_audd,
-        )
-
-        audd_lookup_fn = _recognize_with_audd
-        audd_lookup_exception = _AudDLookupError
-        audd_limit_mb = int(_AUDD_LIMIT_BYTES / (1024 * 1024))
-        audd_snippet_seconds = int(_AUDD_SNIPPET_SECONDS)
+        audd_support = get_audd_support()
+        audd_lookup_fn = audd_support.recognize
+        audd_error_cls = audd_support.error_cls
+        audd_needs_snippet = audd_support.needs_snippet
+        audd_limit_mb = int(audd_support.max_bytes / (1024 * 1024))
+        audd_snippet_seconds = int(audd_support.snippet_seconds)
 
     template_value = resolve_template(template, config)
     log_format_value = (log_format or config.log_format).lower()
@@ -328,10 +321,14 @@ def identify_batch(
             audd_error_message: str | None = None
             audd_attempted = False
 
-            if audd_lookup_fn and audd_prefer_setting and not matches:
+            if audd_lookup_fn and audd_error_cls and audd_prefer_setting and not matches:
                 audd_attempted = True
                 try:
-                    if audd_snippet_seconds is not None and _needs_audd_snippet(file_path):
+                    if (
+                        audd_snippet_seconds is not None
+                        and audd_needs_snippet
+                        and audd_needs_snippet(file_path)
+                    ):
                         typer.echo(
                             _(
                                 "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz); "
@@ -343,7 +340,7 @@ def identify_batch(
                             )
                         )
                     audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
-                except audd_lookup_exception as exc:  # type: ignore[misc]
+                except audd_error_cls as exc:
                     audd_error_message = str(exc)
                     message_template = _(
                         "AudD lookup failed for {path}: {error}. Falling back to AcoustID."
@@ -392,9 +389,19 @@ def identify_batch(
                 if matches and match_source is None:
                     match_source = "acoustid"
 
-            if audd_lookup_fn and audd_available and not matches and not audd_attempted:
+            if (
+                audd_lookup_fn
+                and audd_error_cls
+                and audd_available
+                and not matches
+                and not audd_attempted
+            ):
                 try:
-                    if audd_snippet_seconds is not None and _needs_audd_snippet(file_path):
+                    if (
+                        audd_snippet_seconds is not None
+                        and audd_needs_snippet
+                        and audd_needs_snippet(file_path)
+                    ):
                         typer.echo(
                             _(
                                 "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz); "
@@ -406,7 +413,7 @@ def identify_batch(
                             )
                         )
                     audd_candidates = audd_lookup_fn(fallback_audd_token, file_path)
-                except audd_lookup_exception as exc:  # type: ignore[misc]
+                except audd_error_cls as exc:
                     audd_error_message = str(exc)
                     typer.echo(
                         _("AudD lookup failed for {path}: {error}").format(

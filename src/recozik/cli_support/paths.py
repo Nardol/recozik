@@ -37,32 +37,38 @@ def discover_audio_files(
     seen: set[Path] = set()
 
     def should_keep(path: Path) -> bool:
-        if not path.is_file():
+        try:
+            if not path.is_file():
+                return False
+        except OSError:
             return False
-        if not extensions:
-            return True
-        return path.suffix.lower() in extensions
+        if extensions and path.suffix.lower() not in extensions:
+            return False
+        return True
 
     iterator_patterns = list(patterns)
-    if iterator_patterns:
-        for pattern in iterator_patterns:
-            globber = base_dir.rglob(pattern) if recursive else base_dir.glob(pattern)
-            for item in globber:
-                resolved = item.resolve()
-                if resolved in seen:
-                    continue
-                if should_keep(resolved):
-                    seen.add(resolved)
-                    yield resolved
-    else:
-        globber = base_dir.rglob("*") if recursive else base_dir.glob("*")
-        for item in globber:
-            resolved = item.resolve()
-            if resolved in seen:
-                continue
-            if should_keep(resolved):
-                seen.add(resolved)
-                yield resolved
+
+    def iterate() -> Iterable[Path]:
+        if iterator_patterns:
+            for pattern in iterator_patterns:
+                if recursive:
+                    yield from base_dir.rglob(pattern)
+                else:
+                    yield from base_dir.glob(pattern)
+        else:
+            if recursive:
+                yield from base_dir.rglob("*")
+            else:
+                yield from base_dir.glob("*")
+
+    for candidate in iterate():
+        if not should_keep(candidate):
+            continue
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        yield resolved
 
 
 def sanitize_filename(name: str) -> str:

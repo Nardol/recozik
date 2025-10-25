@@ -8,11 +8,12 @@ from datetime import timedelta
 from pathlib import Path
 
 import typer
-from click.core import ParameterSource
 
+from ..cli_support.audd_helpers import get_audd_support
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import format_match_template
+from ..cli_support.options import resolve_option
 from ..cli_support.paths import resolve_path
 from ..cli_support.prompts import prompt_api_key, prompt_yes_no
 from ..i18n import _
@@ -122,19 +123,26 @@ def identify(
     audd_prefer_setting = prefer_audd if prefer_audd is not None else config.identify_audd_prefer
     audd_available = bool(fallback_audd_token) and audd_enabled_setting
 
-    limit_source = ctx.get_parameter_source("limit")
-    limit_value = (
-        config.identify_default_limit if limit_source is ParameterSource.DEFAULT else max(limit, 1)
+    limit_value = resolve_option(
+        ctx,
+        "limit",
+        limit,
+        config.identify_default_limit,
+        transform=lambda value: max(value, 1),
     )
 
-    json_source = ctx.get_parameter_source("json_output")
-    json_value = (
-        config.identify_output_json if json_source is ParameterSource.DEFAULT else json_output
+    json_value = resolve_option(
+        ctx,
+        "json_output",
+        json_output,
+        config.identify_output_json,
     )
 
-    refresh_source = ctx.get_parameter_source("refresh")
-    refresh_value = (
-        config.identify_refresh_cache if refresh_source is ParameterSource.DEFAULT else refresh
+    refresh_value = resolve_option(
+        ctx,
+        "refresh",
+        refresh,
+        config.identify_refresh_cache,
     )
 
     key = (api_key or config.acoustid_api_key or "").strip()
@@ -182,31 +190,17 @@ def identify(
     def run_audd(will_retry_acoustid: bool) -> list:
         nonlocal audd_attempted
         audd_attempted = True
-        from ..audd import (
-            MAX_AUDD_BYTES as _AUDD_LIMIT_BYTES,
-        )
-        from ..audd import (
-            SNIPPET_DURATION_SECONDS as _AUDD_SNIPPET_SECONDS,
-        )
-        from ..audd import (
-            AudDLookupError as _AudDLookupError,  # Local import for startup time
-        )
-        from ..audd import (
-            needs_audd_snippet as _needs_audd_snippet,
-        )
-        from ..audd import (
-            recognize_with_audd as _recognize_with_audd,
-        )
-
+        support = get_audd_support()
+        error_cls = support.error_cls
         try:
-            requires_snippet = _needs_audd_snippet(resolved_audio)
-        except _AudDLookupError as exc:
+            requires_snippet = support.needs_snippet(resolved_audio)
+        except error_cls as exc:
             typer.echo(_("AudD lookup failed: {error}.").format(error=exc))
             return []
 
         if requires_snippet:
-            limit_mb = int(_AUDD_LIMIT_BYTES / (1024 * 1024))
-            snippet_seconds = int(_AUDD_SNIPPET_SECONDS)
+            limit_mb = int(support.max_bytes / (1024 * 1024))
+            snippet_seconds = int(support.snippet_seconds)
             typer.echo(
                 _(
                     "Preparing AudD snippet (~{seconds}s, mono 16 kHz) "
@@ -215,8 +209,8 @@ def identify(
             )
 
         try:
-            return _recognize_with_audd(fallback_audd_token, resolved_audio)
-        except _AudDLookupError as exc:
+            return support.recognize(fallback_audd_token, resolved_audio)
+        except error_cls as exc:
             message = _("AudD lookup failed: {error}.").format(error=exc)
             if will_retry_acoustid:
                 message = _("AudD lookup failed: {error}. Falling back to AcoustID.").format(

@@ -8,7 +8,6 @@ from pathlib import Path
 
 import click
 import typer
-from click.core import ParameterSource
 
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
@@ -19,6 +18,7 @@ from ..cli_support.logs import (
     render_log_template,
 )
 from ..cli_support.metadata import build_metadata_match, coerce_metadata_dict
+from ..cli_support.options import resolve_option
 from ..cli_support.paths import (
     compute_backup_path,
     resolve_conflict_path,
@@ -194,11 +194,11 @@ def rename_from_log(
         field for field in template_fields_used if field in _TEMPLATE_FIELDS_SUPPORTED
     }
 
-    conflict_source = ctx.get_parameter_source("on_conflict")
-    conflict_choice = (
-        config.rename_conflict_strategy
-        if conflict_source is ParameterSource.DEFAULT
-        else on_conflict
+    conflict_choice = resolve_option(
+        ctx,
+        "on_conflict",
+        on_conflict,
+        config.rename_conflict_strategy,
     )
 
     conflict_strategy = conflict_choice.lower()
@@ -214,29 +214,35 @@ def rename_from_log(
     interactive = config.rename_default_interactive if interactive is None else interactive
     confirm = config.rename_default_confirm_each if confirm is None else confirm
 
-    metadata_confirm_source = ctx.get_parameter_source("metadata_fallback_confirm")
-    metadata_fallback_confirm = (
-        config.rename_metadata_confirm
-        if metadata_confirm_source is ParameterSource.DEFAULT
-        else metadata_fallback_confirm
+    metadata_fallback_confirm = resolve_option(
+        ctx,
+        "metadata_fallback_confirm",
+        metadata_fallback_confirm,
+        config.rename_metadata_confirm,
     )
 
-    deduplicate_source = ctx.get_parameter_source("deduplicate_template")
-    deduplicate_template_enabled = (
-        config.rename_deduplicate_template
-        if deduplicate_source is ParameterSource.DEFAULT
-        else bool(deduplicate_template)
+    deduplicate_template_enabled = resolve_option(
+        ctx,
+        "deduplicate_template",
+        deduplicate_template,
+        config.rename_deduplicate_template,
+        transform=lambda value: bool(value),
     )
 
     valid_cleanup_modes = {"ask", "always", "never"}
-    cleanup_choice = None
-    if log_cleanup is not None:
-        cleanup_choice = log_cleanup.lower()
-        if cleanup_choice not in valid_cleanup_modes:
-            typer.echo(_("Invalid --log-cleanup value. Choose ask, always, or never."))
-            raise typer.Exit(code=1)
+    raw_cleanup_value = resolve_option(
+        ctx,
+        "log_cleanup",
+        log_cleanup,
+        getattr(config, "rename_log_cleanup", "ask"),
+    )
+    cleanup_choice = (raw_cleanup_value or "").strip().lower() or None
+    if log_cleanup is not None and cleanup_choice not in valid_cleanup_modes:
+        typer.echo(_("Invalid --log-cleanup value. Choose ask, always, or never."))
+        raise typer.Exit(code=1)
 
-    cleanup_mode = cleanup_choice or getattr(config, "rename_log_cleanup", "ask")
+    config_cleanup = str(getattr(config, "rename_log_cleanup", "ask") or "ask").strip().lower()
+    cleanup_mode = cleanup_choice or config_cleanup
     if cleanup_mode not in valid_cleanup_modes:
         cleanup_mode = "ask"
 
