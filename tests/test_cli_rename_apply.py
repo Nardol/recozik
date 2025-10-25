@@ -36,7 +36,7 @@ def test_rename_from_log_apply(cli_runner: CliRunner, rename_env: RenameTestEnv)
 
     result = invoke_rename(
         cli_runner,
-        [*build_rename_command(log_path, root), "--apply", "--log-cleanup", "never"],
+        build_rename_command(log_path, root, apply=True, log_cleanup="never"),
     )
 
     assert result.exit_code == 0
@@ -71,7 +71,7 @@ def test_rename_missing_template_values_allowed_by_default(
 
     result = invoke_rename(
         cli_runner,
-        [*build_rename_command(log_path, root), "--apply", "--log-cleanup", "never"],
+        build_rename_command(log_path, root, apply=True, log_cleanup="never"),
     )
 
     assert result.exit_code == 0
@@ -117,11 +117,12 @@ def test_rename_from_log_log_cleanup_modes(
         ],
     )
 
-    args = [
-        *build_rename_command(log_path, root),
-        "--apply",
-        *extra_args,
-    ]
+    args = build_rename_command(
+        log_path,
+        root,
+        apply=True,
+        extra_args=extra_args,
+    )
 
     if config_cleanup:
         config_path = rename_env.base / "config.toml"
@@ -182,7 +183,7 @@ def test_rename_from_log_conflict_append(cli_runner: CliRunner, rename_env: Rena
 
     result = invoke_rename(
         cli_runner,
-        [*build_rename_command(log_path, root), "--apply", "--log-cleanup", "never"],
+        build_rename_command(log_path, root, apply=True, log_cleanup="never"),
     )
 
     assert result.exit_code == 0

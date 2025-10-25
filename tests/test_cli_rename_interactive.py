@@ -6,7 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from .conftest import RenameTestEnv
-from .helpers.rename import build_matches, invoke_rename, make_entry
+from .helpers.rename import build_matches, build_rename_command, invoke_rename, make_entry
 
 
 @pytest.mark.parametrize(
@@ -69,18 +69,13 @@ def test_rename_from_log_interactive_selection(
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            interactive=True,
+            apply=True,
+            log_cleanup="never",
+        ),
         input="".join(input_sequence),
     )
 
@@ -116,18 +111,13 @@ def test_rename_interactive_deduplicates_template(
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            interactive=True,
+            apply=True,
+            log_cleanup="never",
+        ),
         input="2\n",
     )
 
@@ -162,19 +152,14 @@ def test_rename_interactive_can_keep_template_duplicates(
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--interactive",
-            "--apply",
-            "--log-cleanup",
-            "never",
-            "--keep-template-duplicates",
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            interactive=True,
+            apply=True,
+            log_cleanup="never",
+            extra_args=["--keep-template-duplicates"],
+        ),
         input="3\n",
     )
 
@@ -220,19 +205,13 @@ def test_rename_from_log_interactive_via_config(
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--apply",
-            "--log-cleanup",
-            "never",
-            "--config-path",
-            str(config_path),
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            apply=True,
+            log_cleanup="never",
+            extra_args=["--config-path", str(config_path)],
+        ),
         input="2\n",
     )
 
@@ -280,19 +259,13 @@ def test_rename_interactive_config_disables_deduplication(
 
     result = invoke_rename(
         cli_runner,
-        [
-            "rename-from-log",
-            str(log_path),
-            "--root",
-            str(root),
-            "--template",
-            "{artist} - {title}",
-            "--apply",
-            "--log-cleanup",
-            "never",
-            "--config-path",
-            str(config_path),
-        ],
+        build_rename_command(
+            log_path,
+            root,
+            apply=True,
+            log_cleanup="never",
+            extra_args=["--config-path", str(config_path)],
+        ),
         input="3\n",
     )
 

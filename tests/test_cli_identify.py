@@ -11,45 +11,12 @@ from recozik import audd, cli
 from recozik.config import AppConfig, write_config
 from recozik.fingerprint import AcoustIDMatch, FingerprintResult, ReleaseInfo
 
-runner = CliRunner()
+from .helpers.identify import DummyLookupCache, make_config
 
 
-class DummyCache:
-    """Minimal in-memory implementation of the lookup cache API."""
-
-    def __init__(self, *args, **kwargs) -> None:
-        """Store parameters and prepare an internal dictionary."""
-        self.enabled = kwargs.get("enabled", True)
-        self.store: dict[tuple[str, int], list[AcoustIDMatch]] = {}
-
-    def _key(self, fingerprint: str, duration: float) -> tuple[str, int]:
-        return (fingerprint, round(duration))
-
-    def get(self, fingerprint: str, duration: float):
-        """Return cached matches if caching is enabled."""
-        if not self.enabled:
-            return None
-        return self.store.get(self._key(fingerprint, duration))
-
-    def set(self, fingerprint: str, duration: float, matches):
-        """Record matches in the fake cache when caching is enabled."""
-        if not self.enabled:
-            return
-        self.store[self._key(fingerprint, duration)] = list(matches)
-
-    def save(self):
-        """Pretend to persist the cache (no-op for the fake cache)."""
-        pass
-
-
-def _fake_config(tmp_path: Path, api_key: str = "token") -> Path:
-    """Write a minimal configuration file for tests and return its path."""
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(f'[acoustid]\napi_key = "{api_key}"\n', encoding="utf-8")
-    return config_path
-
-
-def test_identify_respects_config_defaults(monkeypatch, tmp_path: Path) -> None:
+def test_identify_respects_config_defaults(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Apply config-provided defaults for limit, JSON rendering, and refresh."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
@@ -96,9 +63,9 @@ def test_identify_respects_config_defaults(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
 
-    cache_instances: list[DummyCache] = []
+    cache_instances: list[DummyLookupCache] = []
 
-    class TrackingCache(DummyCache):
+    class TrackingCache(DummyLookupCache):
         def __init__(self, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
             self.get_called = False
@@ -110,7 +77,7 @@ def test_identify_respects_config_defaults(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "LookupCache", TrackingCache)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -127,12 +94,12 @@ def test_identify_respects_config_defaults(monkeypatch, tmp_path: Path) -> None:
     assert cache_instances and cache_instances[0].get_called is False
 
 
-def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
+def test_identify_success_json(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Return JSON payload when --json flag is provided."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     def fake_compute(_audio_path, fpcalc_path=None):
         return FingerprintResult(fingerprint="ABC", duration_seconds=123.0)
@@ -152,9 +119,9 @@ def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "compute_fingerprint", fake_compute)
     monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -172,12 +139,12 @@ def test_identify_success_json(monkeypatch, tmp_path: Path) -> None:
     assert payload[0]["source"] == "acoustid"
 
 
-def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
+def test_identify_success_text(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Render textual output with recording details."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -198,9 +165,9 @@ def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
             )
         ],
     )
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -216,12 +183,14 @@ def test_identify_success_text(monkeypatch, tmp_path: Path) -> None:
     assert "Album: Album X (2018-05-01)" in result.stdout
 
 
-def test_identify_deduplicates_by_template(monkeypatch, tmp_path: Path) -> None:
+def test_identify_deduplicates_by_template(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Collapse matches that render to identical filenames."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -254,9 +223,9 @@ def test_identify_deduplicates_by_template(monkeypatch, tmp_path: Path) -> None:
         ]
 
     monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -276,11 +245,11 @@ def test_identify_deduplicates_by_template(monkeypatch, tmp_path: Path) -> None:
     assert "Result 3" not in result.stdout
 
 
-def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
+def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Call AudD when AcoustID returns no match."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -288,7 +257,7 @@ def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
         lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=110.0),
     )
     monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
     fake_match = AcoustIDMatch(
         score=0.95,
@@ -304,7 +273,7 @@ def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
     monkeypatch.setattr(audd, "recognize_with_audd", lambda token, path: [fake_match])
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -322,11 +291,13 @@ def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
     assert "Recording ID: audd-match" in result.stdout
 
 
-def test_identify_fallback_json_includes_source(monkeypatch, tmp_path: Path) -> None:
+def test_identify_fallback_json_includes_source(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Expose the source field and attribution when returning JSON."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -334,7 +305,7 @@ def test_identify_fallback_json_includes_source(monkeypatch, tmp_path: Path) -> 
         lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
     )
     monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
     fake_match = AcoustIDMatch(
         score=0.88,
@@ -349,7 +320,7 @@ def test_identify_fallback_json_includes_source(monkeypatch, tmp_path: Path) -> 
     monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
     monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -369,11 +340,11 @@ def test_identify_fallback_json_includes_source(monkeypatch, tmp_path: Path) -> 
     assert "Powered by AudD Music (fallback)." in result.stderr
 
 
-def test_identify_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
+def test_identify_can_disable_audd(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Skip AudD even when a token is provided."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -381,7 +352,7 @@ def test_identify_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
         lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
     )
     monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
     def _unexpected_audd(*_args, **_kwargs):
         raise AssertionError("AudD should not be called when --no-audd is set.")
@@ -389,7 +360,7 @@ def test_identify_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(audd, "recognize_with_audd", _unexpected_audd)
     monkeypatch.setattr(audd, "AudDLookupError", RuntimeError)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -406,11 +377,11 @@ def test_identify_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
     assert "No matches found." in result.stdout
 
 
-def test_identify_prefer_audd(monkeypatch, tmp_path: Path) -> None:
+def test_identify_prefer_audd(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Use AudD before AcoustID when requested."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -422,7 +393,7 @@ def test_identify_prefer_audd(monkeypatch, tmp_path: Path) -> None:
         raise AssertionError("AcoustID should not be called when AudD already returned matches.")
 
     monkeypatch.setattr(cli, "lookup_recordings", _unexpected_lookup)
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
     fake_match = AcoustIDMatch(
         score=0.91,
@@ -437,7 +408,7 @@ def test_identify_prefer_audd(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
     monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -455,11 +426,13 @@ def test_identify_prefer_audd(monkeypatch, tmp_path: Path) -> None:
     assert "Priority Artist - Priority Song" in result.stdout
 
 
-def test_identify_announces_audd_snippet(monkeypatch, tmp_path: Path) -> None:
+def test_identify_announces_audd_snippet(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Let users know when a snippet is prepared for AudD uploads."""
     audio_path = tmp_path / "long.wav"
     audio_path.write_bytes(b"0" * 2048)
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -467,7 +440,7 @@ def test_identify_announces_audd_snippet(monkeypatch, tmp_path: Path) -> None:
         lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
     )
     monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
     fake_match = AcoustIDMatch(
         score=0.91,
@@ -483,7 +456,7 @@ def test_identify_announces_audd_snippet(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(audd, "MAX_AUDD_BYTES", 1)
     monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -501,21 +474,21 @@ def test_identify_announces_audd_snippet(monkeypatch, tmp_path: Path) -> None:
     assert "Snippet Artist - Snippet Title" in result.stdout
 
 
-def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
+def test_identify_without_key(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Abort when no API key is available and the user declines to configure it."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
-    config_path = _fake_config(tmp_path, api_key="")
+    config_path = make_config(tmp_path, api_key="")
 
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
         lambda *_args, **_kwargs: FingerprintResult(fingerprint="", duration_seconds=0.0),
     )
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -531,11 +504,11 @@ def test_identify_without_key(monkeypatch, tmp_path: Path) -> None:
     assert "Operation cancelled." in result.stdout
 
 
-def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
+def test_identify_template_override(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Apply a custom output template passed on the CLI."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -556,9 +529,9 @@ def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
         ],
     )
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -574,7 +547,9 @@ def test_identify_template_override(monkeypatch, tmp_path: Path) -> None:
     assert "Artiste :: Titre" in result.stdout
 
 
-def test_identify_register_key_via_prompt(monkeypatch, tmp_path: Path) -> None:
+def test_identify_register_key_via_prompt(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Store a prompted API key and continue the identification flow."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
@@ -608,10 +583,10 @@ def test_identify_register_key_via_prompt(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "compute_fingerprint", fake_compute)
     monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(cli, "_configure_api_key_interactively", fake_configure)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",
@@ -626,12 +601,12 @@ def test_identify_register_key_via_prompt(monkeypatch, tmp_path: Path) -> None:
     assert "Result 1" in result.stdout
 
 
-def test_identify_respects_locale_env(monkeypatch, tmp_path: Path) -> None:
+def test_identify_respects_locale_env(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Switch to French locale when RECOZIK_LOCALE is set."""
     audio_path = tmp_path / "song.wav"
     audio_path.write_bytes(b"fake")
 
-    config_path = _fake_config(tmp_path)
+    config_path = make_config(tmp_path)
 
     monkeypatch.setattr(
         cli,
@@ -651,9 +626,9 @@ def test_identify_respects_locale_env(monkeypatch, tmp_path: Path) -> None:
             )
         ],
     )
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify",

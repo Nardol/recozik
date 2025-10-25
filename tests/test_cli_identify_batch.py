@@ -10,49 +10,16 @@ from typer.testing import CliRunner
 from recozik import audd, cli
 from recozik.fingerprint import AcoustIDMatch, FingerprintResult
 
-runner = CliRunner()
-
-
-class DummyCache:
-    """In-memory stub of the lookup cache used in batch tests."""
-
-    def __init__(self, *args, **kwargs) -> None:
-        """Initialise the fake cache with optional enabled flag."""
-        self.enabled = kwargs.get("enabled", True)
-        self.data: dict[tuple[str, int], list[AcoustIDMatch]] = {}
-
-    def _key(self, fingerprint: str, duration: float) -> tuple[str, int]:
-        return (fingerprint, round(duration))
-
-    def get(self, fingerprint: str, duration: float):
-        """Return cached matches when caching is enabled."""
-        if not self.enabled:
-            return None
-        return self.data.get(self._key(fingerprint, duration))
-
-    def set(self, fingerprint: str, duration: float, matches):
-        """Store matches in the fake cache when caching is enabled."""
-        if not self.enabled:
-            return
-        self.data[self._key(fingerprint, duration)] = list(matches)
-
-    def save(self):
-        """Avoid writing anything to disk for the fake cache."""
-        pass
+from .helpers.identify import DummyLookupCache, make_config
 
 
 def _write_config(
     tmp_path: Path,
     template: str | None = None,
     log_format: str = "text",
-    metadata_fallback: bool = True,
 ) -> Path:
     """Create a reusable configuration file tailored for batch tests."""
-    config_path = tmp_path / "config.toml"
-    sections = [
-        "[acoustid]",
-        'api_key = "token"',
-        "",
+    sections: list[str] = [
         "[audd]",
         '# api_token = "token"',
         "",
@@ -60,17 +27,16 @@ def _write_config(
         "enabled = true",
         "ttl_hours = 24",
         "",
+        "[output]",
     ]
-    sections += ["[output]"]
     if template:
         sections.append(f'template = "{template}"')
     sections.append("")
     sections += ["[logging]", f'format = "{log_format}"', "absolute_paths = false", ""]
-    config_path.write_text("\n".join(sections), encoding="utf-8")
-    return config_path
+    return make_config(tmp_path, extra_lines=sections)
 
 
-def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_text_log(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Log formatted text entries for multiple audio files."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -82,7 +48,7 @@ def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_config(tmp_path)
     log_path = tmp_path / "result.log"
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
@@ -104,7 +70,7 @@ def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
@@ -127,7 +93,7 @@ def test_identify_batch_text_log(monkeypatch, tmp_path: Path) -> None:
     assert "file: track_b.flac" in contents
 
 
-def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_json_log(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Emit JSONL records when log format is jsonl."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -137,7 +103,7 @@ def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, log_format="jsonl")
     log_path = tmp_path / "result.jsonl"
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
@@ -158,7 +124,7 @@ def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
@@ -181,7 +147,9 @@ def test_identify_batch_json_log(monkeypatch, tmp_path: Path) -> None:
     assert payload["matches"][0]["formatted"].startswith("Artist -")
 
 
-def test_identify_batch_metadata_fallback(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_metadata_fallback(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Record embedded metadata when AcoustID returns no matches."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -191,7 +159,7 @@ def test_identify_batch_metadata_fallback(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, log_format="jsonl")
     log_path = tmp_path / "fallback.jsonl"
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
@@ -204,7 +172,7 @@ def test_identify_batch_metadata_fallback(monkeypatch, tmp_path: Path) -> None:
         lambda _path: {"title": "Tag Title", "artist": "Tag Artist"},
     )
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
@@ -228,7 +196,9 @@ def test_identify_batch_metadata_fallback(monkeypatch, tmp_path: Path) -> None:
     assert payload["metadata"]["title"] == "Tag Title"
 
 
-def test_identify_batch_respects_config_defaults(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_respects_config_defaults(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Pick up limit, best-only, recursion and log destination from the configuration."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -254,7 +224,7 @@ def test_identify_batch_respects_config_defaults(monkeypatch, tmp_path: Path) ->
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
 
     monkeypatch.setattr(
         cli,
@@ -284,7 +254,7 @@ def test_identify_batch_respects_config_defaults(monkeypatch, tmp_path: Path) ->
 
     monkeypatch.setattr(cli, "lookup_recordings", fake_lookup)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
@@ -306,7 +276,9 @@ def test_identify_batch_respects_config_defaults(monkeypatch, tmp_path: Path) ->
     assert payload["matches"][0]["recording_id"].endswith("-1")
 
 
-def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_extension_filter(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Skip files without supported audio extensions."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -318,7 +290,7 @@ def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_config(tmp_path)
     log_path = tmp_path / "filter.log"
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
@@ -337,7 +309,7 @@ def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:
         ],
     )
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
@@ -358,7 +330,9 @@ def test_identify_batch_extension_filter(monkeypatch, tmp_path: Path) -> None:
     assert "skip.txt" not in contents
 
 
-def test_identify_batch_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_uses_audd_fallback(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Use AudD as a fallback provider when AcoustID has no result."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -368,7 +342,7 @@ def test_identify_batch_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, log_format="jsonl")
     log_path = tmp_path / "fallback.jsonl"
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
@@ -389,7 +363,7 @@ def test_identify_batch_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
     monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
@@ -414,7 +388,9 @@ def test_identify_batch_uses_audd_fallback(monkeypatch, tmp_path: Path) -> None:
     assert "AudD fallback identified needs-fallback.mp3. Powered by AudD Music." in result.stdout
 
 
-def test_identify_batch_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_can_disable_audd(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
     """Skip AudD when the user opts out."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -424,7 +400,7 @@ def test_identify_batch_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, log_format="jsonl")
     log_path = tmp_path / "no_audd.jsonl"
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
@@ -438,7 +414,7 @@ def test_identify_batch_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(audd, "AudDLookupError", RuntimeError)
     monkeypatch.setattr(audd, "recognize_with_audd", _unexpected_audd)
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
@@ -463,7 +439,7 @@ def test_identify_batch_can_disable_audd(monkeypatch, tmp_path: Path) -> None:
     assert "AudD fallback identified" not in result.stdout
 
 
-def test_identify_batch_prefer_audd(monkeypatch, tmp_path: Path) -> None:
+def test_identify_batch_prefer_audd(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Prioritise AudD when requested."""
     audio_dir = tmp_path / "music"
     audio_dir.mkdir()
@@ -473,7 +449,7 @@ def test_identify_batch_prefer_audd(monkeypatch, tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, log_format="jsonl")
     log_path = tmp_path / "priority.jsonl"
 
-    monkeypatch.setattr(cli, "LookupCache", DummyCache)
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
     monkeypatch.setattr(
         cli,
         "compute_fingerprint",
@@ -498,7 +474,7 @@ def test_identify_batch_prefer_audd(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
     monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
 
-    result = runner.invoke(
+    result = cli_runner.invoke(
         cli.app,
         [
             "identify-batch",
