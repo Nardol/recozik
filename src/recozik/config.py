@@ -46,12 +46,14 @@ class AppConfig:
     identify_refresh_cache: bool = False
     identify_audd_enabled: bool = True
     identify_audd_prefer: bool = False
+    identify_announce_source: bool = True
     identify_batch_limit: int = 3
     identify_batch_best_only: bool = False
     identify_batch_recursive: bool = False
     identify_batch_log_file: str | None = None
     identify_batch_audd_enabled: bool = True
     identify_batch_audd_prefer: bool = False
+    identify_batch_announce_source: bool = True
 
     def to_toml_dict(self) -> dict:
         """Return the configuration as a nested dictionary consumable by TOML writers."""
@@ -85,6 +87,7 @@ class AppConfig:
                 "refresh": self.identify_refresh_cache,
                 "audd_enabled": self.identify_audd_enabled,
                 "prefer_audd": self.identify_audd_prefer,
+                "announce_source": self.identify_announce_source,
             },
             "identify_batch": {
                 "limit": max(int(self.identify_batch_limit), 1),
@@ -92,6 +95,7 @@ class AppConfig:
                 "recursive": self.identify_batch_recursive,
                 "audd_enabled": self.identify_batch_audd_enabled,
                 "prefer_audd": self.identify_batch_audd_prefer,
+                "announce_source": self.identify_batch_announce_source,
             },
             "rename": {
                 "log_cleanup": cleanup_mode,
@@ -272,6 +276,13 @@ def load_config(path: Path | None = None) -> AppConfig:
         identify_prefer_value = identify_prefer_raw
     else:
         raise RuntimeError(_("The field identify.prefer_audd must be a boolean."))
+    identify_announce_raw = identify_section.get("announce_source", True)
+    if identify_announce_raw is None:
+        identify_announce_value = True
+    elif isinstance(identify_announce_raw, bool):
+        identify_announce_value = identify_announce_raw
+    else:
+        raise RuntimeError(_("The field identify.announce_source must be a boolean."))
 
     identify_batch_section = data.get("identify_batch", {}) or {}
     identify_batch_limit_raw = identify_batch_section.get("limit", 3)
@@ -295,6 +306,13 @@ def load_config(path: Path | None = None) -> AppConfig:
         identify_batch_prefer_value = identify_batch_prefer_raw
     else:
         raise RuntimeError(_("The field identify_batch.prefer_audd must be a boolean."))
+    identify_batch_announce_raw = identify_batch_section.get("announce_source", True)
+    if identify_batch_announce_raw is None:
+        identify_batch_announce_value = True
+    elif isinstance(identify_batch_announce_raw, bool):
+        identify_batch_announce_value = identify_batch_announce_raw
+    else:
+        raise RuntimeError(_("The field identify_batch.announce_source must be a boolean."))
     identify_batch_log_file_value = identify_batch_section.get("log_file")
     if identify_batch_log_file_value is not None and not isinstance(
         identify_batch_log_file_value, str
@@ -324,12 +342,14 @@ def load_config(path: Path | None = None) -> AppConfig:
         identify_refresh_cache=identify_refresh_value,
         identify_audd_enabled=identify_audd_enabled_value,
         identify_audd_prefer=identify_prefer_value,
+        identify_announce_source=identify_announce_value,
         identify_batch_limit=identify_batch_limit_value,
         identify_batch_best_only=identify_batch_best_only_value,
         identify_batch_recursive=identify_batch_recursive_value,
         identify_batch_log_file=identify_batch_log_file_value,
         identify_batch_audd_enabled=identify_batch_audd_enabled_value,
         identify_batch_audd_prefer=identify_batch_prefer_value,
+        identify_batch_announce_source=identify_batch_announce_value,
     )
 
 
@@ -394,6 +414,7 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f"refresh = {str(data['identify']['refresh']).lower()}")
     lines.append(f"audd_enabled = {str(data['identify']['audd_enabled']).lower()}")
     lines.append(f"prefer_audd = {str(data['identify']['prefer_audd']).lower()}")
+    lines.append(f"announce_source = {str(data['identify']['announce_source']).lower()}")
     lines.append("")
 
     lines.append("[identify_batch]")
@@ -402,6 +423,7 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f"recursive = {str(data['identify_batch']['recursive']).lower()}")
     lines.append(f"audd_enabled = {str(data['identify_batch']['audd_enabled']).lower()}")
     lines.append(f"prefer_audd = {str(data['identify_batch']['prefer_audd']).lower()}")
+    lines.append(f"announce_source = {str(data['identify_batch']['announce_source']).lower()}")
     log_file_value = data["identify_batch"].get("log_file")
     if log_file_value:
         escaped_log = log_file_value.replace('"', '\\"')

@@ -83,10 +83,12 @@ Recozik can also call the [AudD Music Recognition API](https://audd.io) when Aco
 
 1. Create an AudD account and generate an API token. Each user of Recozik needs to supply **their own** token and remains responsible for AudD’s usage limits and terms (the public “API Test License Agreement” only covers 90 days of evaluation).
 2. Store the token with `uv run recozik config set-audd-token` (remove it later with `uv run recozik config set-audd-token --clear`), export it via the `AUDD_API_TOKEN` environment variable, or pass it per command with `--audd-token`.
-3. When AudD recognises a track, Recozik prints `Powered by AudD Music (fallback)` in the console (and in JSON mode via `stderr`) so the required attribution is always visible. The JSON payloads also expose a `source` field (`acoustid` or `audd`) to help you trace the origin of each suggestion.
+3. When AudD recognises a track, the JSON output still exposes a `source` field (`acoustid` or `audd`) and the batch logs append `Source: AudD.` so you know where every suggestion came from—no console banner required.
 4. For formats that libsndfile cannot decode (e.g. WMA > 10 MB), install `ffmpeg` and the optional extra `pip install recozik[ffmpeg-support]`. Recozik will retry the snippet extraction through FFmpeg before giving up on AudD.
 
-On a per-run basis you can disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Remember that the two commands read separate configuration sections: `identify` pulls defaults from `[identify]`, while `identify-batch` only honours values defined under `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`).
+By default the CLI prints the lookup strategy to `stderr` (for example, “Identification strategy: AcoustID first, AudD fallback.”). Toggle it per run with `--announce-source/--silent-source`, or persist the setting through `announce_source` configuration keys.
+
+On a per-run basis you can disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Remember that the two commands read separate configuration sections: `identify` pulls defaults from `[identify]`, while `identify-batch` only honours values defined under `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`, `announce_source`).
 
 Tip: keep the token disabled in shared scripts unless every user has accepted AudD’s terms and provided their own credentials.
 
@@ -217,6 +219,9 @@ absolute_paths = false
 limit = 3
 json = false
 refresh = false
+audd_enabled = true
+prefer_audd = false
+announce_source = true
 
 # The batch command reads only values defined under [identify_batch]; nothing leaks
 # over from [identify].
@@ -225,6 +230,9 @@ limit = 3
 best_only = false
 recursive = false
 # log_file = "recozik-batch.log"
+audd_enabled = true
+prefer_audd = false
+announce_source = true
 
 [rename]
 # default_mode = "dry-run"
@@ -242,7 +250,7 @@ locale = "en"
 
 ## Configuration reference
 
-Each command reads only the section that matches its name. Values under `[identify]` never fall back to `[identify_batch]`, and the batch command does not reuse single-file defaults. Duplicate keys (for example `audd_enabled`, `prefer_audd`, or `limit`) must therefore be set in both sections if you want the same behaviour across commands.
+Each command reads only the section that matches its name. Values under `[identify]` never fall back to `[identify_batch]`, and the batch command does not reuse single-file defaults. Duplicate keys (for example `audd_enabled`, `prefer_audd`, `announce_source`, or `limit`) must therefore be set in both sections if you want the same behaviour across commands.
 
 | Scope                          | Name                      | Type / Values                     | Default                     | Description                                                           | How to configure                                                                       |
 | ------------------------------ | ------------------------- | --------------------------------- | --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -260,12 +268,14 @@ Each command reads only the section that matches its name. Values under `[identi
 | Config file `[identify]`       | `refresh`                 | boolean                           | `false`                     | Ignore the cache unless explicitly disabled.                          | Edit `config.toml`.                                                                    |
 | Config file `[identify]`       | `audd_enabled`            | boolean                           | `true`                      | Enable AudD support when a token is configured.                       | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
 | Config file `[identify]`       | `prefer_audd`             | boolean                           | `false`                     | Try AudD before AcoustID when enabled.                                | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
+| Config file `[identify]`       | `announce_source`         | boolean                           | `true`                      | Print the planned lookup strategy to `stderr`.                        | Edit `config.toml` or pass `--announce-source/--silent-source`.                        |
 | Config file `[identify_batch]` | `limit`                   | integer >= 1                      | `3`                         | Maximum results stored per file in batch mode.                        | Edit `config.toml`.                                                                    |
 | Config file `[identify_batch]` | `best_only`               | boolean                           | `false`                     | Record only the top proposal for each file.                           | Edit `config.toml`.                                                                    |
 | Config file `[identify_batch]` | `recursive`               | boolean                           | `false`                     | Include sub-directories by default.                                   | Edit `config.toml`.                                                                    |
 | Config file `[identify_batch]` | `log_file`                | string (path)                     | unset → `recozik-batch.log` | Default destination for batch logs.                                   | Edit `config.toml`.                                                                    |
 | Config file `[identify_batch]` | `audd_enabled`            | boolean                           | `true`                      | Enable AudD support during batch identification.                      | Edit `config.toml` or pass `--use-audd/--no-audd`.                                     |
 | Config file `[identify_batch]` | `prefer_audd`             | boolean                           | `false`                     | Try AudD before AcoustID in batch runs.                               | Edit `config.toml` or pass `--prefer-audd/--prefer-acoustid`.                          |
+| Config file `[identify_batch]` | `announce_source`         | boolean                           | `true`                      | Print the batch lookup strategy to `stderr`.                          | Edit `config.toml` or pass `--announce-source/--silent-source`.                        |
 | Config file `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | `"dry-run"`                 | Default behaviour when neither `--dry-run` nor `--apply` is provided. | Edit `config.toml`.                                                                    |
 | Config file `[rename]`         | `interactive`             | boolean                           | `false`                     | Enables interactive selection without `--interactive`.                | Edit `config.toml`.                                                                    |
 | Config file `[rename]`         | `confirm_each`            | boolean                           | `false`                     | Asks for confirmation before each rename by default.                  | Edit `config.toml`.                                                                    |

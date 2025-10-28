@@ -63,6 +63,11 @@ def identify(
         "--prefer-audd/--prefer-acoustid",
         help=_("Try AudD before AcoustID when the integration is enabled."),
     ),
+    announce_source: bool | None = typer.Option(
+        None,
+        "--announce-source/--silent-source",
+        help=_("Announce the identification strategy before running."),
+    ),
     limit: int = typer.Option(
         3,
         "--limit",
@@ -122,6 +127,29 @@ def identify(
     audd_enabled_setting = use_audd if use_audd is not None else config.identify_audd_enabled
     audd_prefer_setting = prefer_audd if prefer_audd is not None else config.identify_audd_prefer
     audd_available = bool(fallback_audd_token) and audd_enabled_setting
+    announce_value = resolve_option(
+        ctx,
+        "announce_source",
+        announce_source,
+        config.identify_announce_source,
+    )
+
+    strategy_description = None
+    if not audd_available:
+        if fallback_audd_token:
+            strategy_description = _("AcoustID only (AudD disabled).")
+        else:
+            strategy_description = _("AcoustID only (no AudD token).")
+    elif audd_prefer_setting:
+        strategy_description = _("AudD first, AcoustID fallback.")
+    else:
+        strategy_description = _("AcoustID first, AudD fallback.")
+
+    if announce_value and strategy_description:
+        typer.echo(
+            _("Identification strategy: {description}").format(description=strategy_description),
+            err=True,
+        )
 
     limit_value = resolve_option(
         ctx,
@@ -254,8 +282,6 @@ def identify(
 
     if json_value:
         matches = matches[:limit_value]
-        if match_source == "audd":
-            typer.echo(_("Powered by AudD Music (fallback)."), err=True)
         payload = []
         for match in matches:
             record = match.to_dict()
@@ -264,9 +290,6 @@ def identify(
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
         cache.save()
         return
-
-    if match_source == "audd":
-        typer.echo(_("Powered by AudD Music (fallback)."))
 
     template_value = resolve_template(template, config)
     matches = _deduplicate_by_template(matches, template_value)
@@ -342,13 +365,20 @@ def configure_api_key_interactively(
         rename_default_confirm_each=existing.rename_default_confirm_each,
         rename_conflict_strategy=existing.rename_conflict_strategy,
         rename_metadata_confirm=existing.rename_metadata_confirm,
+        rename_deduplicate_template=existing.rename_deduplicate_template,
         identify_default_limit=existing.identify_default_limit,
         identify_output_json=existing.identify_output_json,
         identify_refresh_cache=existing.identify_refresh_cache,
+        identify_audd_enabled=existing.identify_audd_enabled,
+        identify_audd_prefer=existing.identify_audd_prefer,
+        identify_announce_source=existing.identify_announce_source,
         identify_batch_limit=existing.identify_batch_limit,
         identify_batch_best_only=existing.identify_batch_best_only,
         identify_batch_recursive=existing.identify_batch_recursive,
         identify_batch_log_file=existing.identify_batch_log_file,
+        identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
+        identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
+        identify_batch_announce_source=existing.identify_batch_announce_source,
     )
 
     target = config_module.write_config(updated, config_path)
