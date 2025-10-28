@@ -352,6 +352,7 @@ def rename_from_log(
         metadata_entry = coerce_metadata_dict(entry.get("metadata"))
 
         if status == "unmatched" and not matches:
+            context = f" ({note})" if note else ""
             if metadata_fallback_enabled and metadata_entry:
                 typer.echo(
                     _("No AcoustID match for {path}, using embedded metadata.").format(
@@ -362,9 +363,16 @@ def rename_from_log(
                     [build_metadata_match(metadata_entry)],
                     source_path,
                 )
+                if not matches:
+                    skipped += 1
+                    typer.echo(
+                        _("No proposal for: {path}{context}").format(
+                            path=source_path, context=context
+                        )
+                    )
+                    continue
             else:
                 skipped += 1
-                context = f" ({note})" if note else ""
                 typer.echo(
                     _("No proposal for: {path}{context}").format(path=source_path, context=context)
                 )
@@ -389,6 +397,10 @@ def rename_from_log(
                     [build_metadata_match(metadata_entry)],
                     source_path,
                 )
+                if not matches:
+                    skipped += 1
+                    typer.echo(_("No proposal for: {path}").format(path=source_path))
+                    continue
                 error_message = None
             else:
                 skipped += 1
@@ -410,6 +422,10 @@ def rename_from_log(
                     [build_metadata_match(metadata_entry)],
                     source_path,
                 )
+                if not matches:
+                    skipped += 1
+                    typer.echo(_("No proposal for: {path}").format(path=source_path))
+                    continue
             else:
                 skipped += 1
                 typer.echo(_("No proposal for: {path}").format(path=source_path))
