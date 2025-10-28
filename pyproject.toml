@@ -1,6 +1,6 @@
 [project]
 name = "recozik"
-version = "0.7.0"
+version = "0.8.0"
 description = "Terminal-first CLI for audio fingerprinting and AcoustID lookup"
 readme = "README.md"
 license = { file = "LICENSE" }
