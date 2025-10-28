@@ -141,3 +141,42 @@ def test_rename_from_log_confirm_prompt(
         assert not target.exists()
         if expected_message:
             assert expected_message in result.stdout
+
+
+def test_rename_from_log_metadata_missing_required_fields(
+    cli_runner: CliRunner,
+    rename_env: RenameTestEnv,
+) -> None:
+    """Ensure metadata fallback entries missing template fields are skipped gracefully."""
+    root = rename_env.make_root("metadata-missing")
+    src = rename_env.create_source(root, "missing.mp3")
+
+    log_path = rename_env.write_log(
+        "metadata-missing.jsonl",
+        [
+            make_entry(
+                "missing.mp3",
+                matches=[],
+                metadata={"title": "Only Title"},
+                status="unmatched",
+                note="Aucune correspondance.",
+            )
+        ],
+    )
+
+    result = invoke_rename(
+        cli_runner,
+        build_rename_command(
+            log_path,
+            root,
+            template="{artist} - {title}",
+            apply=True,
+            log_cleanup="never",
+            extra_args=["--require-template-fields"],
+        ),
+    )
+
+    assert result.exit_code == 0
+    assert src.exists()
+    assert "Match skipped for missing.mp3" in result.stdout
+    assert "No proposal for: " in result.stdout
