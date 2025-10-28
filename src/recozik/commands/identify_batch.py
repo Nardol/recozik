@@ -55,6 +55,11 @@ def identify_batch(
         "--prefer-audd/--prefer-acoustid",
         help=_("Try AudD before AcoustID when the integration is enabled."),
     ),
+    announce_source: bool | None = typer.Option(
+        None,
+        "--announce-source/--silent-source",
+        help=_("Announce the identification strategy before scanning files."),
+    ),
     limit: int = typer.Option(
         3,
         "--limit",
@@ -217,6 +222,26 @@ def identify_batch(
         prefer_audd if prefer_audd is not None else config.identify_batch_audd_prefer
     )
     audd_available = bool(fallback_audd_token) and audd_enabled_setting
+    announce_value = resolve_option(
+        ctx,
+        "announce_source",
+        announce_source,
+        config.identify_batch_announce_source,
+    )
+    if not audd_available:
+        if fallback_audd_token:
+            strategy_description = _("AcoustID only (AudD disabled).")
+        else:
+            strategy_description = _("AcoustID only (no AudD token).")
+    elif audd_prefer_setting:
+        strategy_description = _("AudD first, AcoustID fallback.")
+    else:
+        strategy_description = _("AcoustID first, AudD fallback.")
+    if announce_value:
+        typer.echo(
+            _("Identification strategy: {description}").format(description=strategy_description),
+            err=True,
+        )
     audd_lookup_fn = None
     audd_error_cls = None
     audd_limit_mb = None
@@ -353,13 +378,9 @@ def identify_batch(
                 else:
                     if audd_candidates:
                         matches = audd_candidates
-                        audd_note = _("Powered by AudD Music (fallback).")
+                        audd_note = _("Source: AudD.")
                         match_source = "audd"
-                        typer.echo(
-                            _("AudD fallback identified {path}. Powered by AudD Music.").format(
-                                path=relative_display
-                            )
-                        )
+                        typer.echo(_("AudD identified {path}.").format(path=relative_display))
                     else:
                         matches = None
 
@@ -424,20 +445,16 @@ def identify_batch(
                 else:
                     if audd_candidates:
                         matches = audd_candidates
-                        audd_note = _("Powered by AudD Music (fallback).")
+                        audd_note = _("Source: AudD.")
                         match_source = "audd"
-                        typer.echo(
-                            _("AudD fallback identified {path}. Powered by AudD Music.").format(
-                                path=relative_display
-                            )
-                        )
+                        typer.echo(_("AudD identified {path}.").format(path=relative_display))
 
             if not matches:
                 metadata_payload = metadata_extractor(file_path) if use_metadata_fallback else None
                 note_parts = [_("No match.")]
                 if audd_error_message:
                     note_parts.append(
-                        _("AudD fallback failed: {error}").format(error=audd_error_message)
+                        _("AudD lookup failed: {error}").format(error=audd_error_message)
                     )
                 note_text = " ".join(note_parts)
                 write_log_entry(
@@ -466,9 +483,7 @@ def identify_batch(
             if match_source == "audd" and audd_note:
                 note_parts.append(audd_note)
             if audd_error_message and match_source != "audd":
-                note_parts.append(
-                    _("AudD fallback failed: {error}").format(error=audd_error_message)
-                )
+                note_parts.append(_("AudD lookup failed: {error}").format(error=audd_error_message))
             success_note = " ".join(note_parts) if note_parts else None
             write_log_entry(
                 handle,

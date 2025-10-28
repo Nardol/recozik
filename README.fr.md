@@ -70,10 +70,12 @@ Recozik peut interroger l'API [AudD Music Recognition](https://audd.io) quand Ac
 
 1. Créez un compte AudD et générez un token API. Chaque utilisateur de Recozik doit fournir son propre token et respecter les conditions d'AudD (l'accord public « API Test License Agreement » limite l'évaluation à 90 jours).
 2. Enregistrez le token avec `uv run recozik config set-audd-token` (supprimez-le ensuite avec `uv run recozik config set-audd-token --clear` si besoin), exportez la variable `AUDD_API_TOKEN` ou passez `--audd-token` lors de l'exécution.
-3. Quand AudD identifie un titre, Recozik affiche `Powered by AudD Music (fallback)` dans la console (et, en mode JSON, via `stderr`). Le flux JSON ajoute également un champ `source` (`acoustid` ou `audd`) pour tracer l'origine de la proposition.
+3. Quand AudD identifie un titre, le JSON conserve l'origine via le champ `source` (`acoustid` ou `audd`) et les journaux ajoutent la note `Source: AudD.` — aucune bannière console n'est imposée.
 4. Pour les formats qu'libsndfile ne sait pas lire (ex. WMA volumineux), installez `ffmpeg` et l'extra `pip install recozik[ffmpeg-support]`. Recozik réessaiera alors de générer l'extrait via FFmpeg avant d'abandonner le fallback AudD.
 
-Selon les besoins, vous pouvez désactiver ponctuellement le fallback avec `--no-audd`, ou au contraire privilégier AudD avant AcoustID via `--prefer-audd`. Gardez en tête que chaque commande lit sa propre section : `identify` récupère ses réglages (dont `audd_enabled` et `prefer_audd`) dans `[identify]`, tandis que `identify-batch` ne tient compte que de `[identify_batch]`.
+Par défaut, la CLI affiche la stratégie choisie sur `stderr` (ex. « Identification strategy: AcoustID first, AudD fallback. »). Activez ou désactivez ce bandeau avec `--announce-source/--silent-source`, ou rendez le réglage persistant via les clés `announce_source`.
+
+Selon les besoins, vous pouvez désactiver ponctuellement le fallback avec `--no-audd`, ou au contraire privilégier AudD avant AcoustID via `--prefer-audd`. Gardez en tête que chaque commande lit sa propre section : `identify` récupère ses réglages (dont `audd_enabled`, `prefer_audd` et `announce_source`) dans `[identify]`, tandis que `identify-batch` ne tient compte que de `[identify_batch]`.
 
 Conseil : laissez le fallback désactivé dans les scripts partagés tant que chaque personne n'a pas accepté les conditions AudD et fourni son jeton.
 
@@ -201,6 +203,7 @@ json = false
 refresh = false
 audd_enabled = true
 prefer_audd = false
+announce_source = true
 
 # La commande batch ne lit que la section [identify_batch]; aucune valeur n’est reprise
 # depuis [identify].
@@ -211,6 +214,7 @@ recursive = false
 # log_file = "recozik-batch.log"
 audd_enabled = true
 prefer_audd = false
+announce_source = true
 
 [rename]
 # default_mode = "dry-run"
@@ -228,7 +232,7 @@ locale = "fr"
 
 ## Référence de configuration
 
-Chaque commande ne lit que la section qui porte son nom. Les valeurs définies sous `[identify]` ne servent jamais de repli pour `[identify_batch]`, et inversement. Si vous voulez un comportement identique (par exemple pour `limit`, `audd_enabled` ou `prefer_audd`), dupliquez les réglages dans les deux blocs.
+Chaque commande ne lit que la section qui porte son nom. Les valeurs définies sous `[identify]` ne servent jamais de repli pour `[identify_batch]`, et inversement. Si vous voulez un comportement identique (par exemple pour `limit`, `audd_enabled`, `prefer_audd` ou `announce_source`), dupliquez les réglages dans les deux blocs.
 
 | Portée                     | Nom                       | Type / Valeurs                    | Valeur par défaut                | Description                                                                | Méthode de configuration                                                                 |
 | -------------------------- | ------------------------- | --------------------------------- | -------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -246,12 +250,14 @@ Chaque commande ne lit que la section qui porte son nom. Les valeurs définies s
 | Fichier `[identify]`       | `refresh`                 | booléen                           | `false`                          | Ignore le cache sauf désactivation explicite.                              | Édition de `config.toml`.                                                                |
 | Fichier `[identify]`       | `audd_enabled`            | booléen                           | `true`                           | Active le fallback AudD lorsqu’un jeton est configuré.                     | `--use-audd/--no-audd` ou édition de `config.toml`.                                      |
 | Fichier `[identify]`       | `prefer_audd`             | booléen                           | `false`                          | Lance AudD avant AcoustID si activé.                                       | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                           |
+| Fichier `[identify]`       | `announce_source`         | booléen                           | `true`                           | Affiche la stratégie retenue sur `stderr`.                                 | `--announce-source/--silent-source` ou édition de `config.toml`.                         |
 | Fichier `[identify_batch]` | `limit`                   | entier >= 1                       | `3`                              | Maximum de propositions conservées par fichier.                            | Édition de `config.toml`.                                                                |
 | Fichier `[identify_batch]` | `best_only`               | booléen                           | `false`                          | Conserve uniquement la meilleure proposition.                              | Édition de `config.toml`.                                                                |
 | Fichier `[identify_batch]` | `recursive`               | booléen                           | `false`                          | Analyse les sous-dossiers par défaut.                                      | Édition de `config.toml`.                                                                |
 | Fichier `[identify_batch]` | `log_file`                | chaîne (chemin)                   | non défini → `recozik-batch.log` | Destination par défaut des journaux batch.                                 | Édition de `config.toml`.                                                                |
 | Fichier `[identify_batch]` | `audd_enabled`            | booléen                           | `true`                           | Active AudD pendant l’identification en lot.                               | `--use-audd/--no-audd` ou édition de `config.toml`.                                      |
 | Fichier `[identify_batch]` | `prefer_audd`             | booléen                           | `false`                          | Tente AudD avant AcoustID lors des traitements batch.                      | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                           |
+| Fichier `[identify_batch]` | `announce_source`         | booléen                           | `true`                           | Affiche la stratégie lot sur `stderr`.                                     | `--announce-source/--silent-source` ou édition de `config.toml`.                         |
 | Fichier `[rename]`         | `default_mode`            | `dry-run` \| `apply`              | `"dry-run"`                      | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.      | Édition de `config.toml`.                                                                |
 | Fichier `[rename]`         | `interactive`             | booléen                           | `false`                          | Active l'interactif sans ajouter l'option `--interactive`.                 | Édition de `config.toml`.                                                                |
 | Fichier `[rename]`         | `confirm_each`            | booléen                           | `false`                          | Demande confirmation avant chaque renommage par défaut.                    | Édition de `config.toml`.                                                                |

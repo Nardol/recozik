@@ -383,9 +383,10 @@ def test_identify_batch_uses_audd_fallback(
     lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
     assert len(lines) == 1
     payload = json.loads(lines[0])
-    assert payload["note"] == "Powered by AudD Music (fallback)."
+    assert payload["note"] == "Source: AudD."
     assert payload["matches"][0]["recording_id"] == "audd-batch"
-    assert "AudD fallback identified needs-fallback.mp3. Powered by AudD Music." in result.stdout
+    assert "AudD identified needs-fallback.mp3." in result.stdout
+    assert "Identification strategy: AcoustID first, AudD fallback." in result.stderr
 
 
 def test_identify_batch_can_disable_audd(
@@ -437,6 +438,7 @@ def test_identify_batch_can_disable_audd(
     payload = json.loads(lines[0])
     assert payload["note"] == "No match."
     assert "AudD fallback identified" not in result.stdout
+    assert "AcoustID only (AudD disabled)." in result.stderr
 
 
 def test_identify_batch_prefer_audd(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
@@ -495,5 +497,62 @@ def test_identify_batch_prefer_audd(monkeypatch, tmp_path: Path, cli_runner: Cli
     lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
     assert len(lines) == 1
     payload = json.loads(lines[0])
-    assert payload["note"] == "Powered by AudD Music (fallback)."
+    assert payload["note"] == "Source: AudD."
     assert payload["matches"][0]["recording_id"] == "audd-priority"
+    assert "Identification strategy: AudD first, AcoustID fallback." in result.stderr
+
+
+def test_identify_batch_silent_source(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
+    """Suppress the strategy banner in batch mode when requested."""
+    audio_dir = tmp_path / "music"
+    audio_dir.mkdir()
+    sample = audio_dir / "silent.mp3"
+    sample.write_bytes(b"bytes")
+
+    config_path = _write_config(tmp_path, log_format="jsonl")
+    log_path = tmp_path / "silent.jsonl"
+
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="MISS", duration_seconds=180.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+
+    fake_match = AcoustIDMatch(
+        score=0.91,
+        recording_id="audd-silent",
+        title="Silent Batch",
+        artist="AudD Artist",
+    )
+
+    class DummyAudDError(Exception):
+        pass
+
+    monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
+
+    result = cli_runner.invoke(
+        cli.app,
+        [
+            "identify-batch",
+            str(audio_dir),
+            "--config-path",
+            str(config_path),
+            "--log-file",
+            str(log_path),
+            "--log-format",
+            "jsonl",
+            "--audd-token",
+            "secret",
+            "--silent-source",
+        ],
+    )
+
+    assert result.exit_code == 0
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload["matches"][0]["recording_id"] == "audd-silent"
+    assert "Identification strategy" not in result.stderr

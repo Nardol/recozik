@@ -71,6 +71,26 @@ def config_show(
             mode=path_mode,
         )
     )
+    identify_audd_state = _("yes") if config.identify_audd_enabled else _("no")
+    identify_prefer_state = _("yes") if config.identify_audd_prefer else _("no")
+    identify_announce_state = _("yes") if config.identify_announce_source else _("no")
+    typer.echo(
+        _("Identify strategy: AudD {enabled}, prefer {prefer}, announce {announce}").format(
+            enabled=identify_audd_state,
+            prefer=identify_prefer_state,
+            announce=identify_announce_state,
+        )
+    )
+    batch_audd_state = _("yes") if config.identify_batch_audd_enabled else _("no")
+    batch_prefer_state = _("yes") if config.identify_batch_audd_prefer else _("no")
+    batch_announce_state = _("yes") if config.identify_batch_announce_source else _("no")
+    typer.echo(
+        _("Identify-batch strategy: AudD {enabled}, prefer {prefer}, announce {announce}").format(
+            enabled=batch_audd_state,
+            prefer=batch_prefer_state,
+            announce=batch_announce_state,
+        )
+    )
     typer.echo(_("File: {path}").format(path=target))
 
 
@@ -143,12 +163,14 @@ def config_set_key(
         identify_refresh_cache=existing.identify_refresh_cache,
         identify_audd_enabled=existing.identify_audd_enabled,
         identify_audd_prefer=existing.identify_audd_prefer,
+        identify_announce_source=existing.identify_announce_source,
         identify_batch_limit=existing.identify_batch_limit,
         identify_batch_best_only=existing.identify_batch_best_only,
         identify_batch_recursive=existing.identify_batch_recursive,
         identify_batch_log_file=existing.identify_batch_log_file,
         identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
         identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
+        identify_batch_announce_source=existing.identify_batch_announce_source,
     )
 
     target = config_module.write_config(updated, config_path)
@@ -220,12 +242,14 @@ def config_set_audd_token(
         identify_refresh_cache=existing.identify_refresh_cache,
         identify_audd_enabled=existing.identify_audd_enabled,
         identify_audd_prefer=existing.identify_audd_prefer,
+        identify_announce_source=existing.identify_announce_source,
         identify_batch_limit=existing.identify_batch_limit,
         identify_batch_best_only=existing.identify_batch_best_only,
         identify_batch_recursive=existing.identify_batch_recursive,
         identify_batch_log_file=existing.identify_batch_log_file,
         identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
         identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
+        identify_batch_announce_source=existing.identify_batch_announce_source,
     )
 
     target = config_module.write_config(updated, config_path)

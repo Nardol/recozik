@@ -180,7 +180,7 @@ Override with `RECOZIK_CONFIG_FILE` environment variable.
 ## Important Notes
 
 - **Never commit API keys**: The `config.toml` file should never be committed. API keys are user-specific secrets.
-- **AudD is opt-in**: AudD fallback requires users to provide their own token and accept AudD's terms. Always display "Powered by AudD Music (fallback)" attribution when used.
+- **AudD is opt-in**: AudD fallback requires users to provide their own token and accept AudD's terms. The CLI now exposes the `source` in JSON/logs and prints the lookup strategy to `stderr` by default—no mandatory banner is needed.
 - **Chromaprint dependency**: The CLI requires `fpcalc` (Chromaprint) to be installed and on PATH. Tests may mock this if `fpcalc` is unavailable.
 - **Translation workflow**: After modifying `.po` files, always run `python scripts/compile_translations.py` to regenerate `.mo` binaries before testing.
 - **Commit conventions**: Use imperative commit messages and sign commits with `-s` (Developer Certificate of Origin).

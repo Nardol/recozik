@@ -33,12 +33,14 @@ def test_write_and_load_config(tmp_path: Path) -> None:
         identify_refresh_cache=True,
         identify_audd_enabled=False,
         identify_audd_prefer=True,
+        identify_announce_source=False,
         identify_batch_limit=4,
         identify_batch_best_only=True,
         identify_batch_recursive=True,
         identify_batch_log_file="logs/default.jsonl",
         identify_batch_audd_enabled=False,
         identify_batch_audd_prefer=True,
+        identify_batch_announce_source=False,
     )
 
     write_config(config, target)
@@ -65,12 +67,14 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     assert loaded.identify_refresh_cache is True
     assert loaded.identify_audd_enabled is False
     assert loaded.identify_audd_prefer is True
+    assert loaded.identify_announce_source is False
     assert loaded.identify_batch_limit == 4
     assert loaded.identify_batch_best_only is True
     assert loaded.identify_batch_recursive is True
     assert loaded.identify_batch_log_file == "logs/default.jsonl"
     assert loaded.identify_batch_audd_enabled is False
     assert loaded.identify_batch_audd_prefer is True
+    assert loaded.identify_batch_announce_source is False
 
 
 def test_load_config_missing_returns_default(tmp_path: Path) -> None:
@@ -99,12 +103,14 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
     assert config.identify_refresh_cache is False
     assert config.identify_audd_enabled is True
     assert config.identify_audd_prefer is False
+    assert config.identify_announce_source is True
     assert config.identify_batch_limit == 3
     assert config.identify_batch_best_only is False
     assert config.identify_batch_recursive is False
     assert config.identify_batch_log_file is None
     assert config.identify_batch_audd_enabled is True
     assert config.identify_batch_audd_prefer is False
+    assert config.identify_batch_announce_source is True
 
 
 def test_write_config_with_audd_token(tmp_path: Path) -> None:

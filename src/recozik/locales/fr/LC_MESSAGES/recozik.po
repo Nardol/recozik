@@ -66,20 +66,44 @@ msgstr "Jeton API AudD à enregistrer (alternative à l'argument positionnel)."
 msgid "AudD API token to use as a fallback when AcoustID returns no match."
 msgstr "Jeton API AudD à utiliser comme repli lorsque AcoustID ne trouve aucun résultat."
 
-msgid "AudD fallback failed for {path}: {error}"
-msgstr "Le fallback AudD a échoué pour {path} : {error}"
+msgid "Announce the identification strategy before running."
+msgstr "Annonce la stratégie d'identification avant l'exécution."
 
-msgid "AudD fallback failed: {error}"
-msgstr "Le fallback AudD a échoué : {error}"
-
-msgid "AudD fallback identified {path}. Powered by AudD Music."
-msgstr "Le fallback AudD a identifié {path}. Powered by AudD Music."
+msgid "Announce the identification strategy before scanning files."
+msgstr "Annonce la stratégie d'identification avant l'analyse des fichiers."
 
 msgid "AudD lookup failed: {error}."
 msgstr "La recherche AudD a échoué : {error}."
 
 msgid "AudD lookup failed: {error}. Falling back to AcoustID."
 msgstr "La recherche AudD a échoué : {error}. Repli vers AcoustID."
+
+msgid "AudD lookup failed: {error}"
+msgstr "La recherche AudD a échoué : {error}"
+
+msgid "AudD lookup failed for {path}: {error}"
+msgstr "La recherche AudD a échoué pour {path} : {error}"
+
+msgid "AudD identified {path}."
+msgstr "AudD a identifié {path}."
+
+msgid "Source: AudD."
+msgstr "Source : AudD."
+
+msgid "AcoustID only (AudD disabled)."
+msgstr "AcoustID uniquement (AudD désactivé)."
+
+msgid "AcoustID only (no AudD token)."
+msgstr "AcoustID uniquement (aucun jeton AudD)."
+
+msgid "AudD first, AcoustID fallback."
+msgstr "AudD en premier, repli sur AcoustID."
+
+msgid "AcoustID first, AudD fallback."
+msgstr "AcoustID en premier, repli sur AudD."
+
+msgid "Identification strategy: {description}"
+msgstr "Stratégie d'identification : {description}"
 
 msgid "AudD lookup failed for {path}: {error}. Falling back to AcoustID."
 msgstr "La recherche AudD a échoué pour {path} : {error}. Repli vers AcoustID."
@@ -162,6 +186,12 @@ msgstr "Confirme les renommages basés sur les métadonnées intégrées (utilis
 msgid "Cache enabled: {state} (TTL: {hours} h)"
 msgstr "Cache activé : {state} (TTL : {hours} h)"
 
+msgid "Identify strategy: AudD {enabled}, prefer {prefer}, announce {announce}"
+msgstr "Identify : AudD {enabled}, préférence {prefer}, annonce {announce}"
+
+msgid "Identify-batch strategy: AudD {enabled}, prefer {prefer}, announce {announce}"
+msgstr "Identify-batch : AudD {enabled}, préférence {prefer}, annonce {announce}"
+
 msgid "Channels: {channels}"
 msgstr "Canaux : {channels}"
 
@@ -212,9 +242,6 @@ msgstr "Script de complétion écrit dans {path}"
 
 msgid "Completion uninstalled."
 msgstr "Complétion désinstallée."
-
-msgid "Powered by AudD Music (fallback)."
-msgstr "Powered by AudD Music (fallback)."
 
 msgid "Confirm rename based on embedded metadata: {source} -> {target}?"
 msgstr "Confirmer le renommage basé sur les métadonnées : {source} -> {target} ?"
