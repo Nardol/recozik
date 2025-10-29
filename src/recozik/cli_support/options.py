@@ -18,11 +18,16 @@ def resolve_option(
     cli_value: T,
     default_value: U,
     *,
+    env_value: T | None = None,
     transform: Callable[[T], U] | None = None,
 ) -> U:
     """Return the effective option value honoring configuration defaults."""
     source = ctx.get_parameter_source(param_name)
     if source is ParameterSource.DEFAULT:
+        if env_value is not None:
+            if transform is not None:
+                return transform(env_value)
+            return cast(U, env_value)
         return default_value
     if transform is not None:
         return transform(cli_value)

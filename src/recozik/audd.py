@@ -9,6 +9,7 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -21,7 +22,9 @@ from .fingerprint import AcoustIDMatch, ReleaseInfo
 from .i18n import _
 
 DEFAULT_ENDPOINT = "https://api.audd.io/"
+ENTERPRISE_ENDPOINT = "https://enterprise.audd.io/"
 MAX_AUDD_BYTES = 10 * 1024 * 1024
+MAX_AUDD_ENTERPRISE_BYTES = 1024 * 1024 * 1024
 SNIPPET_DURATION_SECONDS = 45.0
 _AUDD_TARGET_SAMPLE_RATE = 16_000
 _AUDD_SNIPPET_SUFFIX = ".wav"
@@ -47,6 +50,26 @@ def _redact_audd_token(text: str | Any) -> str:
 
 class AudDLookupError(RuntimeError):
     """Raised when the AudD API request fails."""
+
+
+class AudDMode(str, Enum):
+    """Execution mode for AudD lookups."""
+
+    STANDARD = "standard"
+    ENTERPRISE = "enterprise"
+    AUTO = "auto"
+
+
+@dataclass(slots=True)
+class AudDEnterpriseParams:
+    """Parameters specific to the AudD Enterprise endpoint."""
+
+    skip: tuple[int, ...] = ()
+    every: float | None = None
+    limit: int | None = None
+    skip_first_seconds: float | None = None
+    accurate_offsets: bool = False
+    use_timecode: bool = False
 
 
 @dataclass(slots=True)
@@ -108,12 +131,23 @@ def recognize_with_audd(
     *,
     endpoint: str = DEFAULT_ENDPOINT,
     timeout: float = 20.0,
+    use_enterprise: bool = False,
+    enterprise_params: AudDEnterpriseParams | None = None,
 ) -> list[AcoustIDMatch]:
     """Send an identification request to AudD and normalize results."""
     if not api_token:
         raise AudDLookupError(_("No AudD token provided."))
     if not audio_path.is_file():
         raise AudDLookupError(_("Audio file not found: {path}").format(path=audio_path))
+
+    if use_enterprise:
+        return _recognize_with_enterprise(
+            api_token,
+            audio_path,
+            endpoint=endpoint or ENTERPRISE_ENDPOINT,
+            timeout=timeout,
+            enterprise_params=enterprise_params or AudDEnterpriseParams(),
+        )
 
     try:
         payload_manager = _prepare_audd_payload(audio_path)
@@ -168,6 +202,96 @@ def recognize_with_audd(
             matches.append(match.to_acoustid_match())
 
     return matches
+
+
+def _recognize_with_enterprise(
+    api_token: str,
+    audio_path: Path,
+    *,
+    endpoint: str,
+    timeout: float,
+    enterprise_params: AudDEnterpriseParams,
+) -> list[AcoustIDMatch]:
+    """Send an identification request through the AudD Enterprise endpoint."""
+    if not endpoint:
+        endpoint = ENTERPRISE_ENDPOINT
+
+    try:
+        size = audio_path.stat().st_size
+    except OSError as exc:  # pragma: no cover - filesystem failures
+        message = _redact_audd_token(_("Unable to access audio file: {error}").format(error=exc))
+        raise AudDLookupError(message) from exc
+
+    if size > MAX_AUDD_ENTERPRISE_BYTES:
+        raise AudDLookupError(
+            _("AudD enterprise upload exceeds {limit} bytes (got {size}).").format(
+                limit=MAX_AUDD_ENTERPRISE_BYTES,
+                size=size,
+            )
+        )
+
+    data: dict[str, Any] = {
+        "api_token": api_token,
+        "return": "apple_music,spotify,deezer",
+    }
+    _apply_enterprise_params(data, enterprise_params)
+
+    try:
+        with audio_path.open("rb") as handle:
+            files = {"file": (audio_path.name, handle, "application/octet-stream")}
+            response = requests.post(endpoint, data=data, files=files, timeout=timeout)
+    except requests.RequestException as exc:  # pragma: no cover - network failures
+        message = _redact_audd_token(_("AudD request failed: {error}").format(error=exc))
+        raise AudDLookupError(message) from exc
+
+    if response.status_code != 200:
+        raise AudDLookupError(
+            _("AudD returned an unexpected HTTP status: {status}").format(
+                status=response.status_code
+            )
+        )
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise AudDLookupError(_("Invalid JSON response received from AudD.")) from exc
+
+    if payload.get("status") != "success":
+        message = _extract_error_message(payload)
+        raise AudDLookupError(message)
+
+    result = payload.get("result")
+    if not result:
+        return []
+
+    entries = result if isinstance(result, list) else [result]
+    matches: list[AcoustIDMatch] = []
+
+    for entry in entries:
+        match = _normalize_entry(entry)
+        if match:
+            matches.append(match.to_acoustid_match())
+
+    return matches
+
+
+def _apply_enterprise_params(
+    payload: dict[str, Any],
+    params: AudDEnterpriseParams,
+) -> None:
+    """Attach optional enterprise parameters to the request payload."""
+    if params.skip:
+        payload["skip"] = ",".join(str(int(value)) for value in params.skip)
+    if params.every is not None:
+        payload["every"] = str(params.every)
+    if params.limit is not None:
+        payload["limit"] = str(int(params.limit))
+    if params.skip_first_seconds is not None:
+        payload["skip_first_seconds"] = str(params.skip_first_seconds)
+    if params.accurate_offsets:
+        payload["accurate_offsets"] = "1"
+    if params.use_timecode:
+        payload["use_timecode"] = "1"
 
 
 def _normalize_entry(entry: Any) -> AudDMatch | None:
@@ -235,19 +359,21 @@ def _build_synthetic_identifier(artist: str | None, title: str | None) -> str:
     return f"audd:{digest}"
 
 
-def needs_audd_snippet(audio_path: Path) -> bool:
+def needs_audd_snippet(audio_path: Path, *, max_bytes: int | None = None) -> bool:
     """Return True when the audio file exceeds AudD's upload size limit."""
+    limit = MAX_AUDD_BYTES if max_bytes is None else max_bytes
     try:
-        return audio_path.stat().st_size > MAX_AUDD_BYTES
+        return audio_path.stat().st_size > limit
     except OSError as exc:  # pragma: no cover - filesystem failures
         message = _redact_audd_token(_("Unable to access audio file: {error}").format(error=exc))
         raise AudDLookupError(message) from exc
 
 
 @contextmanager
-def _prepare_audd_payload(audio_path: Path) -> Iterator[Path]:
+def _prepare_audd_payload(audio_path: Path, *, max_bytes: int | None = None) -> Iterator[Path]:
     """Return a context manager yielding the path to upload to AudD."""
-    if not needs_audd_snippet(audio_path):
+    limit = MAX_AUDD_BYTES if max_bytes is None else max_bytes
+    if not needs_audd_snippet(audio_path, max_bytes=limit):
         yield audio_path
         return
 
@@ -260,10 +386,10 @@ def _prepare_audd_payload(audio_path: Path) -> Iterator[Path]:
     try:
         _render_snippet(audio_path, snippet_path)
         size = snippet_path.stat().st_size
-        if size > MAX_AUDD_BYTES:
+        if size > limit:
             raise AudDLookupError(
                 _("AudD snippet still exceeds {limit} bytes (got {size}).").format(
-                    limit=MAX_AUDD_BYTES,
+                    limit=limit,
                     size=size,
                 )
             )

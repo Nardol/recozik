@@ -271,7 +271,7 @@ def test_identify_uses_audd_fallback(monkeypatch, tmp_path: Path, cli_runner: Cl
         pass
 
     monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
-    monkeypatch.setattr(audd, "recognize_with_audd", lambda token, path: [fake_match])
+    monkeypatch.setattr(audd, "recognize_with_audd", lambda token, path, **_kwargs: [fake_match])
 
     result = cli_runner.invoke(
         cli.app,

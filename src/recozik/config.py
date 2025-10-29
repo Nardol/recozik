@@ -5,9 +5,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import platformdirs
 
+from .audd import DEFAULT_ENDPOINT as AUDD_DEFAULT_ENDPOINT
+from .audd import ENTERPRISE_ENDPOINT as AUDD_ENTERPRISE_ENDPOINT
 from .i18n import _
 
 try:  # pragma: no cover - depends on the Python version
@@ -26,6 +29,17 @@ class AppConfig:
 
     acoustid_api_key: str | None = None
     audd_api_token: str | None = None
+    audd_endpoint_standard: str = AUDD_DEFAULT_ENDPOINT
+    audd_endpoint_enterprise: str = AUDD_ENTERPRISE_ENDPOINT
+    audd_mode: str = "standard"
+    audd_force_enterprise: bool = False
+    audd_enterprise_fallback: bool = False
+    audd_skip: tuple[int, ...] = ()
+    audd_every: float | None = None
+    audd_limit: int | None = None
+    audd_skip_first_seconds: float | None = None
+    audd_accurate_offsets: bool = False
+    audd_use_timecode: bool = False
     cache_enabled: bool = True
     cache_ttl_hours: int = 24
     output_template: str | None = None
@@ -65,9 +79,23 @@ class AppConfig:
         if default_mode not in {"dry-run", "apply"}:
             default_mode = "dry-run"
 
+        audd_skip_list: list[int] = list(self.audd_skip)
+
         data: dict[str, dict] = {
             "acoustid": {},
-            "audd": {},
+            "audd": {
+                "endpoint_standard": self.audd_endpoint_standard or AUDD_DEFAULT_ENDPOINT,
+                "endpoint_enterprise": self.audd_endpoint_enterprise or AUDD_ENTERPRISE_ENDPOINT,
+                "mode": (self.audd_mode or "standard").strip().lower(),
+                "force_enterprise": bool(self.audd_force_enterprise),
+                "enterprise_fallback": bool(self.audd_enterprise_fallback),
+                "skip": audd_skip_list,
+                "every": self.audd_every,
+                "limit": self.audd_limit,
+                "skip_first_seconds": self.audd_skip_first_seconds,
+                "accurate_offsets": bool(self.audd_accurate_offsets),
+                "use_timecode": bool(self.audd_use_timecode),
+            },
             "cache": {
                 "enabled": self.cache_enabled,
                 "ttl_hours": self.cache_ttl_hours,
@@ -164,6 +192,118 @@ def load_config(path: Path | None = None) -> AppConfig:
     audd_token = audd_section.get("api_token")
     if audd_token is not None and not isinstance(audd_token, str):
         raise RuntimeError(_("The field audd.api_token must be a string."))
+
+    endpoint_standard_raw = audd_section.get("endpoint_standard", AUDD_DEFAULT_ENDPOINT)
+    if endpoint_standard_raw is None:
+        endpoint_standard_value = AUDD_DEFAULT_ENDPOINT
+    elif isinstance(endpoint_standard_raw, str):
+        endpoint_standard_value = endpoint_standard_raw or AUDD_DEFAULT_ENDPOINT
+    else:
+        raise RuntimeError(_("The field audd.endpoint_standard must be a string."))
+
+    endpoint_enterprise_raw = audd_section.get("endpoint_enterprise", AUDD_ENTERPRISE_ENDPOINT)
+    if endpoint_enterprise_raw is None:
+        endpoint_enterprise_value = AUDD_ENTERPRISE_ENDPOINT
+    elif isinstance(endpoint_enterprise_raw, str):
+        endpoint_enterprise_value = endpoint_enterprise_raw or AUDD_ENTERPRISE_ENDPOINT
+    else:
+        raise RuntimeError(_("The field audd.endpoint_enterprise must be a string."))
+
+    mode_raw = audd_section.get("mode", "standard")
+    if mode_raw is None:
+        mode_value = "standard"
+    elif isinstance(mode_raw, str):
+        mode_value = mode_raw.strip().lower() or "standard"
+    else:
+        raise RuntimeError(_("The field audd.mode must be a string."))
+    if mode_value not in {"standard", "enterprise", "auto"}:
+        raise RuntimeError(_("The field audd.mode must be standard, enterprise, or auto."))
+
+    def _coerce_bool(raw: Any, field: str, default: bool = False) -> bool:
+        if raw is None:
+            return default
+        if isinstance(raw, bool):
+            return raw
+        raise RuntimeError(_("The field {field} must be a boolean.").format(field=field))
+
+    def _coerce_optional_float(raw: Any, field: str) -> float | None:
+        if raw is None:
+            return None
+        if isinstance(raw, (int, float)):
+            return float(raw)
+        if isinstance(raw, str):
+            text = raw.strip()
+            if not text:
+                return None
+            try:
+                return float(text)
+            except ValueError as exc:  # pragma: no cover - user validation
+                raise RuntimeError(
+                    _("The field {field} must be a number.").format(field=field)
+                ) from exc
+        raise RuntimeError(_("The field {field} must be a number.").format(field=field))
+
+    def _coerce_optional_int(raw: Any, field: str) -> int | None:
+        if raw is None:
+            return None
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, float) and raw.is_integer():
+            return int(raw)
+        if isinstance(raw, str):
+            text = raw.strip()
+            if not text:
+                return None
+            try:
+                return int(text)
+            except ValueError as exc:  # pragma: no cover - user validation
+                raise RuntimeError(
+                    _("The field {field} must be an integer.").format(field=field)
+                ) from exc
+        raise RuntimeError(_("The field {field} must be an integer.").format(field=field))
+
+    force_enterprise_value = _coerce_bool(
+        audd_section.get("force_enterprise", False),
+        "audd.force_enterprise",
+    )
+    enterprise_fallback_value = _coerce_bool(
+        audd_section.get("enterprise_fallback", False),
+        "audd.enterprise_fallback",
+    )
+
+    skip_raw = audd_section.get("skip")
+    skip_values: tuple[int, ...]
+    if skip_raw is None:
+        skip_values = ()
+    elif isinstance(skip_raw, (list, tuple)):
+        temp_list: list[int] = []
+        for item in skip_raw:
+            coerced = _coerce_optional_int(item, "audd.skip")
+            if coerced is None:
+                continue
+            temp_list.append(coerced)
+        skip_values = tuple(temp_list)
+    elif isinstance(skip_raw, str):
+        parts = [part.strip() for part in skip_raw.split(",") if part.strip()]
+        temp_list = []
+        for part in parts:
+            try:
+                temp_list.append(int(part))
+            except ValueError as exc:  # pragma: no cover - user validation
+                raise RuntimeError(_("The field audd.skip must be a list of integers.")) from exc
+        skip_values = tuple(temp_list)
+    else:
+        raise RuntimeError(_("The field audd.skip must be a list of integers."))
+
+    every_value = _coerce_optional_float(audd_section.get("every"), "audd.every")
+    limit_value = _coerce_optional_int(audd_section.get("limit"), "audd.limit")
+    skip_first_value = _coerce_optional_float(
+        audd_section.get("skip_first_seconds"), "audd.skip_first_seconds"
+    )
+    accurate_offsets_value = _coerce_bool(
+        audd_section.get("accurate_offsets", False), "audd.accurate_offsets"
+    )
+    use_timecode_value = _coerce_bool(audd_section.get("use_timecode", False), "audd.use_timecode")
 
     cache_section = data.get("cache", {}) or {}
     cache_enabled = bool(cache_section.get("enabled", True))
@@ -322,6 +462,17 @@ def load_config(path: Path | None = None) -> AppConfig:
     return AppConfig(
         acoustid_api_key=api_key,
         audd_api_token=audd_token,
+        audd_endpoint_standard=endpoint_standard_value,
+        audd_endpoint_enterprise=endpoint_enterprise_value,
+        audd_mode=mode_value,
+        audd_force_enterprise=force_enterprise_value,
+        audd_enterprise_fallback=enterprise_fallback_value,
+        audd_skip=skip_values,
+        audd_every=every_value,
+        audd_limit=limit_value,
+        audd_skip_first_seconds=skip_first_value,
+        audd_accurate_offsets=accurate_offsets_value,
+        audd_use_timecode=use_timecode_value,
         cache_enabled=cache_enabled,
         cache_ttl_hours=cache_ttl_hours,
         output_template=template,
@@ -377,12 +528,54 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append("")
 
     lines.append("[audd]")
-    audd_token = data["audd"].get("api_token")
+    audd_section = data["audd"]
+    audd_token = audd_section.get("api_token")
     if audd_token:
         escaped = audd_token.replace('"', '\\"')
         lines.append(f'api_token = "{escaped}"')
     else:
         lines.append('# api_token = "your_audd_token"')
+
+    endpoint_standard = audd_section.get("endpoint_standard") or AUDD_DEFAULT_ENDPOINT
+    endpoint_enterprise = audd_section.get("endpoint_enterprise") or AUDD_ENTERPRISE_ENDPOINT
+    lines.append(f'endpoint_standard = "{endpoint_standard}"')
+    lines.append(f'endpoint_enterprise = "{endpoint_enterprise}"')
+
+    mode_value = audd_section.get("mode", "standard") or "standard"
+    lines.append(f'mode = "{mode_value}"')
+
+    lines.append(f"force_enterprise = {str(audd_section.get('force_enterprise', False)).lower()}")
+    lines.append(
+        f"enterprise_fallback = {str(audd_section.get('enterprise_fallback', False)).lower()}"
+    )
+
+    skip_values = audd_section.get("skip") or []
+    if skip_values:
+        rendered_skip = ", ".join(str(value) for value in skip_values)
+        lines.append(f"skip = [{rendered_skip}]")
+    else:
+        lines.append("# skip = [12, 24, 36]")
+
+    every_value = audd_section.get("every")
+    if every_value is not None:
+        lines.append(f"every = {every_value}")
+    else:
+        lines.append("# every = 6.0")
+
+    limit_value = audd_section.get("limit")
+    if limit_value is not None:
+        lines.append(f"limit = {int(limit_value)}")
+    else:
+        lines.append("# limit = 10")
+
+    skip_first_value = audd_section.get("skip_first_seconds")
+    if skip_first_value is not None:
+        lines.append(f"skip_first_seconds = {skip_first_value}")
+    else:
+        lines.append("# skip_first_seconds = 30")
+
+    lines.append(f"accurate_offsets = {str(audd_section.get('accurate_offsets', False)).lower()}")
+    lines.append(f"use_timecode = {str(audd_section.get('use_timecode', False)).lower()}")
     lines.append("")
 
     lines.append("[cache]")

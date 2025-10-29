@@ -15,6 +15,17 @@ def test_write_and_load_config(tmp_path: Path) -> None:
 
     config = AppConfig(
         acoustid_api_key="abcd1234",
+        audd_endpoint_standard="https://alt.audd.io/",
+        audd_endpoint_enterprise="https://enterprise.audd.io/v2/",
+        audd_mode="enterprise",
+        audd_force_enterprise=True,
+        audd_enterprise_fallback=True,
+        audd_skip=(12, 24),
+        audd_every=6.0,
+        audd_limit=8,
+        audd_skip_first_seconds=30.0,
+        audd_accurate_offsets=True,
+        audd_use_timecode=True,
         cache_enabled=False,
         cache_ttl_hours=12,
         output_template="{artist} - {title} ({score:.2f})",
@@ -49,6 +60,17 @@ def test_write_and_load_config(tmp_path: Path) -> None:
 
     assert loaded.acoustid_api_key == "abcd1234"
     assert loaded.audd_api_token is None
+    assert loaded.audd_endpoint_standard == "https://alt.audd.io/"
+    assert loaded.audd_endpoint_enterprise == "https://enterprise.audd.io/v2/"
+    assert loaded.audd_mode == "enterprise"
+    assert loaded.audd_force_enterprise is True
+    assert loaded.audd_enterprise_fallback is True
+    assert loaded.audd_skip == (12, 24)
+    assert loaded.audd_every == 6.0
+    assert loaded.audd_limit == 8
+    assert loaded.audd_skip_first_seconds == 30.0
+    assert loaded.audd_accurate_offsets is True
+    assert loaded.audd_use_timecode is True
     assert loaded.cache_enabled is False
     assert loaded.cache_ttl_hours == 12
     assert loaded.output_template == "{artist} - {title} ({score:.2f})"
@@ -85,6 +107,17 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
 
     assert config.acoustid_api_key is None
     assert config.audd_api_token is None
+    assert config.audd_endpoint_standard == "https://api.audd.io/"
+    assert config.audd_endpoint_enterprise == "https://enterprise.audd.io/"
+    assert config.audd_mode == "standard"
+    assert config.audd_force_enterprise is False
+    assert config.audd_enterprise_fallback is False
+    assert config.audd_skip == ()
+    assert config.audd_every is None
+    assert config.audd_limit is None
+    assert config.audd_skip_first_seconds is None
+    assert config.audd_accurate_offsets is False
+    assert config.audd_use_timecode is False
     assert config.cache_enabled is True
     assert config.cache_ttl_hours == 24
     assert config.output_template is None

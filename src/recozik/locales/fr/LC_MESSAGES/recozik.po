@@ -138,6 +138,9 @@ msgstr "L'extrait AudD dépasse toujours {limit} octets (taille {size})."
 msgid "AudD snippet generation requires librosa: {error}"
 msgstr "La génération d'extraits AudD nécessite librosa : {error}"
 
+msgid "AudD enterprise upload exceeds {limit} bytes (got {size})."
+msgstr "L'envoi AudD enterprise dépasse {limit} octets (taille {size})."
+
 msgid "Failed to read audio for AudD snippet: {error}"
 msgstr "Lecture audio impossible pour l'extrait AudD : {error}"
 
@@ -266,6 +269,12 @@ msgstr "Configurez-le avec `recozik config set-audd-token` quand vous êtes prê
 
 msgid "No AudD token provided."
 msgstr "Aucun jeton AudD fourni."
+
+msgid "Invalid value for environment variable {name}: {value}"
+msgstr "Valeur invalide pour la variable d'environnement {name} : {value}"
+
+msgid "Invalid AudD mode: {value}."
+msgstr "Mode AudD invalide : {value}."
 
 msgid "Directory containing the audio files."
 msgstr "Dossier contenant les fichiers audio."
