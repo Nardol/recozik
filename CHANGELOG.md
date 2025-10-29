@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased changes yet.
 
+## [0.9.0] - 2025-10-29
+
+- Added AudD enterprise API support.
+
 ## [0.8.0] - 2025-10-28
 
 - Streamlined AudD identification output and display a strategy banner when fallbacks engage.
