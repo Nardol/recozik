@@ -55,6 +55,52 @@ def config_show(
     else:
         typer.echo(_("AudD token: not configured"))
         typer.echo(_("Set it with `recozik config set-audd-token` when you are ready."))
+
+    typer.echo(
+        _("AudD endpoints: standard {standard}, enterprise {enterprise}").format(
+            standard=config.audd_endpoint_standard,
+            enterprise=config.audd_endpoint_enterprise,
+        )
+    )
+
+    force_state = _("yes") if config.audd_force_enterprise else _("no")
+    fallback_state = _("yes") if config.audd_enterprise_fallback else _("no")
+    typer.echo(
+        _("AudD mode: {mode} (force enterprise {force}, fallback {fallback})").format(
+            mode=config.audd_mode,
+            force=force_state,
+            fallback=fallback_state,
+        )
+    )
+
+    skip_display = (
+        ", ".join(str(value) for value in config.audd_skip) if config.audd_skip else _("none")
+    )
+    every_display = str(config.audd_every) if config.audd_every is not None else _("unset")
+    limit_display = str(config.audd_limit) if config.audd_limit is not None else _("unset")
+    skip_first_display = (
+        str(config.audd_skip_first_seconds)
+        if config.audd_skip_first_seconds is not None
+        else _("unset")
+    )
+    accurate_offsets_state = _("yes") if config.audd_accurate_offsets else _("no")
+    timecode_state = _("yes") if config.audd_use_timecode else _("no")
+
+    message_template = _(
+        "AudD enterprise options: skip {skip}, every {every}, limit {limit}, "
+        "skip_first {skip_first}, accurate_offsets {accurate}, timecode {timecode}"
+    )
+    typer.echo(
+        message_template.format(
+            skip=skip_display,
+            every=every_display,
+            limit=limit_display,
+            skip_first=skip_first_display,
+            accurate=accurate_offsets_state,
+            timecode=timecode_state,
+        )
+    )
+
     cache_state = _("yes") if config.cache_enabled else _("no")
     typer.echo(
         _("Cache enabled: {state} (TTL: {hours} h)").format(
@@ -144,6 +190,17 @@ def config_set_key(
     updated = config_module.AppConfig(
         acoustid_api_key=key,
         audd_api_token=existing.audd_api_token,
+        audd_endpoint_standard=existing.audd_endpoint_standard,
+        audd_endpoint_enterprise=existing.audd_endpoint_enterprise,
+        audd_mode=existing.audd_mode,
+        audd_force_enterprise=existing.audd_force_enterprise,
+        audd_enterprise_fallback=existing.audd_enterprise_fallback,
+        audd_skip=existing.audd_skip,
+        audd_every=existing.audd_every,
+        audd_limit=existing.audd_limit,
+        audd_skip_first_seconds=existing.audd_skip_first_seconds,
+        audd_accurate_offsets=existing.audd_accurate_offsets,
+        audd_use_timecode=existing.audd_use_timecode,
         cache_enabled=existing.cache_enabled,
         cache_ttl_hours=existing.cache_ttl_hours,
         output_template=existing.output_template,
@@ -223,6 +280,17 @@ def config_set_audd_token(
     updated = config_module.AppConfig(
         acoustid_api_key=existing.acoustid_api_key,
         audd_api_token=token,
+        audd_endpoint_standard=existing.audd_endpoint_standard,
+        audd_endpoint_enterprise=existing.audd_endpoint_enterprise,
+        audd_mode=existing.audd_mode,
+        audd_force_enterprise=existing.audd_force_enterprise,
+        audd_enterprise_fallback=existing.audd_enterprise_fallback,
+        audd_skip=existing.audd_skip,
+        audd_every=existing.audd_every,
+        audd_limit=existing.audd_limit,
+        audd_skip_first_seconds=existing.audd_skip_first_seconds,
+        audd_accurate_offsets=existing.audd_accurate_offsets,
+        audd_use_timecode=existing.audd_use_timecode,
         cache_enabled=existing.cache_enabled,
         cache_ttl_hours=existing.cache_ttl_hours,
         output_template=existing.output_template,
