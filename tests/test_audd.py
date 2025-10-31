@@ -114,7 +114,8 @@ def test_render_snippet_falls_back_to_ffmpeg(
 
     def fake_ffmpeg(*_args, **_kwargs) -> None:
         fallback_called["value"] = True
-        destination.write_bytes(b"RIFFdata")
+        samples = np.zeros(16_000, dtype="float32")
+        soundfile.write(destination, samples, 16_000)
 
     monkeypatch.setattr(audd, "_ffmpeg_support_ready", lambda: True)
     monkeypatch.setattr(audd, "_should_prefer_ffmpeg", lambda _path: True)
@@ -152,3 +153,45 @@ def test_render_snippet_reports_ffmpeg_failure(
     message = str(excinfo.value)
     assert "libsndfile" in message
     assert "ffmpeg pipeline unavailable" in message
+
+
+def test_render_snippet_supports_offset(tmp_path: Path) -> None:
+    """Apply the configured offset when preparing the AudD snippet."""
+    audio_path = tmp_path / "tone.wav"
+    duration = 2.0
+    sample_rate = 16_000
+    time_axis = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+    mono = np.sin(2 * np.pi * 440 * time_axis).astype("float32")
+    soundfile.write(audio_path, mono, sample_rate)
+
+    destination = tmp_path / "snippet.wav"
+    info = audd._render_snippet(  # type: ignore[attr-defined]
+        audio_path,
+        destination,
+        snippet_seconds=1.0,
+        target_sample_rate=16_000,
+        snippet_offset=0.5,
+    )
+
+    assert destination.exists()
+    assert pytest.approx(info.offset_seconds, rel=1e-6) == 0.5
+    assert 0.9 <= info.duration_seconds <= 1.01
+    assert info.rms > 0
+
+
+def test_render_snippet_rejects_offset_beyond_duration(tmp_path: Path) -> None:
+    """Raise an error when the requested offset exceeds the audio duration."""
+    audio_path = tmp_path / "tone.wav"
+    mono = np.zeros(4000, dtype="float32")
+    soundfile.write(audio_path, mono, 16_000)
+
+    destination = tmp_path / "snippet.wav"
+
+    with pytest.raises(audd.AudDLookupError):
+        audd._render_snippet(  # type: ignore[attr-defined]
+            audio_path,
+            destination,
+            snippet_seconds=1.0,
+            target_sample_rate=16_000,
+            snippet_offset=5.0,
+        )

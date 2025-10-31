@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
-    from ..audd import AudDEnterpriseParams
+    from ..audd import AudDEnterpriseParams, SnippetInfo
 
 from ..fingerprint import AcoustIDMatch
 
@@ -25,11 +25,13 @@ class AudDSupport:
     snippet_seconds: float
     default_standard_endpoint: str
     default_enterprise_endpoint: str
-    recognize_standard: Callable[[str, Path, str | None, float | None], list[AcoustIDMatch]]
+    recognize_standard: Callable[
+        [str, Path, str | None, float | None, float | None, Callable[[SnippetInfo], None] | None],
+        list[AcoustIDMatch],
+    ]
     recognize_enterprise: Callable[
         [str, Path, str | None, float | None, AudDEnterpriseParams | None], list[AcoustIDMatch]
     ]
-    needs_snippet: Callable[[Path, int | None], bool]
     error_cls: type[Exception]
     enterprise_params_cls: type[AudDEnterpriseParams]
 
@@ -44,6 +46,8 @@ def get_audd_support() -> AudDSupport:
         path: Path,
         endpoint: str | None = None,
         timeout: float | None = None,
+        snippet_offset: float | None = None,
+        snippet_hook: Callable[[audd_module.SnippetInfo], None] | None = None,
     ) -> list[AcoustIDMatch]:
         return audd_module.recognize_with_audd(
             token,
@@ -51,6 +55,8 @@ def get_audd_support() -> AudDSupport:
             endpoint=endpoint or audd_module.DEFAULT_ENDPOINT,
             timeout=timeout or 20.0,
             use_enterprise=False,
+            snippet_offset=snippet_offset,
+            snippet_hook=snippet_hook,
         )
 
     def _recognize_enterprise(
@@ -69,11 +75,6 @@ def get_audd_support() -> AudDSupport:
             enterprise_params=params or audd_module.AudDEnterpriseParams(),
         )
 
-    def _needs_snippet(path: Path, max_bytes: int | None = None) -> bool:
-        return audd_module.needs_audd_snippet(
-            path, max_bytes=max_bytes or audd_module.MAX_AUDD_BYTES
-        )
-
     return AudDSupport(
         standard_max_bytes=audd_module.MAX_AUDD_BYTES,
         enterprise_max_bytes=audd_module.MAX_AUDD_ENTERPRISE_BYTES,
@@ -82,7 +83,6 @@ def get_audd_support() -> AudDSupport:
         default_enterprise_endpoint=audd_module.ENTERPRISE_ENDPOINT,
         recognize_standard=_recognize_standard,
         recognize_enterprise=_recognize_enterprise,
-        needs_snippet=_needs_snippet,
         error_cls=audd_module.AudDLookupError,
         enterprise_params_cls=audd_module.AudDEnterpriseParams,
     )

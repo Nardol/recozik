@@ -6,8 +6,8 @@ import os
 import re
 import shutil
 import tempfile
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
@@ -25,7 +25,8 @@ DEFAULT_ENDPOINT = "https://api.audd.io/"
 ENTERPRISE_ENDPOINT = "https://enterprise.audd.io/"
 MAX_AUDD_BYTES = 10 * 1024 * 1024
 MAX_AUDD_ENTERPRISE_BYTES = 1024 * 1024 * 1024
-SNIPPET_DURATION_SECONDS = 45.0
+SNIPPET_DURATION_SECONDS = 12.0
+SNIPPET_OFFSET_SECONDS = 0.0
 _AUDD_TARGET_SAMPLE_RATE = 16_000
 _AUDD_SNIPPET_SUFFIX = ".wav"
 _TOKEN_PATTERN = re.compile(r"(?i)(['\"]?api_token['\"]?\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^&\s]+)")
@@ -125,6 +126,15 @@ class AudDMatch:
         )
 
 
+@dataclass(slots=True)
+class SnippetInfo:
+    """Metadata collected while preparing the AudD snippet."""
+
+    offset_seconds: float
+    duration_seconds: float
+    rms: float
+
+
 def recognize_with_audd(
     api_token: str,
     audio_path: Path,
@@ -133,6 +143,8 @@ def recognize_with_audd(
     timeout: float = 20.0,
     use_enterprise: bool = False,
     enterprise_params: AudDEnterpriseParams | None = None,
+    snippet_offset: float | None = None,
+    snippet_hook: Callable[[SnippetInfo], None] | None = None,
 ) -> list[AcoustIDMatch]:
     """Send an identification request to AudD and normalize results."""
     if not api_token:
@@ -149,8 +161,11 @@ def recognize_with_audd(
             enterprise_params=enterprise_params or AudDEnterpriseParams(),
         )
 
+    offset_value = (
+        SNIPPET_OFFSET_SECONDS if snippet_offset is None else max(0.0, float(snippet_offset))
+    )
     try:
-        payload_manager = _prepare_audd_payload(audio_path)
+        payload_manager = _prepare_audd_payload(audio_path, snippet_offset=offset_value)
     except AudDLookupError:
         raise
     except Exception as exc:  # pragma: no cover - defensive
@@ -159,7 +174,11 @@ def recognize_with_audd(
         )
         raise AudDLookupError(message) from exc
 
-    with payload_manager as payload_path:
+    with payload_manager as payload_data:
+        payload_path, snippet_info = payload_data
+        if snippet_hook is not None:
+            with suppress(Exception):  # pragma: no cover - user-defined hook errors
+                snippet_hook(snippet_info)
         try:
             with payload_path.open("rb") as handle:
                 files = {"file": (audio_path.name, handle, "application/octet-stream")}
@@ -370,13 +389,14 @@ def needs_audd_snippet(audio_path: Path, *, max_bytes: int | None = None) -> boo
 
 
 @contextmanager
-def _prepare_audd_payload(audio_path: Path, *, max_bytes: int | None = None) -> Iterator[Path]:
-    """Return a context manager yielding the path to upload to AudD."""
+def _prepare_audd_payload(
+    audio_path: Path,
+    *,
+    max_bytes: int | None = None,
+    snippet_offset: float = SNIPPET_OFFSET_SECONDS,
+) -> Iterator[tuple[Path, SnippetInfo]]:
+    """Return a context manager yielding the snippet metadata and path to upload to AudD."""
     limit = MAX_AUDD_BYTES if max_bytes is None else max_bytes
-    if not needs_audd_snippet(audio_path, max_bytes=limit):
-        yield audio_path
-        return
-
     fd, raw_path = tempfile.mkstemp(prefix="recozik-audd-", suffix=_AUDD_SNIPPET_SUFFIX)
     try:
         os.close(fd)
@@ -384,7 +404,13 @@ def _prepare_audd_payload(audio_path: Path, *, max_bytes: int | None = None) -> 
         pass
     snippet_path = Path(raw_path)
     try:
-        _render_snippet(audio_path, snippet_path)
+        info = _render_snippet(
+            audio_path,
+            snippet_path,
+            snippet_seconds=SNIPPET_DURATION_SECONDS,
+            target_sample_rate=_AUDD_TARGET_SAMPLE_RATE,
+            snippet_offset=snippet_offset,
+        )
         size = snippet_path.stat().st_size
         if size > limit:
             raise AudDLookupError(
@@ -393,7 +419,7 @@ def _prepare_audd_payload(audio_path: Path, *, max_bytes: int | None = None) -> 
                     size=size,
                 )
             )
-        yield snippet_path
+        yield snippet_path, info
     finally:
         snippet_path.unlink(missing_ok=True)
 
@@ -404,8 +430,10 @@ def _render_snippet(
     *,
     snippet_seconds: float = SNIPPET_DURATION_SECONDS,
     target_sample_rate: int = _AUDD_TARGET_SAMPLE_RATE,
-) -> None:
-    """Render a mono PCM snippet suitable for AudD uploads."""
+    snippet_offset: float = SNIPPET_OFFSET_SECONDS,
+) -> SnippetInfo:
+    """Render a mono PCM snippet suitable for AudD uploads and return metrics."""
+    offset_seconds = max(0.0, float(snippet_offset))
     ffmpeg_ready = _ffmpeg_support_ready()
     prefer_ffmpeg = _should_prefer_ffmpeg(audio_path) and ffmpeg_ready
 
@@ -421,8 +449,14 @@ def _render_snippet(
                 destination,
                 snippet_seconds=snippet_seconds,
                 target_sample_rate=target_sample_rate,
+                snippet_offset=offset_seconds,
             )
-            return
+            analysis = _analyse_snippet(destination)
+            return SnippetInfo(
+                offset_seconds=offset_seconds,
+                duration_seconds=analysis[0],
+                rms=analysis[1],
+            )
         except AudDLookupError as exc:
             ffmpeg_error = exc
 
@@ -432,8 +466,14 @@ def _render_snippet(
             destination,
             snippet_seconds=snippet_seconds,
             target_sample_rate=target_sample_rate,
+            snippet_offset=offset_seconds,
         )
-        return
+        analysis = _analyse_snippet(destination)
+        return SnippetInfo(
+            offset_seconds=offset_seconds,
+            duration_seconds=analysis[0],
+            rms=analysis[1],
+        )
     except AudDLookupError:
         raise
     except Exception as exc:
@@ -447,8 +487,14 @@ def _render_snippet(
                 destination,
                 snippet_seconds=snippet_seconds,
                 target_sample_rate=target_sample_rate,
+                snippet_offset=offset_seconds,
             )
-            return
+            analysis = _analyse_snippet(destination)
+            return SnippetInfo(
+                offset_seconds=offset_seconds,
+                duration_seconds=analysis[0],
+                rms=analysis[1],
+            )
         except AudDLookupError as exc:
             ffmpeg_error = exc
 
@@ -475,6 +521,7 @@ def _render_snippet_with_soundfile(
     *,
     snippet_seconds: float,
     target_sample_rate: int,
+    snippet_offset: float,
 ) -> None:
     """Try to render the AudD snippet via libsndfile/librosa."""
     try:
@@ -489,13 +536,20 @@ def _render_snippet_with_soundfile(
         with soundfile.SoundFile(audio_path, "r") as source:
             source_frames = source.frames
             source_rate = source.samplerate
+            start_frame = int(min(max(snippet_offset * source_rate, 0.0), float(source_frames)))
+            if start_frame >= source_frames:
+                raise AudDLookupError(
+                    _(
+                        "Audio file is shorter than the requested AudD snippet offset ({offset}s)."
+                    ).format(offset=snippet_offset)
+                )
             duration_frames = min(
                 int(snippet_seconds * source_rate),
-                source_frames,
+                max(source_frames - start_frame, 0),
             )
             if duration_frames <= 0:
                 raise AudDLookupError(_("Audio file is empty."))
-            source.seek(0)
+            source.seek(start_frame)
             buffer = source.read(duration_frames, dtype="float32", always_2d=True)
     except RuntimeError as exc:
         message = _redact_audd_token(
@@ -527,6 +581,7 @@ def _render_snippet_with_ffmpeg(
     *,
     snippet_seconds: float,
     target_sample_rate: int,
+    snippet_offset: float,
 ) -> None:
     """Render the AudD snippet via ffmpeg when libsndfile cannot decode the file."""
     ffmpeg_executable = shutil.which("ffmpeg")
@@ -546,8 +601,11 @@ def _render_snippet_with_ffmpeg(
         raise AudDLookupError(message) from exc
 
     try:
+        input_kwargs: dict[str, float] = {}
+        if snippet_offset > 0.0:
+            input_kwargs["ss"] = snippet_offset
         (
-            ffmpeg.input(str(audio_path))
+            ffmpeg.input(str(audio_path), **input_kwargs)
             .output(
                 str(destination),
                 ac=1,
@@ -587,6 +645,34 @@ def _render_snippet_with_ffmpeg(
                 size=size,
             )
         )
+    if size == 0:
+        raise AudDLookupError(_("Failed to read audio for AudD snippet: unknown error"))
+
+
+def _analyse_snippet(snippet_path: Path) -> tuple[float, float]:
+    """Read the rendered snippet and compute duration/RMS metrics."""
+    try:
+        samples, rate = soundfile.read(snippet_path, dtype="float32")
+    except Exception as exc:  # pragma: no cover - defensive path
+        message = _redact_audd_token(
+            _("Failed to read audio for AudD snippet: {error}").format(error=exc)
+        )
+        raise AudDLookupError(message) from exc
+
+    if samples.size == 0 or rate <= 0:
+        raise AudDLookupError(_("Audio file is empty."))
+
+    if samples.ndim > 1:
+        mono = np.mean(samples, axis=1)
+    else:
+        mono = samples
+
+    duration_seconds = float(len(mono) / rate)
+    if duration_seconds <= 0:
+        raise AudDLookupError(_("Audio file is empty."))
+
+    rms = float(np.sqrt(np.mean(np.square(mono, dtype=np.float64))))
+    return duration_seconds, rms
 
 
 def _ffmpeg_support_ready() -> bool:

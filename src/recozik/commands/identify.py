@@ -118,6 +118,16 @@ def identify(
         "--audd-limit",
         help=_("Enterprise: maximum number of matches to return."),
     ),
+    audd_snippet_offset: float | None = typer.Option(
+        None,
+        "--audd-snippet-offset",
+        help=_("Seconds from the start before extracting the AudD standard snippet."),
+    ),
+    audd_snippet_min_level: float | None = typer.Option(
+        None,
+        "--audd-snippet-min-rms",
+        help=_("Warn when the AudD snippet RMS falls below this value."),
+    ),
     audd_skip_first: float | None = typer.Option(
         None,
         "--audd-skip-first",
@@ -232,6 +242,8 @@ def identify(
     env_skip_first = _parse_env("AUDD_SKIP_FIRST_SECONDS", parse_float_env)
     env_accurate_offsets = _parse_env("AUDD_ACCURATE_OFFSETS", parse_bool_env)
     env_use_timecode = _parse_env("AUDD_USE_TIMECODE", parse_bool_env)
+    env_snippet_offset = _parse_env("AUDD_SNIPPET_OFFSET", parse_float_env)
+    env_snippet_min_level = _parse_env("AUDD_SNIPPET_MIN_RMS", parse_float_env)
 
     fallback_audd_token = (audd_token or env_audd_token or (config.audd_api_token or "")).strip()
     audd_enabled_setting = use_audd if use_audd is not None else config.identify_audd_enabled
@@ -368,6 +380,32 @@ def identify(
         accurate_offsets=accurate_offsets_value,
         use_timecode=use_timecode_value,
     )
+
+    def _coerce_non_negative(value: float | None, option_name: str) -> float | None:
+        if value is None:
+            return None
+        if value < 0:
+            raise typer.BadParameter(
+                _("{option} must be zero or greater.").format(option=option_name)
+            )
+        return value
+
+    snippet_offset_value = resolve_option(
+        ctx,
+        "audd_snippet_offset",
+        audd_snippet_offset,
+        config.audd_snippet_offset,
+        env_value=env_snippet_offset,
+        transform=lambda value: _coerce_non_negative(value, "--audd-snippet-offset"),
+    )
+    snippet_min_level_value = resolve_option(
+        ctx,
+        "audd_snippet_min_level",
+        audd_snippet_min_level,
+        config.audd_snippet_min_level,
+        env_value=env_snippet_min_level,
+        transform=lambda value: _coerce_non_negative(value, "--audd-snippet-min-rms"),
+    )
     audd_available = bool(fallback_audd_token) and audd_enabled_setting
     announce_value = resolve_option(
         ctx,
@@ -458,18 +496,10 @@ def identify(
     error_cls = support.error_cls
     audd_attempted = False
 
-    standard_limit = audd_module.MAX_AUDD_BYTES
-
     def determine_primary_mode() -> AudDMode:
         if force_enterprise_value:
             return AudDMode.ENTERPRISE
         if audd_mode_value is AudDMode.AUTO:
-            try:
-                file_size = resolved_audio.stat().st_size
-            except OSError:
-                file_size = 0
-            if file_size > standard_limit:
-                return AudDMode.ENTERPRISE
             if (
                 enterprise_params.skip
                 or enterprise_params.every is not None
@@ -486,34 +516,49 @@ def identify(
         nonlocal audd_attempted
         audd_attempted = True
         snippet_announced = False
+        snippet_warned = False
+
+        def handle_snippet(info: audd_module.SnippetInfo) -> None:
+            nonlocal snippet_announced, snippet_warned
+            display_seconds = int(support.snippet_seconds)
+            if not snippet_announced:
+                if info.offset_seconds > 0:
+                    message = _(
+                        "Preparing AudD snippet (~{seconds}s, mono 16 kHz) starting at "
+                        "~{offset}s before upload."
+                    ).format(
+                        seconds=display_seconds,
+                        offset=f"{info.offset_seconds:.2f}",
+                    )
+                    typer.echo(message, err=json_value)
+                else:
+                    message = _(
+                        "Preparing AudD snippet (~{seconds}s, mono 16 kHz) before upload."
+                    ).format(seconds=display_seconds)
+                    typer.echo(message, err=json_value)
+                snippet_announced = True
+
+            if (
+                snippet_min_level_value is not None
+                and info.rms < snippet_min_level_value
+                and not snippet_warned
+            ):
+                warning = _(
+                    "AudD snippet RMS is low (~{rms:.4f}); consider adjusting the offset or "
+                    "using the enterprise endpoint."
+                ).format(rms=info.rms)
+                typer.echo(warning, err=True)
+                snippet_warned = True
 
         def _execute(mode: AudDMode) -> list:
-            nonlocal snippet_announced
             if mode is AudDMode.STANDARD:
-                try:
-                    requires_snippet = support.needs_snippet(
-                        resolved_audio, max_bytes=standard_limit
-                    )
-                except error_cls as exc:
-                    typer.echo(_("AudD lookup failed: {error}.").format(error=exc))
-                    return []
-
-                if requires_snippet and not snippet_announced:
-                    limit_mb = max(1, int(standard_limit / (1024 * 1024)))
-                    snippet_seconds = int(support.snippet_seconds)
-                    typer.echo(
-                        _(
-                            "Preparing AudD snippet (~{seconds}s, mono 16 kHz) "
-                            "because the file exceeds {limit} MB."
-                        ).format(seconds=snippet_seconds, limit=limit_mb)
-                    )
-                    snippet_announced = True
-
                 try:
                     return support.recognize_standard(
                         fallback_audd_token,
                         resolved_audio,
                         endpoint=audd_endpoint_standard_value,
+                        snippet_offset=snippet_offset_value or 0.0,
+                        snippet_hook=handle_snippet,
                     )
                 except error_cls as exc:
                     message = _("AudD lookup failed: {error}.").format(error=exc)
