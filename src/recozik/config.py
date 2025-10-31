@@ -40,6 +40,8 @@ class AppConfig:
     audd_skip_first_seconds: float | None = None
     audd_accurate_offsets: bool = False
     audd_use_timecode: bool = False
+    audd_snippet_offset: float = 0.0
+    audd_snippet_min_level: float | None = None
     cache_enabled: bool = True
     cache_ttl_hours: int = 24
     output_template: str | None = None
@@ -95,6 +97,8 @@ class AppConfig:
                 "skip_first_seconds": self.audd_skip_first_seconds,
                 "accurate_offsets": bool(self.audd_accurate_offsets),
                 "use_timecode": bool(self.audd_use_timecode),
+                "snippet_offset": float(self.audd_snippet_offset or 0.0),
+                "snippet_min_rms": self.audd_snippet_min_level,
             },
             "cache": {
                 "enabled": self.cache_enabled,
@@ -304,6 +308,18 @@ def load_config(path: Path | None = None) -> AppConfig:
         audd_section.get("accurate_offsets", False), "audd.accurate_offsets"
     )
     use_timecode_value = _coerce_bool(audd_section.get("use_timecode", False), "audd.use_timecode")
+    snippet_offset_value = _coerce_optional_float(
+        audd_section.get("snippet_offset"), "audd.snippet_offset"
+    )
+    if snippet_offset_value is None:
+        snippet_offset_value = 0.0
+    if snippet_offset_value < 0:
+        raise RuntimeError(_("The field audd.snippet_offset must be zero or greater."))
+    snippet_min_level_value = _coerce_optional_float(
+        audd_section.get("snippet_min_rms"), "audd.snippet_min_rms"
+    )
+    if snippet_min_level_value is not None and snippet_min_level_value < 0:
+        raise RuntimeError(_("The field audd.snippet_min_rms must be zero or greater."))
 
     cache_section = data.get("cache", {}) or {}
     cache_enabled = bool(cache_section.get("enabled", True))
@@ -473,6 +489,8 @@ def load_config(path: Path | None = None) -> AppConfig:
         audd_skip_first_seconds=skip_first_value,
         audd_accurate_offsets=accurate_offsets_value,
         audd_use_timecode=use_timecode_value,
+        audd_snippet_offset=snippet_offset_value,
+        audd_snippet_min_level=snippet_min_level_value,
         cache_enabled=cache_enabled,
         cache_ttl_hours=cache_ttl_hours,
         output_template=template,
@@ -576,6 +594,13 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
 
     lines.append(f"accurate_offsets = {str(audd_section.get('accurate_offsets', False)).lower()}")
     lines.append(f"use_timecode = {str(audd_section.get('use_timecode', False)).lower()}")
+    snippet_offset_value = audd_section.get("snippet_offset", 0.0)
+    lines.append(f"snippet_offset = {snippet_offset_value}")
+    snippet_min_rms_value = audd_section.get("snippet_min_rms")
+    if snippet_min_rms_value is not None:
+        lines.append(f"snippet_min_rms = {snippet_min_rms_value}")
+    else:
+        lines.append("# snippet_min_rms = 0.0005")
     lines.append("")
 
     lines.append("[cache]")

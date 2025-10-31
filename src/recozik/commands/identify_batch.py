@@ -111,6 +111,16 @@ def identify_batch(
         "--audd-limit",
         help=_("Enterprise: maximum number of matches to return."),
     ),
+    audd_snippet_offset: float | None = typer.Option(
+        None,
+        "--audd-snippet-offset",
+        help=_("Seconds from the start before extracting the AudD standard snippet."),
+    ),
+    audd_snippet_min_level: float | None = typer.Option(
+        None,
+        "--audd-snippet-min-rms",
+        help=_("Warn when the AudD snippet RMS falls below this value."),
+    ),
     audd_skip_first: float | None = typer.Option(
         None,
         "--audd-skip-first",
@@ -273,6 +283,8 @@ def identify_batch(
     env_skip_first = _parse_env("AUDD_SKIP_FIRST_SECONDS", parse_float_env)
     env_accurate_offsets = _parse_env("AUDD_ACCURATE_OFFSETS", parse_bool_env)
     env_use_timecode = _parse_env("AUDD_USE_TIMECODE", parse_bool_env)
+    env_snippet_offset = _parse_env("AUDD_SNIPPET_OFFSET", parse_float_env)
+    env_snippet_min_level = _parse_env("AUDD_SNIPPET_MIN_RMS", parse_float_env)
 
     fallback_audd_token = (audd_token or env_audd_token or (config.audd_api_token or "")).strip()
     audd_enabled_setting = use_audd if use_audd is not None else config.identify_batch_audd_enabled
@@ -412,6 +424,32 @@ def identify_batch(
         use_timecode=use_timecode_value,
     )
 
+    def _coerce_non_negative(value: float | None, option_name: str) -> float | None:
+        if value is None:
+            return None
+        if value < 0:
+            raise typer.BadParameter(
+                _("{option} must be zero or greater.").format(option=option_name)
+            )
+        return value
+
+    snippet_offset_value = resolve_option(
+        ctx,
+        "audd_snippet_offset",
+        audd_snippet_offset,
+        config.audd_snippet_offset,
+        env_value=env_snippet_offset,
+        transform=lambda value: _coerce_non_negative(value, "--audd-snippet-offset"),
+    )
+    snippet_min_level_value = resolve_option(
+        ctx,
+        "audd_snippet_min_level",
+        audd_snippet_min_level,
+        config.audd_snippet_min_level,
+        env_value=env_snippet_min_level,
+        transform=lambda value: _coerce_non_negative(value, "--audd-snippet-min-rms"),
+    )
+
     audd_available = bool(fallback_audd_token) and audd_enabled_setting
 
     limit_value = resolve_option(
@@ -495,20 +533,12 @@ def identify_batch(
             err=True,
         )
     audd_error_cls = support.error_cls
-    standard_limit = audd_module.MAX_AUDD_BYTES
-    audd_limit_mb = max(1, int(standard_limit / (1024 * 1024)))
     audd_snippet_seconds = int(support.snippet_seconds)
 
     def determine_primary_mode_for_file(path: Path) -> AudDMode:
         if force_enterprise_value:
             return AudDMode.ENTERPRISE
         if audd_mode_value is AudDMode.AUTO:
-            try:
-                file_size = path.stat().st_size
-            except OSError:
-                file_size = 0
-            if file_size > standard_limit:
-                return AudDMode.ENTERPRISE
             if (
                 enterprise_params.skip
                 or enterprise_params.every is not None
@@ -531,41 +561,52 @@ def identify_batch(
             return [], None, None, False
 
         snippet_announced = False
+        snippet_warned = False
         last_error: str | None = None
 
+        def handle_snippet(info: audd_module.SnippetInfo) -> None:
+            nonlocal snippet_announced, snippet_warned
+            if not snippet_announced:
+                if info.offset_seconds > 0:
+                    message = _(
+                        "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz) starting "
+                        "at ~{offset}s before upload."
+                    ).format(
+                        path=display_path,
+                        seconds=audd_snippet_seconds,
+                        offset=f"{info.offset_seconds:.2f}",
+                    )
+                    typer.echo(message, err=True)
+                else:
+                    message = _(
+                        "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz) before "
+                        "upload."
+                    ).format(path=display_path, seconds=audd_snippet_seconds)
+                    typer.echo(message, err=True)
+                snippet_announced = True
+
+            if (
+                snippet_min_level_value is not None
+                and info.rms < snippet_min_level_value
+                and not snippet_warned
+            ):
+                warning = _(
+                    "AudD snippet for {path} has low RMS (~{rms:.4f}); consider adjusting the "
+                    "offset or using the enterprise endpoint."
+                ).format(path=display_path, rms=info.rms)
+                typer.echo(warning, err=True)
+                snippet_warned = True
+
         def _execute(mode: AudDMode) -> list[AcoustIDMatch]:
-            nonlocal snippet_announced, last_error
+            nonlocal last_error
             if mode is AudDMode.STANDARD:
-                try:
-                    requires_snippet = support.needs_snippet(path, max_bytes=standard_limit)
-                except audd_error_cls as exc:
-                    last_error = str(exc)
-                    typer.echo(
-                        _("AudD lookup failed for {path}: {error}.").format(
-                            path=display_path,
-                            error=last_error,
-                        )
-                    )
-                    return []
-
-                if requires_snippet and not snippet_announced:
-                    typer.echo(
-                        _(
-                            "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz); "
-                            "file exceeds {limit} MB."
-                        ).format(
-                            path=display_path,
-                            seconds=audd_snippet_seconds,
-                            limit=audd_limit_mb,
-                        )
-                    )
-                    snippet_announced = True
-
                 try:
                     return support.recognize_standard(
                         fallback_audd_token,
                         path,
                         endpoint=audd_endpoint_standard_value,
+                        snippet_offset=snippet_offset_value or 0.0,
+                        snippet_hook=handle_snippet,
                     )
                 except audd_error_cls as exc:
                     last_error = str(exc)

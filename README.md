@@ -94,6 +94,8 @@ Recozik can also call the [AudD Music Recognition API](https://audd.io) when Aco
    | Environment | `AUDD_SKIP_FIRST_SECONDS` | float / seconds | unset | Enterprise: delay scanning by the given offset. | Export before running the CLI. |
    | Environment | `AUDD_ACCURATE_OFFSETS` | boolean | unset | Enterprise: enable per-second offset detection. | Export before running the CLI. |
    | Environment | `AUDD_USE_TIMECODE` | boolean | unset | Enterprise: request formatted timecodes in results. | Export before running the CLI. |
+   | Environment | `AUDD_SNIPPET_OFFSET` | float / seconds | `0` | Standard: shift the 12-second snippet forward before upload. | Export before running the CLI. |
+   | Environment | `AUDD_SNIPPET_MIN_RMS` | float | unset | Warn when the AudD snippet RMS falls below this threshold. | Export before running the CLI. |
 3. The default endpoint (`https://api.audd.io/`) only inspects the first **12 seconds** of audio; AudD support confirmed that longer uploads are truncated rather than analysed in full. Use the enterprise endpoint (`https://enterprise.audd.io/`) when you need to scan an entire file.
 4. When AudD recognises a track, the JSON output still exposes a `source` field (`acoustid` or `audd`) and the batch logs append `Source: AudD.` so you know where every suggestion came from—no console banner required.
 5. For formats that libsndfile cannot decode (e.g. WMA > 10 MB), install `ffmpeg` and the optional extra `pip install recozik[ffmpeg-support]`. Recozik will retry the snippet extraction through FFmpeg before giving up on AudD.
@@ -102,12 +104,13 @@ By default the CLI prints the lookup strategy to `stderr` (for example, “Ident
 
 Advanced knobs are available when you need enterprise behaviour:
 
-- `--audd-mode standard|enterprise|auto` switches endpoints on demand. `auto` sticks with the standard endpoint unless the file is larger than the 10 MiB snippet cap or you enable enterprise-only options.
+- `--audd-mode standard|enterprise|auto` switches endpoints on demand. `auto` sticks with the standard endpoint unless you enable enterprise-only options.
 - `--force-enterprise` bypasses the standard endpoint entirely, while `--audd-enterprise-fallback` retries the enterprise endpoint automatically when the first pass finds nothing.
 - `--audd-endpoint-standard` / `--audd-endpoint-enterprise` redirect requests to custom AudD hosts.
+- `--audd-snippet-offset` shifts the 12-second snippet forward; `--audd-snippet-min-rms` warns when the snippet is nearly silent.
 - `--audd-skip`, `--audd-every`, `--audd-limit`, `--audd-skip-first`, `--audd-accurate-offsets`, and `--audd-use-timecode` mirror the parameters documented on the AudD enterprise API.
 
-Every flag has a matching environment variable (`AUDD_MODE`, `AUDD_FORCE_ENTERPRISE`, `AUDD_ENTERPRISE_FALLBACK`, `AUDD_ENDPOINT_STANDARD`, `AUDD_ENDPOINT_ENTERPRISE`, `AUDD_SKIP`, `AUDD_EVERY`, `AUDD_LIMIT`, `AUDD_SKIP_FIRST_SECONDS`, `AUDD_ACCURATE_OFFSETS`, `AUDD_USE_TIMECODE`) and a configuration field under `[audd]` so you can persist your preferred defaults.
+Every flag has a matching environment variable (`AUDD_MODE`, `AUDD_FORCE_ENTERPRISE`, `AUDD_ENTERPRISE_FALLBACK`, `AUDD_ENDPOINT_STANDARD`, `AUDD_ENDPOINT_ENTERPRISE`, `AUDD_SKIP`, `AUDD_EVERY`, `AUDD_LIMIT`, `AUDD_SKIP_FIRST_SECONDS`, `AUDD_ACCURATE_OFFSETS`, `AUDD_USE_TIMECODE`, `AUDD_SNIPPET_OFFSET`, `AUDD_SNIPPET_MIN_RMS`) and a configuration field under `[audd]` so you can persist your preferred defaults.
 
 On a per-run basis you can still disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Remember that the two commands read separate configuration sections: `identify` pulls defaults from `[identify]`, while `identify-batch` only honours values defined under `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`, `announce_source`).
 
@@ -300,6 +303,8 @@ Each command reads only the section that matches its name. Values under `[identi
 | Config file `[audd]`           | `skip_first_seconds`      | float / seconds                      | unset                           | Enterprise: offset applied before scanning.                           | Edit `config.toml` or pass `--audd-skip-first`.                                        |
 | Config file `[audd]`           | `accurate_offsets`        | boolean                              | `false`                         | Enterprise: enable per-second offset detection.                       | Edit `config.toml` or pass `--audd-accurate-offsets/--no-audd-accurate-offsets`.       |
 | Config file `[audd]`           | `use_timecode`            | boolean                              | `false`                         | Enterprise: request formatted timecodes in results.                   | Edit `config.toml` or pass `--audd-use-timecode/--no-audd-use-timecode`.               |
+| Config file `[audd]`           | `snippet_offset`          | float / seconds                      | `0.0`                           | Standard: shift the 12-second snippet forward before upload.          | Edit `config.toml` or pass `--audd-snippet-offset`.                                    |
+| Config file `[audd]`           | `snippet_min_rms`         | float                                | unset                           | Warn when the AudD snippet RMS falls below this threshold.            | Edit `config.toml` or pass `--audd-snippet-min-rms`.                                   |
 | Config file `[cache]`          | `enabled`                 | boolean                              | `true`                          | Enables the local lookup cache.                                       | Edit `config.toml`.                                                                    |
 | Config file `[cache]`          | `ttl_hours`               | integer                              | `24`                            | Cache time-to-live in hours (minimum 1).                              | Edit `config.toml`.                                                                    |
 | Config file `[output]`         | `template`                | string                               | `"{artist} - {title}"`          | Default template for identify/rename output.                          | Edit `config.toml` or pass `--template`.                                               |

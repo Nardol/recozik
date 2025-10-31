@@ -427,6 +427,110 @@ def test_identify_prefer_audd(monkeypatch, tmp_path: Path, cli_runner: CliRunner
     assert "AudD first, AcoustID fallback." in result.stderr
 
 
+def test_identify_snippet_offset_option(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
+    """Shift the AudD snippet when --audd-snippet-offset is provided."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+    config_path = make_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
+
+    fake_match = AcoustIDMatch(
+        score=0.92,
+        recording_id="audd-offset",
+        title="Offset Track",
+        artist="Artist",
+    )
+
+    captured_offsets: list[float | None] = []
+
+    def fake_recognize(token, path, **kwargs):
+        captured_offsets.append(kwargs.get("snippet_offset"))
+        hook = kwargs.get("snippet_hook")
+        if hook is not None:
+            hook(
+                audd.SnippetInfo(
+                    offset_seconds=float(kwargs.get("snippet_offset") or 0.0),
+                    duration_seconds=12.0,
+                    rms=0.8,
+                )
+            )
+        return [fake_match]
+
+    monkeypatch.setattr(audd, "AudDLookupError", RuntimeError)
+    monkeypatch.setattr(audd, "recognize_with_audd", fake_recognize)
+
+    result = cli_runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--audd-token",
+            "secret-token",
+            "--prefer-audd",
+            "--audd-snippet-offset",
+            "5",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured_offsets == [5.0]
+    assert "~5.00s" in result.stdout
+    assert "Artist - Offset Track" in result.stdout
+
+
+def test_identify_snippet_low_rms_warning(
+    monkeypatch, tmp_path: Path, cli_runner: CliRunner
+) -> None:
+    """Emit a warning when the snippet RMS falls below the configured threshold."""
+    audio_path = tmp_path / "song.wav"
+    audio_path.write_bytes(b"fake")
+    config_path = make_config(tmp_path)
+
+    monkeypatch.setattr(
+        cli,
+        "compute_fingerprint",
+        lambda *_args, **_kwargs: FingerprintResult(fingerprint="FP", duration_seconds=90.0),
+    )
+    monkeypatch.setattr(cli, "lookup_recordings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(cli, "LookupCache", DummyLookupCache)
+
+    def fake_recognize(token, path, **kwargs):
+        hook = kwargs.get("snippet_hook")
+        if hook is not None:
+            hook(audd.SnippetInfo(offset_seconds=0.0, duration_seconds=12.0, rms=0.0001))
+        return []
+
+    monkeypatch.setattr(audd, "AudDLookupError", RuntimeError)
+    monkeypatch.setattr(audd, "recognize_with_audd", fake_recognize)
+
+    result = cli_runner.invoke(
+        cli.app,
+        [
+            "identify",
+            str(audio_path),
+            "--config-path",
+            str(config_path),
+            "--audd-token",
+            "secret-token",
+            "--prefer-audd",
+            "--audd-snippet-min-rms",
+            "0.01",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "RMS" in result.stderr
+
+
 def test_identify_silent_source(monkeypatch, tmp_path: Path, cli_runner: CliRunner) -> None:
     """Silence the strategy announcement when requested."""
     audio_path = tmp_path / "song.wav"
@@ -498,9 +602,15 @@ def test_identify_announces_audd_snippet(
     class DummyAudDError(Exception):
         pass
 
+    def fake_recognize(*_args, **kwargs):
+        hook = kwargs.get("snippet_hook")
+        if hook is not None:
+            hook(audd.SnippetInfo(offset_seconds=0.0, duration_seconds=12.0, rms=0.8))
+        return [fake_match]
+
     monkeypatch.setattr(audd, "AudDLookupError", DummyAudDError)
     monkeypatch.setattr(audd, "MAX_AUDD_BYTES", 1)
-    monkeypatch.setattr(audd, "recognize_with_audd", lambda *_args, **_kwargs: [fake_match])
+    monkeypatch.setattr(audd, "recognize_with_audd", fake_recognize)
 
     result = cli_runner.invoke(
         cli.app,

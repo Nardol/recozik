@@ -108,11 +108,26 @@ msgstr "Stratégie d'identification : {description}"
 msgid "AudD lookup failed for {path}: {error}. Falling back to AcoustID."
 msgstr "La recherche AudD a échoué pour {path} : {error}. Repli vers AcoustID."
 
-msgid "Preparing AudD snippet (~{seconds}s, mono 16 kHz) because the file exceeds {limit} MB."
-msgstr "Préparation d'un extrait AudD (~{seconds}s, mono 16 kHz) car le fichier dépasse {limit} Mo."
+msgid "{option} must be zero or greater."
+msgstr "{option} doit être supérieur ou égal à zéro."
 
-msgid "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz); file exceeds {limit} MB."
-msgstr "Préparation d'un extrait AudD pour {path} (~{seconds}s, mono 16 kHz) ; le fichier dépasse {limit} Mo."
+msgid "Preparing AudD snippet (~{seconds}s, mono 16 kHz) before upload."
+msgstr "Préparation d'un extrait AudD (~{seconds}s, mono 16 kHz) avant l'envoi."
+
+msgid "Preparing AudD snippet (~{seconds}s, mono 16 kHz) starting at ~{offset}s before upload."
+msgstr "Préparation d'un extrait AudD (~{seconds}s, mono 16 kHz) à partir de ~{offset}s avant l'envoi."
+
+msgid "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz) before upload."
+msgstr "Préparation d'un extrait AudD pour {path} (~{seconds}s, mono 16 kHz) avant l'envoi."
+
+msgid "Preparing AudD snippet for {path} (~{seconds}s, mono 16 kHz) starting at ~{offset}s before upload."
+msgstr "Préparation d'un extrait AudD pour {path} (~{seconds}s, mono 16 kHz) à partir de ~{offset}s avant l'envoi."
+
+msgid "AudD snippet RMS is low (~{rms:.4f}); consider adjusting the offset or using the enterprise endpoint."
+msgstr "Le niveau RMS de l'extrait AudD est faible (~{rms:.4f}) ; pensez à ajuster l'offset ou à utiliser l'endpoint enterprise."
+
+msgid "AudD snippet for {path} has low RMS (~{rms:.4f}); consider adjusting the offset or using the enterprise endpoint."
+msgstr "Le niveau RMS de l'extrait AudD pour {path} est faible (~{rms:.4f}) ; pensez à ajuster l'offset ou à utiliser l'endpoint enterprise."
 
 msgid "AudD token removed from {path}"
 msgstr "Jeton AudD supprimé de {path}"
@@ -134,6 +149,9 @@ msgstr "Impossible d'accéder au fichier audio : {error}"
 
 msgid "AudD snippet still exceeds {limit} bytes (got {size})."
 msgstr "L'extrait AudD dépasse toujours {limit} octets (taille {size})."
+
+msgid "Audio file is shorter than the requested AudD snippet offset ({offset}s)."
+msgstr "Le fichier audio est plus court que l'offset demandé pour l'extrait AudD ({offset}s)."
 
 msgid "AudD snippet generation requires librosa: {error}"
 msgstr "La génération d'extraits AudD nécessite librosa : {error}"
@@ -654,6 +672,12 @@ msgstr "Modèle d'affichage des propositions ({artist}, {title}, {album}, {score
 
 msgid "The field acoustid.api_key must be a string."
 msgstr "Le champ acoustid.api_key doit être une chaîne de caractères."
+
+msgid "The field audd.snippet_offset must be zero or greater."
+msgstr "Le champ audd.snippet_offset doit être supérieur ou égal à zéro."
+
+msgid "The field audd.snippet_min_rms must be zero or greater."
+msgstr "Le champ audd.snippet_min_rms doit être supérieur ou égal à zéro."
 
 msgid "The field cache.ttl_hours must be an integer."
 msgstr "Le champ cache.ttl_hours doit être un entier."
