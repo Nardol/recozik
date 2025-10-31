@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased changes yet.
 
+## [0.10.0] - 2025-10-31
+
+- Added AudD snippet offset controls
+
 ## [0.9.0] - 2025-10-29
 
 - Added AudD enterprise API support.
