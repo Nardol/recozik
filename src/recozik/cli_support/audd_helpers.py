@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
-    from ..audd import AudDEnterpriseParams, SnippetInfo
+    from recozik_core.audd import AudDEnterpriseParams, SnippetInfo
 
-from ..fingerprint import AcoustIDMatch
+from recozik_core.fingerprint import AcoustIDMatch
 
 _PathLike = TypeVar("_PathLike", bound=Path)
 
@@ -39,7 +39,7 @@ class AudDSupport:
 @lru_cache(maxsize=1)
 def get_audd_support() -> AudDSupport:
     """Return cached AudD utilities without paying the import cost on startup."""
-    from .. import audd as audd_module
+    from recozik_core import audd as audd_module
 
     def _recognize_standard(
         token: str,

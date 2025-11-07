@@ -154,7 +154,7 @@ uv run recozik completion install --shell zsh --no-write   # affiche uniquement 
 
 ## Internationalisation
 
-Le code source utilise des msgids en anglais. Les traductions vivent dans `src/recozik/locales/<lang>/LC_MESSAGES/`.
+Le code source utilise des msgids en anglais. Les traductions vivent dans `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/`.
 
 Ordre de priorité des locales :
 
@@ -333,7 +333,7 @@ Un fixture pytest (`tests/conftest.py`) force la locale anglaise par défaut afi
 
 - Respecter le cycle format (`ruff format`), lint (`ruff check --fix`) et tests (`pytest`) avant toute contribution.
 - Utiliser des messages de commit impératifs signés (`git commit -s`).
-- Envelopper toute nouvelle chaîne utilisateur avec `_()` fourni par `recozik.i18n` et mettre à jour les catalogues de traductions.
+- Envelopper toute nouvelle chaîne utilisateur avec `_()` fourni par `recozik_core.i18n` et mettre à jour les catalogues de traductions.
 - Les détails du workflow i18n sont décrits dans [TRANSLATION.md](TRANSLATION.md).
 
 Merci d'avance pour vos contributions et vos retours !

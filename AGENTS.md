@@ -4,8 +4,8 @@
 
 - `src/recozik/cli.py` – Typer app registration + backward-compatible shims (exposes lazy symbols such as `compute_fingerprint`, `LookupCache`, completion helpers).
 - `src/recozik/commands/` – Feature-focused command modules (`inspect`, `fingerprint`, `identify`, `identify_batch`, `rename`, `config`, `completion`).
-- `src/recozik/cli_support/` – Shared utilities (locale resolution, path helpers, metadata/log formatting, prompts, lazy dependency loaders).
-- `src/recozik/` – Core libraries (`fingerprint.py`, `cache.py`, `config.py`, etc.) used by command modules.
+- `src/recozik/cli_support/` – Shared CLI utilities (locale resolution, path helpers, metadata/log formatting, prompts, lazy dependency loaders).
+- `packages/recozik-core/src/recozik_core/` – Core libraries (`fingerprint.py`, `cache.py`, `config.py`, `audd.py`, `i18n.py`, locales) consumed by the CLI and future GUIs.
 - `tests/` – Pytest suites mirroring CLI features and performance guards (includes `test_cli_import_time.py`).
 - `README.md` – User-facing quick start; AGENTS should cross-check when updating commands.
 - `dist/`, `build/`, and `.venv/` are generated artifacts; never commit them.
@@ -29,7 +29,7 @@
 - Keep Typer command logic inside the relevant module under `src/recozik/commands/`; `cli.py` should only register commands and surface compatibility wrappers.
 - When touching completion logic, update both `src/recozik/commands/completion.py` and the wrapper wiring in `cli.py` so tests that monkeypatch `recozik.cli` continue to work.
 - Sanitize filenames using `_sanitize_filename`; reuse helpers instead of ad-hoc logic.
-- Route every user-facing string through `recozik.i18n._` using an English msgid. Update the relevant `.po` file under `src/recozik/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.
+- Route every user-facing string through `recozik_core.i18n._` using an English msgid. Update the relevant `.po` file under `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.
 - Honor locale precedence in this order: CLI option `--locale` > environment variable `RECOZIK_LOCALE` > config `[general].locale` > system locale.
 - Favor readability-first helpers. Prefer `cli_support.options.resolve_option` for CLI/config reconciliation, `cli_support.audd_helpers.get_audd_support` for AudD fallbacks, and other shared utilities so new code stays maintainable and avoids redundant, slow logic.
 

@@ -6,10 +6,11 @@ from pathlib import Path
 
 import typer
 
+from recozik_core.i18n import _
+
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale
 from ..cli_support.prompts import prompt_api_key, prompt_service_token
-from ..i18n import _
 from .identify import validate_client_key
 
 

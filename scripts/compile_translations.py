@@ -13,7 +13,7 @@ except ImportError:  # pragma: no cover - fallback path
     polib = None
 
 ROOT = Path(__file__).resolve().parents[1]
-LOCALES_DIR = ROOT / "src" / "recozik" / "locales"
+LOCALES_DIR = ROOT / "packages" / "recozik-core" / "src" / "recozik_core" / "locales"
 
 
 def _parse_po(path: Path) -> dict[str, str]:

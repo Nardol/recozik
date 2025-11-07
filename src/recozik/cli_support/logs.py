@@ -8,10 +8,10 @@ from pathlib import Path
 from string import Formatter
 from typing import TYPE_CHECKING
 
-from ..i18n import _
+from recozik_core.i18n import _
 
 if TYPE_CHECKING:
-    from ..fingerprint import AcoustIDMatch, FingerprintResult
+    from recozik_core.fingerprint import AcoustIDMatch, FingerprintResult
 
 
 class _SafeDict(dict):

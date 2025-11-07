@@ -22,7 +22,7 @@ The CLI is built using the Typer framework. It also includes an optional fallbac
 - `src/recozik/cli.py`: The main Typer application entry point where all commands are registered.
 - `src/recozik/commands/`: Contains the implementation for each CLI command (e.g., `inspect`, `identify`, `rename-from-log`).
 - `src/recozik/cli_support/`: Shared helper modules for tasks like configuration, locale handling, and file system operations.
-- `src/recozik/locales/`: Contains translation files (`.po`, `.mo`) for internationalization using gettext.
+- `packages/recozik-core/src/recozik_core/locales/`: Contains translation files (`.po`, `.mo`) for internationalization using gettext.
 - `tests/`: Contains the pytest test suite.
 - `scripts/`: Utility scripts, such as for compiling translations.
 
@@ -76,7 +76,7 @@ The project uses `uv` to manage dependencies and virtual environments.
 - **Commit Messages:** Commits should use the imperative mood (e.g., "Add feature for X") and be signed off (`git commit -s`).
 
 - **Internationalization (i18n):** User-facing strings are wrapped in a `_()` function for gettext. To update translations:
-  1.  Edit the `.po` files in `src/recozik/locales/<lang>/LC_MESSAGES/`.
+  1.  Edit the `.po` files in `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/`.
   2.  Compile the messages into `.mo` files using the provided script:
       ```bash
       uv run python scripts/compile_translations.py

@@ -1,9 +1,9 @@
 [project]
-name = "recozik"
+name = "recozik-core"
 version = "0.10.0"
-description = "Terminal-first CLI for audio fingerprinting and AcoustID lookup"
-readme = "README.md"
-license = { file = "LICENSE" }
+description = "Core audio fingerprinting, config, caching, and localization primitives for Recozik."
+readme = "../../README.md"
+license = { file = "../../LICENSE" }
 authors = [
     { name = "Patrick ZAJDA", email = "patrick@zajda.fr" }
 ]
@@ -11,18 +11,15 @@ keywords = [
     "audio",
     "fingerprinting",
     "acoustid",
+    "recozik",
     "cli",
     "music",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Environment :: Console",
-    "Intended Audience :: End Users/Desktop",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
-    "Natural Language :: English",
-    "Natural Language :: French",
-    "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -31,38 +28,22 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Multimedia :: Sound/Audio",
-    "Topic :: Utilities",
 ]
 requires-python = ">=3.10,<3.14"
 dependencies = [
-    "recozik-core",
     "librosa>=0.10.2.post1",
     "soundfile>=0.13",
     "mutagen>=1.47",
     "pyacoustid>=1.3",
-    "typer>=0.12",
     "platformdirs>=4.2",
     "tomli>=2.0; python_version < '3.11'",
-    "requests>=2.31"
+    "requests>=2.31",
 ]
 
 [project.optional-dependencies]
 ffmpeg-support = [
-    "recozik-core[ffmpeg-support]"
+    "ffmpeg-python>=0.2"
 ]
-
-[dependency-groups]
-test = [
-    "pytest>=8.3",
-    "pytest-mock>=3.14"
-]
-dev = [
-    "pre-commit>=4.3",
-    "ruff>=0.6.5",
-]
-
-[project.scripts]
-recozik = "recozik.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/Nardol/recozik"
@@ -74,40 +55,9 @@ Changelog = "https://github.com/Nardol/recozik/releases"
 requires = ["uv_build>=0.9.0,<0.10.0"]
 build-backend = "uv_build"
 
-[tool.typer]
-short_help = "Music recognition based on audio fingerprints."
-
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-select = [
-    "E",
-    "F",
-    "W",
-    "D",
-    "B",
-    "I",
-    "UP",
-    "N",
-    "S",
-    "RUF"
+[tool.uv.build-backend]
+source-include = [
+    "src/recozik_core/locales/**/*.po",
+    "src/recozik_core/locales/**/*.mo",
 ]
-ignore = [
-    "S101",
-    "B008",
-    "D203",
-    "D213"
-]
-
-[tool.ruff.lint.isort]
-known-first-party = ["recozik", "recozik_core"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]
-
-[tool.uv.sources]
-recozik-core = { workspace = true }
-
-[tool.uv.workspace]
-members = ["packages/*"]
+data = { purelib = "src/recozik_core/locales" }

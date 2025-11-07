@@ -1,11 +1,11 @@
 # Gestion des traductions
 
-Recozik utilise `gettext` pour traduire les chaînes de la CLI. Les messages sources sont en anglais dans le code ; les catalogues se trouvent dans `src/recozik/locales/`.
+Recozik utilise `gettext` pour traduire les chaînes de la CLI. Les messages sources sont en anglais dans le code ; les catalogues se trouvent dans `packages/recozik-core/src/recozik_core/locales/`.
 
 ## Structure
 
-- `src/recozik/locales/<lang>/LC_MESSAGES/recozik.po` : fichier source (éditable).
-- `src/recozik/locales/<lang>/LC_MESSAGES/recozik.mo` : fichier compilé utilisé à l'exécution (généré).
+- `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/recozik.po` : fichier source (éditable).
+- `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/recozik.mo` : fichier compilé utilisé à l'exécution (généré).
 - `scripts/compile_translations.py` : script utilitaire pour recompiler tous les `.po` en `.mo`.
 
 ## Mettre à jour une traduction
@@ -24,7 +24,7 @@ Recozik utilise `gettext` pour traduire les chaînes de la CLI. Les messages sou
 
 ## Ajouter une nouvelle langue
 
-1. Copiez `src/recozik/locales/fr/LC_MESSAGES/recozik.po` vers le nouveau répertoire (`src/recozik/locales/<lang>/LC_MESSAGES/`).
+1. Copiez `packages/recozik-core/src/recozik_core/locales/fr/LC_MESSAGES/recozik.po` vers le nouveau répertoire (`packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/`).
 2. Traduisez les entrées (`msgstr`). Laissez `msgid` inchangé.
 3. Recompilez via `python scripts/compile_translations.py` (le `.mo` est généré automatiquement).
 4. Vérifiez la locale via :

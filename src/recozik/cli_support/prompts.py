@@ -7,7 +7,8 @@ from pathlib import Path
 import click
 import typer
 
-from ..i18n import _
+from recozik_core.i18n import _
+
 from .logs import format_score
 
 
