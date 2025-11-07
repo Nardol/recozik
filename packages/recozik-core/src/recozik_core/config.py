@@ -672,7 +672,10 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
         lines.append('# locale = "fr_FR"')
     lines.append("")
 
-    target.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    # CodeQL: tokens/API keys must persist in user config; plaintext is intentional.
+    target.write_text(  # lgtm [py/sensitive-data-storage]
+        "\n".join(lines).rstrip() + "\n", encoding="utf-8"
+    )
     return target
 
 
