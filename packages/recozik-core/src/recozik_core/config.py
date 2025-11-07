@@ -673,9 +673,9 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append("")
 
     # CodeQL: tokens/API keys must persist in user config; plaintext is intentional.
-    target.write_text(  # lgtm [py/sensitive-data-storage]
+    target.write_text(
         "\n".join(lines).rstrip() + "\n", encoding="utf-8"
-    )
+    )  # lgtm [py/clear-text-storage-of-sensitive-data]
     return target
 
 
