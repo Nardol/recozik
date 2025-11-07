@@ -192,19 +192,19 @@ Override with `RECOZIK_CONFIG_FILE` environment variable.
 1. Create command implementation in `src/recozik/commands/your_command.py`
 2. Import and register in `src/recozik/cli.py` using `@app.command()` decorator
 3. Add tests in `tests/test_cli_your_command.py`
-4. Wrap user-facing strings with `_()` from `recozik.i18n`
+4. Wrap user-facing strings with `_()` from `recozik_core.i18n`
 5. Update translation catalogs if needed
 
 ### Adding internationalization
 
-1. Wrap strings with `_()` from `recozik.i18n`
-2. Update `.po` files in `src/recozik/locales/*/LC_MESSAGES/`
+1. Wrap strings with `_()` from `recozik_core.i18n`
+2. Update `.po` files in `packages/recozik-core/src/recozik_core/locales/*/LC_MESSAGES/`
 3. Run `python scripts/compile_translations.py`
 4. Test with `RECOZIK_LOCALE=fr uv run recozik ...`
 
 ### Modifying fingerprinting logic
 
-- Edit `src/recozik/fingerprint.py`
+- Edit `packages/recozik-core/src/recozik_core/fingerprint.py`
 - Note: `_normalize_fingerprint_output()` handles version differences in pyacoustid (return order varies)
 - Deduplication logic in `_merge_matches()` is critical for clean batch results
 - Always return consistent data structures (`FingerprintResult`, `AcoustIDMatch`)

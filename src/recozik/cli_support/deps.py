@@ -27,7 +27,7 @@ def get_config_module():
     """Return the lazily-imported configuration module."""
     global _config_module
     if _config_module is _UNINITIALIZED:
-        from .. import config as config_module
+        from recozik_core import config as config_module
 
         _config_module = config_module
     return _config_module
@@ -37,7 +37,7 @@ def get_lookup_cache_cls():
     """Return the lazily-imported LookupCache class."""
     global _lookup_cache_cls
     if _lookup_cache_cls is _UNINITIALIZED:
-        from ..cache import LookupCache
+        from recozik_core.cache import LookupCache
 
         _lookup_cache_cls = LookupCache
     return _lookup_cache_cls
@@ -59,7 +59,7 @@ def get_fingerprint_symbols() -> FingerprintSymbols:
     """Return functions and classes from the fingerprint module."""
     global _fingerprint_symbols
     if _fingerprint_symbols is _UNINITIALIZED:
-        from .. import fingerprint as fingerprint_module
+        from recozik_core import fingerprint as fingerprint_module
 
         _fingerprint_symbols = FingerprintSymbols(
             compute_fingerprint=fingerprint_module.compute_fingerprint,

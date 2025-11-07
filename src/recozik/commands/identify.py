@@ -11,8 +11,10 @@ from typing import Any
 
 import typer
 
+from recozik_core.audd import AudDEnterpriseParams, AudDMode
+from recozik_core.i18n import _
+
 from .. import audd as audd_module
-from ..audd import AudDEnterpriseParams, AudDMode
 from ..cli_support.audd_helpers import (
     get_audd_support,
     parse_bool_env,
@@ -26,7 +28,6 @@ from ..cli_support.logs import format_match_template
 from ..cli_support.options import resolve_option
 from ..cli_support.paths import resolve_path
 from ..cli_support.prompts import prompt_api_key, prompt_yes_no
-from ..i18n import _
 
 DEFAULT_AUDIO_EXTENSIONS = {
     ".mp3",

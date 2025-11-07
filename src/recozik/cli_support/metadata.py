@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from ..i18n import _
+from recozik_core.i18n import _
 
 try:  # pragma: no cover - depends on optional dependency
     import mutagen  # type: ignore[import-not-found]

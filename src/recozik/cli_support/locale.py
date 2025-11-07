@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from ..i18n import detect_system_locale, resolve_preferred_locale, set_locale
+from recozik_core.i18n import detect_system_locale, resolve_preferred_locale, set_locale
 
 if TYPE_CHECKING:
-    from ..config import AppConfig
+    from recozik_core.config import AppConfig
 
 ENV_LOCALE_VAR = "RECOZIK_LOCALE"
 

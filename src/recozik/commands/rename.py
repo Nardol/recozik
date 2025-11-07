@@ -9,6 +9,8 @@ from pathlib import Path
 import click
 import typer
 
+from recozik_core.i18n import _
+
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import (
@@ -31,7 +33,6 @@ from ..cli_support.prompts import (
     prompt_rename_interrupt_decision,
     prompt_yes_no,
 )
-from ..i18n import _
 
 _TEMPLATE_FIELDS_SUPPORTED = {
     "artist",

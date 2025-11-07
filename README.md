@@ -186,7 +186,7 @@ uv run recozik completion install --shell zsh --no-write
 
 ## Internationalisation
 
-Recozik uses GNU gettext. English msgids live in the code; translations ship in `src/recozik/locales/`.
+Recozik uses GNU gettext. English msgids live in the code; translations ship in `packages/recozik-core/src/recozik_core/locales/`.
 
 Locale precedence:
 
@@ -197,7 +197,7 @@ Locale precedence:
 
 Updating translations:
 
-1. Modify the relevant `.po` file (e.g. `src/recozik/locales/fr/LC_MESSAGES/recozik.po`).
+1. Modify the relevant `.po` file (e.g. `packages/recozik-core/src/recozik_core/locales/fr/LC_MESSAGES/recozik.po`).
 2. Run `python scripts/compile_translations.py` to regenerate `.mo` binaries.
 3. Execute tests in English (default) and in the target locale if you added coverage.
 4. See [TRANSLATION.md](TRANSLATION.md) for the full workflow and tips.
@@ -343,6 +343,7 @@ Each command reads only the section that matches its name. Values under `[identi
 - `src/recozik/cli.py` registers the Typer application and exposes backwards-compatible aliases for tests and integrations.
 - `src/recozik/commands/` contains the command implementations split by feature (`inspect`, `identify`, `identify-batch`, `rename-from-log`, `config`, `completion`).
 - `src/recozik/cli_support/` provides shared helpers (locale handling, filesystem utilities, metadata parsing, logging helpers, and lazy dependency loaders).
+- `packages/recozik-core/src/recozik_core/` hosts the reusable core library (fingerprinting, AudD integration, caching, config, gettext locales) consumed by the CLI and future front-ends.
 
 This layout keeps the import-time fast while making the command code easier to navigate and test.
 
@@ -360,7 +361,7 @@ A pytest fixture (`tests/conftest.py`) forces the English locale during tests, s
 
 - Follow the linting/testing flow above before committing.
 - Use imperative, signed-off commit messages (`git commit -s`).
-- When adding user-facing strings, wrap them with `_()` from `recozik.i18n` and update the translation catalogues.
+- When adding user-facing strings, wrap them with `_()` from `recozik_core.i18n` and update the translation catalogues.
 - See [TRANSLATION.md](TRANSLATION.md) for localisation details.
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, the [Code of Conduct](CODE_OF_CONDUCT.md), and the [security policy](SECURITY.md) before opening an issue or pull request.
 

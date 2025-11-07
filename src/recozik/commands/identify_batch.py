@@ -10,8 +10,11 @@ from typing import Any
 
 import typer
 
+from recozik_core.audd import AudDEnterpriseParams, AudDMode
+from recozik_core.fingerprint import AcoustIDMatch
+from recozik_core.i18n import _
+
 from .. import audd as audd_module
-from ..audd import AudDEnterpriseParams, AudDMode
 from ..cli_support.audd_helpers import (
     get_audd_support,
     parse_bool_env,
@@ -31,8 +34,6 @@ from ..cli_support.paths import (
 )
 from ..cli_support.prompts import prompt_yes_no
 from ..commands.identify import DEFAULT_AUDIO_EXTENSIONS, configure_api_key_interactively
-from ..fingerprint import AcoustIDMatch
-from ..i18n import _
 
 
 def identify_batch(
