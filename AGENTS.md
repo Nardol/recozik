@@ -30,6 +30,7 @@
 - When touching completion logic, update both `src/recozik/commands/completion.py` and the wrapper wiring in `cli.py` so tests that monkeypatch `recozik.cli` continue to work.
 - Sanitize filenames using `_sanitize_filename`; reuse helpers instead of ad-hoc logic.
 - Route every user-facing string through `recozik_core.i18n._` using an English msgid. Update the relevant `.po` file under `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.
+- Store AcoustID/AudD secrets via `recozik_core.secrets` (system keyring); never write them in plaintext config files.
 - Honor locale precedence in this order: CLI option `--locale` > environment variable `RECOZIK_LOCALE` > config `[general].locale` > system locale.
 - Favor readability-first helpers. Prefer `cli_support.options.resolve_option` for CLI/config reconciliation, `cli_support.audd_helpers.get_audd_support` for AudD fallbacks, and other shared utilities so new code stays maintainable and avoids redundant, slow logic.
 

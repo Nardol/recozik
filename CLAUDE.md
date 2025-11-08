@@ -193,7 +193,8 @@ Override with `RECOZIK_CONFIG_FILE` environment variable.
 2. Import and register in `src/recozik/cli.py` using `@app.command()` decorator
 3. Add tests in `tests/test_cli_your_command.py`
 4. Wrap user-facing strings with `_()` from `recozik_core.i18n`
-5. Update translation catalogs if needed
+5. Persist secrets with `recozik_core.secrets` (system keyring), not plain text files
+6. Update translation catalogs if needed
 
 ### Adding internationalization
 

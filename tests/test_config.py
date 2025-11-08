@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from recozik.config import AppConfig, load_config, write_config
+from recozik.config import AppConfig, backup_config_file, load_config, write_config
+from recozik_core import secrets as secret_store
 
 TEST_AUDD_TOKEN = "recozik-test-token"  # noqa: S105
 
@@ -14,7 +15,6 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     target = tmp_path / "config.toml"
 
     config = AppConfig(
-        acoustid_api_key="abcd1234",
         audd_endpoint_standard="https://alt.audd.io/",
         audd_endpoint_enterprise="https://enterprise.audd.io/v2/",
         audd_mode="enterprise",
@@ -54,6 +54,7 @@ def test_write_and_load_config(tmp_path: Path) -> None:
         identify_batch_announce_source=False,
     )
 
+    secret_store.set_acoustid_api_key("abcd1234")
     write_config(config, target)
 
     loaded = load_config(target)
@@ -97,6 +98,8 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     assert loaded.identify_batch_audd_enabled is False
     assert loaded.identify_batch_audd_prefer is True
     assert loaded.identify_batch_announce_source is False
+    contents = target.read_text()
+    assert "abcd1234" not in contents
 
 
 def test_load_config_missing_returns_default(tmp_path: Path) -> None:
@@ -151,9 +154,9 @@ def test_write_config_with_audd_token(tmp_path: Path) -> None:
     target = tmp_path / "config.toml"
     config = AppConfig(
         acoustid_api_key="key",
-        audd_api_token=TEST_AUDD_TOKEN,
     )
 
+    secret_store.set_audd_api_token(TEST_AUDD_TOKEN)
     write_config(config, target)
     loaded = load_config(target)
 
@@ -161,3 +164,43 @@ def test_write_config_with_audd_token(tmp_path: Path) -> None:
     assert loaded.rename_default_mode == "dry-run"
     assert loaded.identify_default_limit == 3
     assert loaded.rename_deduplicate_template is True
+    contents = target.read_text()
+    assert TEST_AUDD_TOKEN not in contents
+    assert "stored securely" in contents
+
+
+def test_plaintext_secrets_are_migrated(tmp_path: Path) -> None:
+    """Move legacy plaintext secrets to the keyring and rewrite the file."""
+    target = tmp_path / "config.toml"
+    target.write_text(
+        '[acoustid]\napi_key = "legacy-key"\n\n[audd]\napi_token = "legacy-token"\n',
+        encoding="utf-8",
+    )
+
+    config = load_config(target)
+
+    assert config.acoustid_api_key == "legacy-key"
+    assert config.audd_api_token == "legacy-token"  # noqa: S105 - dummy fixtures
+    assert secret_store.get_acoustid_api_key() == "legacy-key"
+    assert secret_store.get_audd_api_token() == "legacy-token"
+    backups = list(tmp_path.glob("config.toml.bak-*"))
+    assert backups, "Expected a backup after migration"
+    rewritten = target.read_text(encoding="utf-8")
+    assert "legacy-key" not in rewritten
+    assert "legacy-token" not in rewritten
+
+
+def test_backup_config_file_handles_missing_path(tmp_path: Path) -> None:
+    """Return None when there is no file to back up."""
+    missing = tmp_path / "absent.toml"
+    assert backup_config_file(missing) is None
+
+
+def test_backup_config_file_creates_copy(tmp_path: Path) -> None:
+    """Create a timestamped backup when the file exists."""
+    target = tmp_path / "config.toml"
+    target.write_text("content", encoding="utf-8")
+    backup = backup_config_file(target)
+    assert backup is not None
+    assert backup.exists()
+    assert backup.read_text(encoding="utf-8") == "content"

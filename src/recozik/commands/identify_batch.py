@@ -240,6 +240,7 @@ def identify_batch(
     apply_locale(ctx, config=config)
 
     env_values = os.environ
+    env_acoustid_key = env_values.get("ACOUSTID_API_KEY", "")
     env_audd_token = env_values.get("AUDD_API_TOKEN", "")
     support = get_audd_support()
 
@@ -488,7 +489,7 @@ def identify_batch(
     else:
         log_file_option = None
 
-    key = (api_key or config.acoustid_api_key or "").strip()
+    key = (api_key or env_acoustid_key or config.acoustid_api_key or "").strip()
     if not key:
         typer.echo(_("No AcoustID API key configured."))
         if prompt_yes_no(_("Would you like to save it now?"), default=True):

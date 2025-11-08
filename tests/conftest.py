@@ -9,6 +9,8 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
+from recozik_core import secrets as secret_store
+
 from .helpers.rename import write_jsonl_log
 
 
@@ -21,6 +23,29 @@ def force_english_locale(monkeypatch: pytest.MonkeyPatch) -> None:
     except ModuleNotFoundError:  # pragma: no cover - during initial imports
         return
     set_locale("en")
+
+
+class _InMemorySecretBackend:
+    def __init__(self) -> None:
+        self._store: dict[tuple[str, str], str] = {}
+
+    def get_password(self, service: str, username: str) -> str | None:
+        return self._store.get((service, username))
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        self._store[(service, username)] = password
+
+    def delete_password(self, service: str, username: str) -> None:
+        self._store.pop((service, username), None)
+
+
+@pytest.fixture(autouse=True)
+def fake_secret_backend() -> None:
+    """Provide an in-memory secret backend for deterministic tests."""
+    backend = _InMemorySecretBackend()
+    secret_store.configure_secret_backend(backend)
+    yield
+    secret_store.configure_secret_backend(None)
 
 
 @pytest.fixture()

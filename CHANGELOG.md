@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 - Split the codebase into a uv workspace: the reusable core now lives in `packages/recozik-core` while the CLI stays under `src/recozik`, keeping backwards-compatible shims for existing imports.
 - Moved gettext catalogs into the core package and updated docs/tooling (README, TRANSLATION.md, AGENTS.md, scripts) to point to the new location.
 - Added uv lock/workspace metadata and ensured Ruff/pytest cover both the CLI and the new core package.
+- Stored AcoustID/AudD credentials in the system keyring via `recozik_core.secrets`, added `ACOUSTID_API_KEY` env fallback, and stopped writing secrets in plaintext config files.
+- Automatically migrate legacy plaintext secrets from `config.toml` into the keyring on the next run, rewriting the file with placeholders.
 
 ## [0.10.0] - 2025-10-31
 

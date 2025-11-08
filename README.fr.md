@@ -32,6 +32,7 @@ Application en ligne de commande conçue pour calculer des empreintes [Chromapri
 - [Chromaprint](https://acoustid.org/chromaprint) et son binaire `fpcalc` présents dans le `PATH`.
   - Linux : paquet `chromaprint` / `libchromaprint-tools` selon la distribution.
   - Windows : télécharger l'archive Chromaprint, extraire, ajouter le dossier contenant `fpcalc.exe` au `PATH`.
+- Un backend de trousseau système (`python-keyring`) pour stocker les clés AcoustID/AudD de façon sécurisée. Sur un serveur sans trousseau, exportez `ACOUSTID_API_KEY` et `AUDD_API_TOKEN` avant chaque commande.
 - Outil `msgfmt` optionnel si vous modifiez les traductions.
 - FFmpeg (facultatif) + `pip install recozik[ffmpeg-support]` pour que le fallback AudD et `recozik inspect` puissent traiter les formats non pris en charge par libsndfile (par exemple les fichiers WMA volumineux).
 
@@ -49,10 +50,11 @@ La commande crée un environnement virtuel local et installe les dépendances (r
 ## Configuration d'AcoustID
 
 1. Créer un compte sur <https://acoustid.org> puis générer une clé API (`Account → Create API Key`).
-2. Enregistrer la clé via la CLI :
+2. Enregistrer la clé via la CLI (elle est stockée dans le trousseau système via `python-keyring`) :
    ```bash
    uv run recozik config set-key
    ```
+   Si aucun trousseau n'est disponible (serveur/headless), exportez `ACOUSTID_API_KEY` avant d'exécuter la commande. Pour supprimer la clé enregistrée, utilisez `uv run recozik config set-key --clear` (ou `uv run recozik config clear-secrets` pour effacer toutes les informations).
    Le fichier `config.toml` est stocké par défaut :
    - Linux/macOS : `~/.config/recozik/config.toml`
    - Windows : `%APPDATA%\recozik\config.toml`
@@ -63,13 +65,14 @@ La commande crée un environnement virtuel local et installe les dépendances (r
    ```
 
 Le fichier peut contenir d'autres options (TTL du cache, modèle d'affichage, mode de log). Un exemple figure dans la section [Workflow de développement](#workflow-de-développement).
+Si votre `config.toml` contenait déjà ces valeurs en clair, elles seront automatiquement migrées vers le trousseau lors de la prochaine exécution d'une commande `recozik` (le fichier est réécrit avec un simple commentaire).
 
 ## Fallback AudD optionnel
 
 Recozik peut interroger l'API [AudD Music Recognition](https://audd.io) quand AcoustID ne retourne aucun résultat. Cette fonctionnalité reste entièrement facultative :
 
 1. Créez un compte AudD et générez un token API. Chaque utilisateur de Recozik doit fournir son propre token et respecter les conditions d'AudD (l'accord public « API Test License Agreement » limite l'évaluation à 90 jours).
-2. Enregistrez le token avec `uv run recozik config set-audd-token` (supprimez-le ensuite avec `uv run recozik config set-audd-token --clear` si besoin), exportez la variable `AUDD_API_TOKEN` ou passez `--audd-token` lors de l'exécution.
+2. Enregistrez le token avec `uv run recozik config set-audd-token` (supprimez-le ensuite avec `uv run recozik config set-audd-token --clear` si besoin). Le token est sauvegardé dans le trousseau système ; si votre environnement n'a pas de backend, exportez `AUDD_API_TOKEN` ou passez `--audd-token` à chaque commande.
 3. L'équipe AudD confirme que l'endpoint principal `https://api.audd.io/` n'analyse que les **12 premières secondes** d'un fichier et peut refuser les uploads volumineux. Basculez vers l'endpoint entreprise `https://enterprise.audd.io/` si vous souhaitez traiter l'intégralité d'un morceau.
 4. Quand AudD identifie un titre, le JSON conserve l'origine via le champ `source` (`acoustid` ou `audd`) et les journaux ajoutent la note `Source: AudD.` — aucune bannière console n'est imposée.
 5. Pour les formats qu'libsndfile ne sait pas lire (ex. WMA volumineux), installez `ffmpeg` et l'extra `pip install recozik[ffmpeg-support]`. Recozik réessaiera alors de générer l'extrait via FFmpeg avant d'abandonner le fallback AudD.
@@ -258,8 +261,8 @@ Chaque commande ne lit que la section qui porte son nom. Les valeurs définies s
 
 | Portée                     | Nom                        | Type / Valeurs                           | Valeur par défaut                | Description                                                                  | Méthode de configuration                                                                       |
 | -------------------------- | -------------------------- | ---------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------- |
-| Fichier `[acoustid]`       | `api_key`                  | chaîne                                   | non défini                       | Clé cliente AcoustID utilisée pour les requêtes.                             | `uv run recozik config set-key` ou édition de `config.toml`.                                   |
-| Fichier `[audd]`           | `api_token`                | chaîne                                   | non défini                       | Jeton AudD utilisé en fallback.                                              | `uv run recozik config set-audd-token` ou édition de `config.toml`.                            |
+| Fichier `[acoustid]`       | `api_key`                  | chaîne                                   | non défini                       | Commentaire : la clé est stockée dans le trousseau système.                  | `uv run recozik config set-key` (recommandé) ou variable `ACOUSTID_API_KEY`.                   |
+| Fichier `[audd]`           | `api_token`                | chaîne                                   | non défini                       | Commentaire : le jeton est stocké dans le trousseau système.                 | `uv run recozik config set-audd-token` (recommandé) ou variable `AUDD_API_TOKEN`.              |
 | Fichier `[audd]`           | `endpoint_standard`        | chaîne                                   | `"https://api.audd.io/"`         | URL de base de l'endpoint standard AudD (analyse les 12 premières secondes). | Édition de `config.toml` ou option `--audd-endpoint-standard`.                                 |
 | Fichier `[audd]`           | `endpoint_enterprise`      | chaîne                                   | `"https://enterprise.audd.io/"`  | URL de base de l'endpoint entreprise (analyse l'intégralité du fichier).     | Édition de `config.toml` ou option `--audd-endpoint-enterprise`.                               |
 | Fichier `[audd]`           | `mode`                     | `standard` \\                            | `enterprise` \\                  | `auto`                                                                       | `"standard"`                                                                                   | Mode AudD par défaut (`auto` bascule vers l'entreprise selon les besoins). | Édition de `config.toml` ou option `--audd-mode`. |
@@ -303,6 +306,7 @@ Chaque commande ne lit que la section qui porte son nom. Les valeurs définies s
 | Fichier `[rename]`         | `deduplicate_template`     | booléen                                  | `true`                           | Fusionne les propositions menant au même nom final.                          | Édition de `config.toml` ou `--deduplicate-template/--keep-template-duplicates`.               |
 | Environnement              | `RECOZIK_CONFIG_FILE`      | chemin                                   | non défini                       | Chemin alternatif vers `config.toml`.                                        | Exporter avant d'exécuter la CLI.                                                              |
 | Environnement              | `RECOZIK_LOCALE`           | chaîne locale                            | non défini                       | Force la locale active (prioritaire sur le fichier).                         | Exporter avant d'exécuter la CLI.                                                              |
+| Environnement              | `ACOUSTID_API_KEY`         | chaîne                                   | non défini                       | Repli quand aucun trousseau système n'est disponible.                        | Exporter avant d'exécuter la CLI.                                                              |
 | Environnement              | `AUDD_API_TOKEN`           | chaîne                                   | non défini                       | Jeton AudD utilisé quand `--audd-token` est omis.                            | Exporter avant d'exécuter la CLI.                                                              |
 | Environnement              | `AUDD_ENDPOINT_STANDARD`   | chaîne                                   | non défini                       | Remplace l'URL de l'endpoint standard AudD.                                  | Exporter avant d'exécuter la CLI.                                                              |
 | Environnement              | `AUDD_ENDPOINT_ENTERPRISE` | chaîne                                   | non défini                       | Remplace l'URL de l'endpoint AudD entreprise.                                | Exporter avant d'exécuter la CLI.                                                              |
@@ -318,6 +322,16 @@ Chaque commande ne lit que la section qui porte son nom. Les valeurs définies s
 | Environnement              | `AUDD_SNIPPET_OFFSET`      | flottant / secondes                      | `0`                              | Standard : décale l'extrait de 12 s avant l'envoi.                           | Exporter avant d'exécuter la CLI.                                                              |
 | Environnement              | `AUDD_SNIPPET_MIN_RMS`     | flottant                                 | non défini                       | Avertit lorsque l'extrait AudD est quasi silencieux (RMS sous le seuil).     | Exporter avant d'exécuter la CLI.                                                              |
 | Environnement (auto)       | `_RECOZIK_COMPLETE`        | interne                                  | gérée automatiquement            | Variable gérée par les scripts de complétion, ne pas la définir à la main.   | Configurée automatiquement lors du chargement de la complétion.                                |
+
+## Gestion sécurisée des secrets
+
+Les commandes `recozik config set-key` et `set-audd-token` stockent désormais les identifiants AcoustID/AudD dans le trousseau système (via `python-keyring`) au lieu de les écrire en clair dans `config.toml`.
+
+- Lorsqu'un trousseau est disponible, le fichier de configuration ne contient plus que des commentaires d'aide. Les valeurs réelles sont récupérées depuis le trousseau à l'exécution.
+- Sur un serveur sans backend keyring, vous pouvez exporter `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` ou passer `--api-key` / `--audd-token` pour chaque commande.
+- Si votre `config.toml` contenait déjà ces secrets en clair, ils sont migrés automatiquement lors du prochain appel à la CLI : Recozik les enregistre dans le trousseau puis réécrit le fichier sans les valeurs sensibles.
+- Avant toute réécriture, Recozik sauvegarde `config.toml` sous la forme `config.toml.bak-YYYYmmddHHMMSS` dans le même dossier afin de permettre un retour arrière facile.
+- Utilisez `uv run recozik config clear-secrets` (ou les options `--clear` des commandes individuelles décrites ci-dessous) pour supprimer les informations du trousseau lorsque vous changez de machine ou renouvelez vos clés.
 
 ## Tests
 

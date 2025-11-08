@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import shutil
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import platformdirs
 
+from . import secrets as secret_store
 from .audd import DEFAULT_ENDPOINT as AUDD_DEFAULT_ENDPOINT
 from .audd import ENTERPRISE_ENDPOINT as AUDD_ENTERPRISE_ENDPOINT
 from .i18n import _
+from .secrets import SecretBackendUnavailableError, SecretStoreError
 
 try:  # pragma: no cover - depends on the Python version
     import tomllib
@@ -21,6 +26,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
 CONFIG_ENV_VAR = "RECOZIK_CONFIG_FILE"
 CONFIG_DIR_NAME = "recozik"
 CONFIG_FILE_NAME = "config.toml"
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -142,12 +148,6 @@ class AppConfig:
                 "deduplicate_template": self.rename_deduplicate_template,
             },
         }
-
-        if self.acoustid_api_key:
-            data["acoustid"]["api_key"] = self.acoustid_api_key
-
-        if self.audd_api_token:
-            data["audd"]["api_token"] = self.audd_api_token
 
         if self.output_template:
             data["output"]["template"] = self.output_template
@@ -475,7 +475,7 @@ def load_config(path: Path | None = None) -> AppConfig:
     ):
         raise RuntimeError(_("The field identify_batch.log_file must be a string."))
 
-    return AppConfig(
+    config = AppConfig(
         acoustid_api_key=api_key,
         audd_api_token=audd_token,
         audd_endpoint_standard=endpoint_standard_value,
@@ -520,6 +520,36 @@ def load_config(path: Path | None = None) -> AppConfig:
         identify_batch_audd_prefer=identify_batch_prefer_value,
         identify_batch_announce_source=identify_batch_announce_value,
     )
+    stored_acoustid = secret_store.get_acoustid_api_key()
+    stored_audd = secret_store.get_audd_api_token()
+    migrated = False
+    if stored_acoustid:
+        config.acoustid_api_key = stored_acoustid
+    elif api_key:
+        try:
+            secret_store.set_acoustid_api_key(api_key)
+        except (SecretBackendUnavailableError, SecretStoreError):
+            pass
+        else:
+            config.acoustid_api_key = api_key
+            migrated = True
+    if stored_audd:
+        config.audd_api_token = stored_audd
+    elif audd_token:
+        try:
+            secret_store.set_audd_api_token(audd_token)
+        except (SecretBackendUnavailableError, SecretStoreError):
+            pass
+        else:
+            config.audd_api_token = audd_token
+            migrated = True
+    if migrated:
+        backup_config_file(path)
+        try:
+            write_config(config, path)
+        except Exception as exc:  # pragma: no cover - best effort cleanup
+            _LOGGER.debug("Failed to rewrite config after secret migration: %s", exc)
+    return config
 
 
 def ensure_config_dir(path: Path | None = None) -> Path:
@@ -527,6 +557,17 @@ def ensure_config_dir(path: Path | None = None) -> Path:
     final_path = path or default_config_path()
     final_path.parent.mkdir(parents=True, exist_ok=True)
     return final_path
+
+
+def backup_config_file(path: Path | None = None) -> Path | None:
+    """Create a timestamped backup of the configuration file when it exists."""
+    target = path or default_config_path()
+    if not target.exists():
+        return None
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    backup = target.with_name(f"{target.name}.bak-{timestamp}")
+    shutil.copy2(target, backup)
+    return backup
 
 
 def write_config(config: AppConfig, path: Path | None = None) -> Path:
@@ -537,20 +578,16 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines: list[str] = []
 
     lines.append("[acoustid]")
-    api_key = data["acoustid"].get("api_key")
-    if api_key:
-        escaped = api_key.replace('"', '\\"')
-        lines.append(f'api_key = "{escaped}"')
+    if secret_store.has_acoustid_api_key():
+        lines.append("# api_key stored securely in the system keyring")
     else:
         lines.append('# api_key = "your_api_key"')
     lines.append("")
 
     lines.append("[audd]")
     audd_section = data["audd"]
-    audd_token = audd_section.get("api_token")
-    if audd_token:
-        escaped = audd_token.replace('"', '\\"')
-        lines.append(f'api_token = "{escaped}"')
+    if secret_store.has_audd_api_token():
+        lines.append("# api_token stored securely in the system keyring")
     else:
         lines.append('# api_token = "your_audd_token"')
 
@@ -682,6 +719,7 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
 __all__ = [
     "CONFIG_ENV_VAR",
     "AppConfig",
+    "backup_config_file",
     "default_config_path",
     "ensure_config_dir",
     "load_config",

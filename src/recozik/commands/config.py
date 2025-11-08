@@ -6,12 +6,19 @@ from pathlib import Path
 
 import typer
 
+from recozik_core import secrets as secret_store
 from recozik_core.i18n import _
+from recozik_core.secrets import SecretBackendUnavailableError, SecretStoreError
 
 from ..cli_support.deps import get_config_module
 from ..cli_support.locale import apply_locale
 from ..cli_support.prompts import prompt_api_key, prompt_service_token
 from .identify import validate_client_key
+
+
+def _announce_backup(path: Path | None) -> None:
+    if path:
+        typer.echo(_("Backup saved to {path}").format(path=path))
 
 
 def config_path(
@@ -158,6 +165,11 @@ def config_set_key(
         "--skip-validation/--validate",
         help=_("Skip online validation (not recommended)."),
     ),
+    clear: bool = typer.Option(
+        False,
+        "--clear",
+        help=_("Remove the stored AcoustID key."),
+    ),
     config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
 ) -> None:
     """Persist the AcoustID API key into the configuration file."""
@@ -169,70 +181,64 @@ def config_set_key(
     except RuntimeError:
         existing = config_module.AppConfig()
 
-    key = (api_key_opt or api_key_arg or "").strip()
-
-    if key:
-        confirmation = typer.prompt(_("Confirm the key"), default=key)
-        if confirmation.strip() != key:
-            typer.echo(_("The keys do not match. Operation cancelled."))
-            raise typer.Exit(code=1)
+    if clear:
+        key: str | None = None
     else:
-        key = prompt_api_key()
-        if not key:
-            typer.echo(_("No API key provided."))
-            raise typer.Exit(code=1)
+        key = (api_key_opt or api_key_arg or "").strip()
 
-    if not skip_validation:
-        valid, message = validate_client_key(key)
-        if not valid:
-            typer.echo(_("Key validation failed: {message}").format(message=message))
-            raise typer.Exit(code=1)
+        if key:
+            confirmation = typer.prompt(_("Confirm the key"), default=key)
+            if confirmation.strip() != key:
+                typer.echo(_("The keys do not match. Operation cancelled."))
+                raise typer.Exit(code=1)
+        else:
+            key = prompt_api_key()
+            if not key:
+                typer.echo(_("No API key provided."))
+                raise typer.Exit(code=1)
 
-    updated = config_module.AppConfig(
-        acoustid_api_key=key,
-        audd_api_token=existing.audd_api_token,
-        audd_endpoint_standard=existing.audd_endpoint_standard,
-        audd_endpoint_enterprise=existing.audd_endpoint_enterprise,
-        audd_mode=existing.audd_mode,
-        audd_force_enterprise=existing.audd_force_enterprise,
-        audd_enterprise_fallback=existing.audd_enterprise_fallback,
-        audd_skip=existing.audd_skip,
-        audd_every=existing.audd_every,
-        audd_limit=existing.audd_limit,
-        audd_skip_first_seconds=existing.audd_skip_first_seconds,
-        audd_accurate_offsets=existing.audd_accurate_offsets,
-        audd_use_timecode=existing.audd_use_timecode,
-        cache_enabled=existing.cache_enabled,
-        cache_ttl_hours=existing.cache_ttl_hours,
-        output_template=existing.output_template,
-        log_format=existing.log_format,
-        log_absolute_paths=existing.log_absolute_paths,
-        metadata_fallback_enabled=existing.metadata_fallback_enabled,
-        locale=existing.locale,
-        rename_log_cleanup=existing.rename_log_cleanup,
-        rename_require_template_fields=existing.rename_require_template_fields,
-        rename_default_mode=existing.rename_default_mode,
-        rename_default_interactive=existing.rename_default_interactive,
-        rename_default_confirm_each=existing.rename_default_confirm_each,
-        rename_conflict_strategy=existing.rename_conflict_strategy,
-        rename_metadata_confirm=existing.rename_metadata_confirm,
-        identify_default_limit=existing.identify_default_limit,
-        identify_output_json=existing.identify_output_json,
-        identify_refresh_cache=existing.identify_refresh_cache,
-        identify_audd_enabled=existing.identify_audd_enabled,
-        identify_audd_prefer=existing.identify_audd_prefer,
-        identify_announce_source=existing.identify_announce_source,
-        identify_batch_limit=existing.identify_batch_limit,
-        identify_batch_best_only=existing.identify_batch_best_only,
-        identify_batch_recursive=existing.identify_batch_recursive,
-        identify_batch_log_file=existing.identify_batch_log_file,
-        identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
-        identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
-        identify_batch_announce_source=existing.identify_batch_announce_source,
-    )
+        if not skip_validation:
+            valid, message = validate_client_key(key)
+            if not valid:
+                typer.echo(_("Key validation failed: {message}").format(message=message))
+                raise typer.Exit(code=1)
 
-    target = config_module.write_config(updated, config_path)
-    typer.echo(_("AcoustID key stored in {path}").format(path=target))
+    try:
+        secret_store.set_acoustid_api_key(key)
+    except SecretBackendUnavailableError as exc:
+        if key is None:
+            typer.echo(
+                _("Unable to remove the key securely: {error}").format(error=str(exc)),
+                err=True,
+            )
+        else:
+            typer.echo(
+                _("Unable to store the key securely: {error}").format(error=str(exc)),
+                err=True,
+            )
+            typer.echo(
+                _(
+                    "Install a system keyring backend or export the "
+                    "ACOUSTID_API_KEY environment variable."
+                ),
+                err=True,
+            )
+        raise typer.Exit(code=1) from exc
+    except SecretStoreError as exc:
+        if key is None:
+            typer.echo(_("Failed to remove the AcoustID key: {error}").format(error=exc), err=True)
+        else:
+            typer.echo(_("Failed to store the AcoustID key: {error}").format(error=exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    existing.acoustid_api_key = key
+    backup = config_module.backup_config_file(config_path)
+    target = config_module.write_config(existing, config_path)
+    _announce_backup(backup)
+    if key is None:
+        typer.echo(_("AcoustID key removed from {path}").format(path=target))
+    else:
+        typer.echo(_("AcoustID key stored securely (config: {path})").format(path=target))
 
 
 def config_set_audd_token(
@@ -278,51 +284,88 @@ def config_set_audd_token(
                 typer.echo(_("No AudD token provided."))
                 raise typer.Exit(code=1)
 
-    updated = config_module.AppConfig(
-        acoustid_api_key=existing.acoustid_api_key,
-        audd_api_token=token,
-        audd_endpoint_standard=existing.audd_endpoint_standard,
-        audd_endpoint_enterprise=existing.audd_endpoint_enterprise,
-        audd_mode=existing.audd_mode,
-        audd_force_enterprise=existing.audd_force_enterprise,
-        audd_enterprise_fallback=existing.audd_enterprise_fallback,
-        audd_skip=existing.audd_skip,
-        audd_every=existing.audd_every,
-        audd_limit=existing.audd_limit,
-        audd_skip_first_seconds=existing.audd_skip_first_seconds,
-        audd_accurate_offsets=existing.audd_accurate_offsets,
-        audd_use_timecode=existing.audd_use_timecode,
-        cache_enabled=existing.cache_enabled,
-        cache_ttl_hours=existing.cache_ttl_hours,
-        output_template=existing.output_template,
-        log_format=existing.log_format,
-        log_absolute_paths=existing.log_absolute_paths,
-        metadata_fallback_enabled=existing.metadata_fallback_enabled,
-        locale=existing.locale,
-        rename_log_cleanup=existing.rename_log_cleanup,
-        rename_require_template_fields=existing.rename_require_template_fields,
-        rename_default_mode=existing.rename_default_mode,
-        rename_default_interactive=existing.rename_default_interactive,
-        rename_default_confirm_each=existing.rename_default_confirm_each,
-        rename_conflict_strategy=existing.rename_conflict_strategy,
-        rename_metadata_confirm=existing.rename_metadata_confirm,
-        identify_default_limit=existing.identify_default_limit,
-        identify_output_json=existing.identify_output_json,
-        identify_refresh_cache=existing.identify_refresh_cache,
-        identify_audd_enabled=existing.identify_audd_enabled,
-        identify_audd_prefer=existing.identify_audd_prefer,
-        identify_announce_source=existing.identify_announce_source,
-        identify_batch_limit=existing.identify_batch_limit,
-        identify_batch_best_only=existing.identify_batch_best_only,
-        identify_batch_recursive=existing.identify_batch_recursive,
-        identify_batch_log_file=existing.identify_batch_log_file,
-        identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
-        identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
-        identify_batch_announce_source=existing.identify_batch_announce_source,
-    )
+    try:
+        secret_store.set_audd_api_token(token)
+    except SecretBackendUnavailableError as exc:
+        if token is None:
+            typer.echo(
+                _("Unable to remove the token securely: {error}").format(error=str(exc)),
+                err=True,
+            )
+        else:
+            typer.echo(
+                _("Unable to store the token securely: {error}").format(error=str(exc)),
+                err=True,
+            )
+            typer.echo(
+                _(
+                    "Install a system keyring backend or export the "
+                    "AUDD_API_TOKEN environment variable."
+                ),
+                err=True,
+            )
+        raise typer.Exit(code=1) from exc
+    except SecretStoreError as exc:
+        if token is None:
+            typer.echo(_("Failed to remove the AudD token: {error}").format(error=exc), err=True)
+        else:
+            typer.echo(_("Failed to store the AudD token: {error}").format(error=exc), err=True)
+        raise typer.Exit(code=1) from exc
 
-    target = config_module.write_config(updated, config_path)
+    existing.audd_api_token = token
+    backup = config_module.backup_config_file(config_path)
+    target = config_module.write_config(existing, config_path)
+    _announce_backup(backup)
     if token is None:
-        typer.echo(_("AudD token removed from {path}").format(path=target))
+        typer.echo(_("AudD token removed (config: {path})").format(path=target))
     else:
-        typer.echo(_("AudD token stored in {path}").format(path=target))
+        typer.echo(_("AudD token stored securely (config: {path})").format(path=target))
+
+
+def config_clear_secrets(
+    ctx: typer.Context,
+    config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
+) -> None:
+    """Delete all stored credentials from the keyring and config."""
+    apply_locale(ctx)
+    config_module = get_config_module()
+    target_path = config_path or config_module.default_config_path()
+    try:
+        config = config_module.load_config(target_path)
+    except RuntimeError:
+        config = config_module.AppConfig()
+
+    removal_failed = False
+    removed_key = False
+    removed_token = False
+
+    try:
+        secret_store.set_acoustid_api_key(None)
+        config.acoustid_api_key = None
+        removed_key = True
+    except (SecretBackendUnavailableError, SecretStoreError) as exc:
+        removal_failed = True
+        typer.echo(_("Failed to remove the AcoustID key: {error}").format(error=exc), err=True)
+
+    try:
+        secret_store.set_audd_api_token(None)
+        config.audd_api_token = None
+        removed_token = True
+    except (SecretBackendUnavailableError, SecretStoreError) as exc:
+        removal_failed = True
+        typer.echo(_("Failed to remove the AudD token: {error}").format(error=exc), err=True)
+
+    if removal_failed and not (removed_key or removed_token):
+        raise typer.Exit(code=1)
+
+    if not (removed_key or removed_token):
+        typer.echo(_("No stored secrets found."))
+        return
+
+    backup = config_module.backup_config_file(config_path)
+    target = config_module.write_config(config, config_path)
+    _announce_backup(backup)
+    if removed_key:
+        typer.echo(_("AcoustID key removed from {path}").format(path=target))
+    if removed_token:
+        typer.echo(_("AudD token removed (config: {path})").format(path=target))
