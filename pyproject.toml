@@ -115,4 +115,7 @@ ignore_missing_imports = true
 files = [
     "packages/recozik-core/src/recozik_core",
     "src/recozik/cli_support",
+    "src/recozik/commands/fingerprint.py",
+    "src/recozik/commands/inspect.py",
+    "src/recozik/commands/rename.py",
 ]
