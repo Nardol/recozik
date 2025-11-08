@@ -120,4 +120,5 @@ files = [
     "src/recozik/commands/rename.py",
     "src/recozik/commands/identify.py",
     "src/recozik/commands/identify_batch.py",
+    "src/recozik/commands/config.py",
 ]
