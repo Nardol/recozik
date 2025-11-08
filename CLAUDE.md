@@ -63,6 +63,14 @@ uv run pytest -v
 uv run pytest --cov=recozik
 ```
 
+### Typing
+
+```bash
+uv run mypy
+```
+
+> The entire `src/recozik` tree (and `recozik_core`) is enforced by mypy. Keep new modules inside those paths and fix any typing regressions before pushing.
+
 ### Internationalization
 
 ```bash

@@ -73,6 +73,8 @@ The project uses `uv` to manage dependencies and virtual environments.
   uv run pytest
   ```
 
+- **Typing:** Mypy now covers the entire `src/recozik` tree (plus `recozik_core`). Always run `uv run mypy` before sending changes and keep any new modules within those checked paths.
+
 - **Commit Messages:** Commits should use the imperative mood (e.g., "Add feature for X") and be signed off (`git commit -s`).
 
 - **Internationalization (i18n):** User-facing strings are wrapped in a `_()` function for gettext. To update translations:

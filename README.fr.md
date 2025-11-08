@@ -182,11 +182,13 @@ uv sync --all-groups
 uv run recozik …
 uv run ruff format
 uv run ruff check --fix
-uv run mypy
+uv run mypy                     # analyse statique sur l'ensemble de la CLI + recozik-core
 uv run pytest
 uv run recozik completion …
 uv build
 ```
+
+> Typage : tout `src/recozik` (ainsi que `recozik_core`) est contrôlé par mypy. Exécutez `uv run mypy` avant chaque PR et veillez à ce que les nouveaux modules restent dans ces répertoires.
 
 Exemple de `config.toml` :
 
