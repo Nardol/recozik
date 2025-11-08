@@ -6,7 +6,7 @@ import os
 from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import typer
 
@@ -14,7 +14,7 @@ from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
 from recozik_core.i18n import _
 
-from .. import audd as audd_module
+from .. import cli as cli_module
 from ..cli_support.audd_helpers import (
     get_audd_support,
     parse_bool_env,
@@ -22,7 +22,7 @@ from ..cli_support.audd_helpers import (
     parse_int_env,
     parse_int_list_env,
 )
-from ..cli_support.deps import get_config_module
+from ..cli_support.deps import get_config_module, get_fingerprint_symbols, get_lookup_cache_cls
 from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import write_log_entry
 from ..cli_support.metadata import extract_audio_metadata
@@ -34,6 +34,18 @@ from ..cli_support.paths import (
 )
 from ..cli_support.prompts import prompt_yes_no
 from ..commands.identify import DEFAULT_AUDIO_EXTENSIONS, configure_api_key_interactively
+
+if TYPE_CHECKING:
+    from recozik_core.audd import SnippetInfo
+
+
+T = TypeVar("T")
+
+
+def _cli_override(name: str, default: T) -> T:
+    """Return a CLI-level override when tests monkeypatch recozik.cli."""
+    cli_symbols = cast("dict[str, Any]", getattr(cli_module, "__dict__", {}))
+    return cast(T, cli_symbols.get(name, default))
 
 
 def identify_batch(
@@ -214,14 +226,18 @@ def identify_batch(
     apply_locale(ctx)
     config_module = get_config_module()
 
-    from .. import cli as cli_module
-
-    compute_fingerprint = cli_module.compute_fingerprint
-    lookup_recordings = cli_module.lookup_recordings
-    fingerprint_error_cls = cli_module.FingerprintError
-    acoustid_lookup_error_cls = cli_module.AcoustIDLookupError
-    lookup_cache_cls = cli_module.LookupCache
-    metadata_extractor = getattr(cli_module, "_extract_audio_metadata", extract_audio_metadata)
+    fingerprint_symbols = get_fingerprint_symbols()
+    compute_fingerprint = _cli_override(
+        "compute_fingerprint", fingerprint_symbols.compute_fingerprint
+    )
+    lookup_recordings = _cli_override("lookup_recordings", fingerprint_symbols.lookup_recordings)
+    fingerprint_error_cls = _cli_override("FingerprintError", fingerprint_symbols.FingerprintError)
+    acoustid_lookup_error_cls = _cli_override(
+        "AcoustIDLookupError", fingerprint_symbols.AcoustIDLookupError
+    )
+    lookup_cache_cls = _cli_override("LookupCache", get_lookup_cache_cls())
+    metadata_extractor: Callable[[Path], dict[str, str] | None]
+    metadata_extractor = _cli_override("_extract_audio_metadata", extract_audio_metadata)
     configure_key = getattr(
         cli_module, "_configure_api_key_interactively", configure_api_key_interactively
     )
@@ -560,13 +576,13 @@ def identify_batch(
         will_retry_acoustid: bool,
     ) -> tuple[list[AcoustIDMatch], str | None, str | None, bool]:
         if not audd_available:
-            return [], None, None, False
+            return cast(list[AcoustIDMatch], []), None, None, False
 
         snippet_announced = False
         snippet_warned = False
         last_error: str | None = None
 
-        def handle_snippet(info: audd_module.SnippetInfo) -> None:
+        def handle_snippet(info: SnippetInfo) -> None:
             nonlocal snippet_announced, snippet_warned
             if not snippet_announced:
                 if info.offset_seconds > 0:
@@ -621,7 +637,7 @@ def identify_batch(
                             "AudD lookup failed for {path}: {error}. Falling back to AcoustID."
                         ).format(path=display_path, error=last_error)
                     typer.echo(message)
-                    return []
+                    return cast(list[AcoustIDMatch], [])
 
             try:
                 return support.recognize_enterprise(
@@ -638,7 +654,7 @@ def identify_batch(
                         error=last_error,
                     )
                 )
-                return []
+                return cast(list[AcoustIDMatch], [])
 
         primary_mode = determine_primary_mode_for_file(path)
         matches = _execute(primary_mode)
@@ -732,7 +748,7 @@ def identify_batch(
                 failures += 1
                 continue
 
-            matches = None
+            matches: list[AcoustIDMatch] | None = None
             match_source = None
             if config.cache_enabled and not refresh:
                 cached = cache.get(
@@ -765,7 +781,7 @@ def identify_batch(
 
             if matches is None:
                 try:
-                    matches = lookup_recordings(key, fingerprint_result)
+                    matches = list(lookup_recordings(key, fingerprint_result))
                 except acoustid_lookup_error_cls as exc:
                     write_log_entry(
                         handle,
@@ -835,12 +851,14 @@ def identify_batch(
                 continue
 
             selected = matches[:effective_limit]
-            note_parts: list[str] = []
+            success_note_parts: list[str] = []
             if match_source == "audd" and audd_note:
-                note_parts.append(audd_note)
+                success_note_parts.append(audd_note)
             if audd_error_message and match_source != "audd":
-                note_parts.append(_("AudD lookup failed: {error}").format(error=audd_error_message))
-            success_note = " ".join(note_parts) if note_parts else None
+                success_note_parts.append(
+                    _("AudD lookup failed: {error}").format(error=audd_error_message)
+                )
+            success_note = " ".join(success_note_parts) if success_note_parts else None
             write_log_entry(
                 handle,
                 log_format_value,

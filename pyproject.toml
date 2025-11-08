@@ -119,4 +119,5 @@ files = [
     "src/recozik/commands/inspect.py",
     "src/recozik/commands/rename.py",
     "src/recozik/commands/identify.py",
+    "src/recozik/commands/identify_batch.py",
 ]
