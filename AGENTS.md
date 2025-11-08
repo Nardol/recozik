@@ -16,7 +16,7 @@
 - `uv run recozik …` – Execute CLI commands (e.g., `uv run recozik identify sample.flac`).
 - `uv run ruff check --fix` – Run Ruff with automatic fixes (must pass before committing).
 - `uv run ruff format` – Apply Ruff formatter to keep code style consistent.
-- `uv run mypy` – Run static type checks (currently targeting `recozik-core`).
+- `uv run mypy` – Run static type checks (entire `src/recozik` + `recozik_core` must stay clean).
 - `uv run pytest` – Run the full automated test suite.
 
 > **Permission reminder:** Always request elevated permissions before running any `uv` command (`uv run …`, `uv sync …`, etc.).
