@@ -215,6 +215,7 @@ uv sync --all-groups            # install runtime + dev dependencies
 uv run recozik …                # execute any CLI command
 uv run ruff format              # auto-format
 uv run ruff check --fix         # lint and apply safe fixes
+uv run mypy                     # static type checks on recozik-core
 uv run pytest                   # run the full test suite
 uv run recozik completion …     # manage shell completion scripts
 uv build                        # build wheel + sdist for release validation

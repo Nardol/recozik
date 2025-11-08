@@ -29,6 +29,14 @@ repos:
     rev: 41.169.2
     hooks:
       - id: renovate-config-validator
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        types: [python]
 ci:
   skip:
     - "uv-lock"

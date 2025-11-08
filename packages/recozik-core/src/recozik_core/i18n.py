@@ -94,22 +94,22 @@ def set_locale(locale_value: str | None) -> str | None:
         except ModuleNotFoundError:  # pragma: no cover - optional deps
             continue
         if hasattr(module, "_"):
-            module._ = translator.gettext
+            module._ = translator.gettext  # type: ignore[attr-defined]
         if hasattr(module, "ngettext"):
-            module.ngettext = translator.ngettext
+            module.ngettext = translator.ngettext  # type: ignore[attr-defined]
 
     rich_utils = sys.modules.get("typer.rich_utils")
     if rich_utils is not None:
         if hasattr(rich_utils, "ARGUMENTS_PANEL_TITLE"):
-            rich_utils.ARGUMENTS_PANEL_TITLE = translator.gettext("Arguments")
+            rich_utils.ARGUMENTS_PANEL_TITLE = translator.gettext("Arguments")  # type: ignore[attr-defined]
         if hasattr(rich_utils, "OPTIONS_PANEL_TITLE"):
-            rich_utils.OPTIONS_PANEL_TITLE = translator.gettext("Options")
+            rich_utils.OPTIONS_PANEL_TITLE = translator.gettext("Options")  # type: ignore[attr-defined]
         if hasattr(rich_utils, "COMMANDS_PANEL_TITLE"):
-            rich_utils.COMMANDS_PANEL_TITLE = translator.gettext("Commands")
+            rich_utils.COMMANDS_PANEL_TITLE = translator.gettext("Commands")  # type: ignore[attr-defined]
         if hasattr(rich_utils, "ERRORS_PANEL_TITLE"):
-            rich_utils.ERRORS_PANEL_TITLE = translator.gettext("Error")
+            rich_utils.ERRORS_PANEL_TITLE = translator.gettext("Error")  # type: ignore[attr-defined]
         if hasattr(rich_utils, "RICH_HELP"):
-            rich_utils.RICH_HELP = translator.gettext(
+            rich_utils.RICH_HELP = translator.gettext(  # type: ignore[attr-defined]
                 "Try [blue]'{command_path} {help_option}'[/] for help."
             )
 
