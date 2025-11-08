@@ -23,23 +23,25 @@ _lookup_cache_cls: type | object = _UNINITIALIZED
 _fingerprint_symbols: FingerprintSymbols | object = _UNINITIALIZED
 
 
-def get_config_module():
+def get_config_module() -> ModuleType:
     """Return the lazily-imported configuration module."""
     global _config_module
     if _config_module is _UNINITIALIZED:
         from recozik_core import config as config_module
 
         _config_module = config_module
+    assert isinstance(_config_module, ModuleType)
     return _config_module
 
 
-def get_lookup_cache_cls():
+def get_lookup_cache_cls() -> type:
     """Return the lazily-imported LookupCache class."""
     global _lookup_cache_cls
     if _lookup_cache_cls is _UNINITIALIZED:
         from recozik_core.cache import LookupCache
 
         _lookup_cache_cls = LookupCache
+    assert isinstance(_lookup_cache_cls, type)
     return _lookup_cache_cls
 
 
@@ -69,4 +71,5 @@ def get_fingerprint_symbols() -> FingerprintSymbols:
             AcoustIDMatch=fingerprint_module.AcoustIDMatch,
             AcoustIDLookupError=fingerprint_module.AcoustIDLookupError,
         )
+    assert isinstance(_fingerprint_symbols, FingerprintSymbols)
     return _fingerprint_symbols

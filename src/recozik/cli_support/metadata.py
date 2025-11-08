@@ -42,9 +42,9 @@ def extract_audio_metadata(path: Path) -> dict[str, str] | None:
             return candidate or None
         if isinstance(tag_value, (list, tuple, set)):
             for item in tag_value:
-                candidate = first_value(item)
-                if candidate:
-                    return candidate
+                nested = first_value(item)
+                if nested:
+                    return nested
             return None
         try:
             candidate = str(tag_value).strip()
@@ -55,11 +55,13 @@ def extract_audio_metadata(path: Path) -> dict[str, str] | None:
 
     metadata: dict[str, str] = {}
     for key in ("artist", "title", "album"):
-        value = first_value(tags.get(key))  # type: ignore[arg-type]
-        if value:
-            metadata[key] = value
+        value_str = first_value(tags.get(key))  # type: ignore[arg-type]
+        if value_str is None:
+            continue
+        assert isinstance(value_str, str)
+        metadata[key] = value_str
 
-    return metadata or None
+    return metadata if metadata else None
 
 
 def coerce_metadata_dict(value: object) -> dict[str, str]:
