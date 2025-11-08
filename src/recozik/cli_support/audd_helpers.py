@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 if TYPE_CHECKING:
     from recozik_core.audd import AudDEnterpriseParams, SnippetInfo
@@ -14,6 +14,33 @@ if TYPE_CHECKING:
 from recozik_core.fingerprint import AcoustIDMatch
 
 _PathLike = TypeVar("_PathLike", bound=Path)
+
+
+class _SnippetHook(Protocol):
+    def __call__(self, info: SnippetInfo) -> None: ...
+
+
+class RecognizeStandardFn(Protocol):
+    def __call__(
+        self,
+        token: str,
+        path: Path,
+        endpoint: str | None = ...,
+        timeout: float | None = ...,
+        snippet_offset: float | None = ...,
+        snippet_hook: _SnippetHook | None = ...,
+    ) -> list[AcoustIDMatch]: ...
+
+
+class RecognizeEnterpriseFn(Protocol):
+    def __call__(
+        self,
+        token: str,
+        path: Path,
+        endpoint: str | None = ...,
+        timeout: float | None = ...,
+        params: AudDEnterpriseParams | None = ...,
+    ) -> list[AcoustIDMatch]: ...
 
 
 @dataclass(frozen=True)
@@ -25,13 +52,8 @@ class AudDSupport:
     snippet_seconds: float
     default_standard_endpoint: str
     default_enterprise_endpoint: str
-    recognize_standard: Callable[
-        [str, Path, str | None, float | None, float | None, Callable[[SnippetInfo], None] | None],
-        list[AcoustIDMatch],
-    ]
-    recognize_enterprise: Callable[
-        [str, Path, str | None, float | None, AudDEnterpriseParams | None], list[AcoustIDMatch]
-    ]
+    recognize_standard: RecognizeStandardFn
+    recognize_enterprise: RecognizeEnterpriseFn
     error_cls: type[Exception]
     enterprise_params_cls: type[AudDEnterpriseParams]
 
