@@ -71,6 +71,10 @@ uv run mypy
 
 > The entire `src/recozik` tree (and `recozik_core`) is enforced by mypy. Keep new modules inside those paths and fix any typing regressions before pushing.
 
+### Import-Time Guard
+
+`tests/test_cli_import_time.py` ensures `recozik.cli` imports in under 0.5 s. To reproduce locally, run the snippet from the README (`uv run python - <<'PY'` …) and check the elapsed time before introducing heavier startup logic.
+
 ### Internationalization
 
 ```bash
