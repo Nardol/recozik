@@ -42,6 +42,7 @@
 - When adding dependencies, verify `uv run pytest` passes locally and in dry-run modes (`--dry-run`, `--json`).
 - Prefer deterministic fixtures; avoid network calls in tests.
 - Keep the import-time guard (`tests/test_cli_import_time.py`) passing; if you introduce heavier startup logic, adjust the threshold deliberately and document the change.
+  - Quick check: `uv run python - <<'PY'` followed by importing `recozik.cli` (see README) to confirm the import stays under 0.5 s.
 
 ## Commit & Pull Request Guidelines
 

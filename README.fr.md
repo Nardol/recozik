@@ -190,6 +190,20 @@ uv build
 
 > Typage : tout `src/recozik` (ainsi que `recozik_core`) est contrôlé par mypy. Exécutez `uv run mypy` avant chaque PR et veillez à ce que les nouveaux modules restent dans ces répertoires.
 
+Le test `tests/test_cli_import_time.py` vérifie que `recozik.cli` s'importe en moins de 0,5 s. Pour mesurer localement :
+
+```bash
+uv run python - <<'PY'
+import importlib
+import time
+
+debut = time.perf_counter()
+importlib.import_module("recozik.cli")
+temps = time.perf_counter() - debut
+print(f"Import recozik.cli : {temps:.3f}s")
+PY
+```
+
 Exemple de `config.toml` :
 
 ```toml

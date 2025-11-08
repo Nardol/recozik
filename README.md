@@ -375,6 +375,20 @@ uv run pytest
 
 A pytest fixture (`tests/conftest.py`) forces the English locale during tests, so assertions stay predictable. Override `RECOZIK_LOCALE` inside a test when you want to check translated output.
 
+Import-time performance is guarded by `tests/test_cli_import_time.py` (expected < 0.5 s). Measure it locally with:
+
+```bash
+uv run python - <<'PY'
+import importlib
+import time
+
+start = time.perf_counter()
+importlib.import_module("recozik.cli")
+elapsed = time.perf_counter() - start
+print(f"recozik.cli import took {elapsed:.3f}s")
+PY
+```
+
 ## Contributing
 
 - Follow the linting/testing flow above before committing.
