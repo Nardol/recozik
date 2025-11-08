@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from recozik_core.fingerprint import AcoustIDMatch, FingerprintResult
+
+    ComputeFingerprintFn = Callable[..., FingerprintResult]
+    LookupRecordingsFn = Callable[..., Sequence[AcoustIDMatch]]
+else:  # pragma: no cover - typing helper
+    ComputeFingerprintFn = Callable[..., Any]
+    LookupRecordingsFn = Callable[..., Any]
 
 from .metadata import MUTAGEN_AVAILABLE
 
@@ -49,12 +61,12 @@ def get_lookup_cache_cls() -> type:
 class FingerprintSymbols:
     """Container holding lazily-imported fingerprint helpers."""
 
-    compute_fingerprint: Any
-    lookup_recordings: Any
+    compute_fingerprint: ComputeFingerprintFn
+    lookup_recordings: LookupRecordingsFn
     FingerprintResult: type
-    FingerprintError: type
+    FingerprintError: type[Exception]
     AcoustIDMatch: type
-    AcoustIDLookupError: type
+    AcoustIDLookupError: type[Exception]
 
 
 def get_fingerprint_symbols() -> FingerprintSymbols:

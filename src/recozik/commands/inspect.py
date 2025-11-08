@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import Any, cast
 
 import typer
 
@@ -120,13 +121,13 @@ def _probe_with_ffmpeg(path: Path) -> _AudioInfo | None:
 
     def _parse_int(value: object) -> int:
         try:
-            return int(float(value))
+            return int(float(cast(Any, value)))
         except (TypeError, ValueError):
             return 0
 
     def _parse_float(value: object) -> float:
         try:
-            return float(value)
+            return float(cast(Any, value))
         except (TypeError, ValueError):
             return 0.0
 

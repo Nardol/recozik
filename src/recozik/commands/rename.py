@@ -432,7 +432,7 @@ def rename_from_log(
                 typer.echo(_("No proposal for: {path}").format(path=source_path))
                 continue
 
-        selected_match_index = 0
+        selected_match_index: int | None = 0
         if interactive and len(matches) > 1:
             while True:
                 try:
@@ -459,6 +459,7 @@ def rename_from_log(
                 )
                 continue
 
+        assert selected_match_index is not None
         match_data = matches[selected_match_index]
         is_metadata_match = match_data.get("source") == "metadata"
         new_name = render_target_filename(match_data, source_path)

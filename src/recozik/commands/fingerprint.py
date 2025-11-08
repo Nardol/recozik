@@ -9,6 +9,7 @@ import typer
 
 from recozik_core.i18n import _
 
+from ..cli_support.deps import get_fingerprint_symbols
 from ..cli_support.locale import apply_locale
 from ..cli_support.paths import resolve_path
 
@@ -38,10 +39,9 @@ def fingerprint(
 ) -> None:
     """Generate a Chromaprint fingerprint for an audio file."""
     apply_locale(ctx)
-    from .. import cli as cli_module
-
-    compute_fingerprint = cli_module.compute_fingerprint
-    fingerprint_error_cls = cli_module.FingerprintError
+    symbols = get_fingerprint_symbols()
+    compute_fingerprint = symbols.compute_fingerprint
+    fingerprint_error_cls = symbols.FingerprintError
 
     resolved_audio = resolve_path(audio_path)
     resolved_fpcalc = resolve_path(fpcalc_path) if fpcalc_path else None
