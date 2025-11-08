@@ -979,27 +979,27 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "librosa", specifier = ">=0.10.2.post1" },
+    { name = "librosa", specifier = ">=0.11.0" },
     { name = "mutagen", specifier = ">=1.47" },
-    { name = "platformdirs", specifier = ">=4.2" },
+    { name = "platformdirs", specifier = ">=4.5.0" },
     { name = "pyacoustid", specifier = ">=1.3" },
     { name = "recozik-core", editable = "packages/recozik-core" },
     { name = "recozik-core", extras = ["ffmpeg-support"], marker = "extra == 'ffmpeg-support'", editable = "packages/recozik-core" },
-    { name = "requests", specifier = ">=2.31" },
-    { name = "soundfile", specifier = ">=0.13" },
+    { name = "requests", specifier = ">=2.32.5" },
+    { name = "soundfile", specifier = ">=0.13.1" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
-    { name = "typer", specifier = ">=0.12" },
+    { name = "typer", specifier = ">=0.20.0" },
 ]
 provides-extras = ["ffmpeg-support"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pre-commit", specifier = ">=4.3" },
-    { name = "ruff", specifier = ">=0.6.5" },
+    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "ruff", specifier = ">=0.14.3" },
 ]
 test = [
-    { name = "pytest", specifier = ">=8.3" },
-    { name = "pytest-mock", specifier = ">=3.14" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
 ]
 
 [[package]]
@@ -1025,13 +1025,13 @@ ffmpeg-support = [
 [package.metadata]
 requires-dist = [
     { name = "ffmpeg-python", marker = "extra == 'ffmpeg-support'", specifier = ">=0.2" },
-    { name = "keyring", specifier = ">=25.2" },
-    { name = "librosa", specifier = ">=0.10.2.post1" },
+    { name = "keyring", specifier = ">=25.6.0" },
+    { name = "librosa", specifier = ">=0.11.0" },
     { name = "mutagen", specifier = ">=1.47" },
-    { name = "platformdirs", specifier = ">=4.2" },
+    { name = "platformdirs", specifier = ">=4.5.0" },
     { name = "pyacoustid", specifier = ">=1.3" },
-    { name = "requests", specifier = ">=2.31" },
-    { name = "soundfile", specifier = ">=0.13" },
+    { name = "requests", specifier = ">=2.32.5" },
+    { name = "soundfile", specifier = ">=0.13.1" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
 ]
 provides-extras = ["ffmpeg-support"]
