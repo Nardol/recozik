@@ -7,16 +7,17 @@ import os
 from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import typer
 
 from recozik_core import secrets as secret_store
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
+from recozik_core.fingerprint import AcoustIDMatch
 from recozik_core.i18n import _
 from recozik_core.secrets import SecretBackendUnavailableError, SecretStoreError
 
-from .. import audd as audd_module
+from .. import cli as cli_module
 from ..cli_support.audd_helpers import (
     get_audd_support,
     parse_bool_env,
@@ -24,12 +25,25 @@ from ..cli_support.audd_helpers import (
     parse_int_env,
     parse_int_list_env,
 )
-from ..cli_support.deps import get_config_module
+from ..cli_support.deps import get_config_module, get_fingerprint_symbols, get_lookup_cache_cls
 from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import format_match_template
 from ..cli_support.options import resolve_option
 from ..cli_support.paths import resolve_path
 from ..cli_support.prompts import prompt_api_key, prompt_yes_no
+
+if TYPE_CHECKING:
+    from recozik_core.audd import SnippetInfo
+
+
+T = TypeVar("T")
+
+
+def _cli_override(name: str, default: T) -> T:
+    """Return a CLI-level override when tests monkeypatch recozik.cli."""
+    cli_symbols = cast("dict[str, Any]", getattr(cli_module, "__dict__", {}))
+    return cast(T, cli_symbols.get(name, default))
+
 
 DEFAULT_AUDIO_EXTENSIONS = {
     ".mp3",
@@ -178,13 +192,16 @@ def identify(
     """Identify a track with the AcoustID API."""
     apply_locale(ctx)
     config_module = get_config_module()
-    from .. import cli as cli_module
-
-    compute_fingerprint = cli_module.compute_fingerprint
-    lookup_recordings = cli_module.lookup_recordings
-    fingerprint_error_cls = cli_module.FingerprintError
-    acoustid_lookup_error_cls = cli_module.AcoustIDLookupError
-    lookup_cache_cls = cli_module.LookupCache
+    fingerprint_symbols = get_fingerprint_symbols()
+    compute_fingerprint = _cli_override(
+        "compute_fingerprint", fingerprint_symbols.compute_fingerprint
+    )
+    lookup_recordings = _cli_override("lookup_recordings", fingerprint_symbols.lookup_recordings)
+    fingerprint_error_cls = _cli_override("FingerprintError", fingerprint_symbols.FingerprintError)
+    acoustid_lookup_error_cls = _cli_override(
+        "AcoustIDLookupError", fingerprint_symbols.AcoustIDLookupError
+    )
+    lookup_cache_cls = _cli_override("LookupCache", get_lookup_cache_cls())
     configure_key = getattr(
         cli_module, "_configure_api_key_interactively", configure_api_key_interactively
     )
@@ -489,7 +506,7 @@ def identify(
         ttl=timedelta(hours=max(config.cache_ttl_hours, 1)),
     )
 
-    matches = None
+    matches: list[AcoustIDMatch] | None = None
     match_source = None
     if config.cache_enabled and not refresh_value:
         cached = cache.get(fingerprint_result.fingerprint, fingerprint_result.duration_seconds)
@@ -516,13 +533,13 @@ def identify(
             return AudDMode.STANDARD
         return audd_mode_value
 
-    def run_audd(will_retry_acoustid: bool) -> list:
+    def run_audd(will_retry_acoustid: bool) -> list[AcoustIDMatch]:
         nonlocal audd_attempted
         audd_attempted = True
         snippet_announced = False
         snippet_warned = False
 
-        def handle_snippet(info: audd_module.SnippetInfo) -> None:
+        def handle_snippet(info: SnippetInfo) -> None:
             nonlocal snippet_announced, snippet_warned
             display_seconds = int(support.snippet_seconds)
             if not snippet_announced:
@@ -571,7 +588,7 @@ def identify(
                             "AudD lookup failed: {error}. Falling back to AcoustID."
                         ).format(error=exc)
                     typer.echo(message)
-                    return []
+                    return cast(list[AcoustIDMatch], [])
 
             try:
                 return support.recognize_enterprise(
@@ -582,7 +599,7 @@ def identify(
                 )
             except error_cls as exc:
                 typer.echo(_("AudD lookup failed: {error}.").format(error=exc))
-                return []
+                return cast(list[AcoustIDMatch], [])
 
         primary_mode = determine_primary_mode()
         matches = _execute(primary_mode)
@@ -606,7 +623,7 @@ def identify(
 
     if matches is None:
         try:
-            matches = lookup_recordings(key, fingerprint_result)
+            matches = list(lookup_recordings(key, fingerprint_result))
         except acoustid_lookup_error_cls as exc:
             typer.echo(str(exc))
             raise typer.Exit(code=1) from exc
@@ -663,7 +680,10 @@ def identify(
     cache.save()
 
 
-def _deduplicate_by_template(matches, template_value: str):
+def _deduplicate_by_template(
+    matches: list[AcoustIDMatch],
+    template_value: str,
+) -> list[AcoustIDMatch]:
     """Return matches preserving order but removing identical template outputs."""
     seen: set[str] = set()
     unique = []
@@ -720,9 +740,14 @@ def validate_client_key(key: str, timeout: float = 5.0) -> tuple[bool, str]:
     import requests
 
     try:
+        params: dict[str, str | int] = {
+            "client": key,
+            "trackid": _VALIDATION_TRACK_ID,
+            "json": 1,
+        }
         response = requests.get(
             _VALIDATION_ENDPOINT,
-            params={"client": key, "trackid": _VALIDATION_TRACK_ID, "json": 1},
+            params=dict(params),
             timeout=timeout,
         )
     except requests.RequestException as exc:
