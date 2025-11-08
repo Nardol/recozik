@@ -193,15 +193,7 @@ uv build
 Le test `tests/test_cli_import_time.py` vérifie que `recozik.cli` s'importe en moins de 0,5 s. Pour mesurer localement :
 
 ```bash
-uv run python - <<'PY'
-import importlib
-import time
-
-debut = time.perf_counter()
-importlib.import_module("recozik.cli")
-temps = time.perf_counter() - debut
-print(f"Import recozik.cli : {temps:.3f}s")
-PY
+uv run python scripts/measure_import_time.py
 ```
 
 Exemple de `config.toml` :

@@ -378,15 +378,7 @@ A pytest fixture (`tests/conftest.py`) forces the English locale during tests, s
 Import-time performance is guarded by `tests/test_cli_import_time.py` (expected < 0.5 s). Measure it locally with:
 
 ```bash
-uv run python - <<'PY'
-import importlib
-import time
-
-start = time.perf_counter()
-importlib.import_module("recozik.cli")
-elapsed = time.perf_counter() - start
-print(f"recozik.cli import took {elapsed:.3f}s")
-PY
+uv run python scripts/measure_import_time.py
 ```
 
 ## Contributing
