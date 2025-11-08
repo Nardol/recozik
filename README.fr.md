@@ -182,6 +182,7 @@ uv sync --all-groups
 uv run recozik …
 uv run ruff format
 uv run ruff check --fix
+uv run mypy
 uv run pytest
 uv run recozik completion …
 uv build

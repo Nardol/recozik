@@ -36,6 +36,8 @@ jobs:
             hashFiles('.pre-commit-config.yaml') }}
           restore-keys: pre-commit-${{ runner.os }}-
       - run: uv run pre-commit run --all-files
+      - name: Type check (mypy)
+        run: uv run mypy
 
   test:
     needs: [lint]
