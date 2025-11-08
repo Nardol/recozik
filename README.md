@@ -350,6 +350,7 @@ Recozik stores the AcoustID key and AudD token in the system keyring (via `pytho
 - `uv run recozik config set-key` and `uv run recozik config set-audd-token` save the values in the keyring and rewrite the config file with placeholder comments.
 - Headless systems without a keyring backend can export `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` or pass `--api-key` / `--audd-token` on each command.
 - Legacy plaintext entries in `config.toml` are migrated automatically the next time any `recozik` command runs: the CLI copies them into the keyring and rewrites the file without the clear-text secrets.
+- Before rewriting `config.toml`, Recozik writes a timestamped `config.toml.bak-YYYYmmddHHMMSS` backup alongside the original file so you can recover if needed.
 - Use `uv run recozik config clear-secrets` (or the individual `--clear` options described below) to delete stored keys/tokens from the keyring if you rotate credentials or change machines.
 
 ## Code structure

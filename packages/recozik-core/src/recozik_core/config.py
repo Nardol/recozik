@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -542,6 +544,7 @@ def load_config(path: Path | None = None) -> AppConfig:
             config.audd_api_token = audd_token
             migrated = True
     if migrated:
+        backup_config_file(path)
         try:
             write_config(config, path)
         except Exception as exc:  # pragma: no cover - best effort cleanup
@@ -554,6 +557,17 @@ def ensure_config_dir(path: Path | None = None) -> Path:
     final_path = path or default_config_path()
     final_path.parent.mkdir(parents=True, exist_ok=True)
     return final_path
+
+
+def backup_config_file(path: Path | None = None) -> Path | None:
+    """Create a timestamped backup of the configuration file when it exists."""
+    target = path or default_config_path()
+    if not target.exists():
+        return None
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    backup = target.with_name(f"{target.name}.bak-{timestamp}")
+    shutil.copy2(target, backup)
+    return backup
 
 
 def write_config(config: AppConfig, path: Path | None = None) -> Path:
@@ -705,6 +719,7 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
 __all__ = [
     "CONFIG_ENV_VAR",
     "AppConfig",
+    "backup_config_file",
     "default_config_path",
     "ensure_config_dir",
     "load_config",

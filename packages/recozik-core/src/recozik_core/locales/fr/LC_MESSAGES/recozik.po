@@ -879,6 +879,9 @@ msgstr "Jeton AudD stocké de façon sécurisée (config : {path})"
 msgid "Remove the stored AcoustID key."
 msgstr "Supprimer la clé AcoustID stockée."
 
+msgid "Backup saved to {path}"
+msgstr "Sauvegarde enregistrée dans {path}"
+
 msgid "AcoustID key stored securely."
 msgstr "Clé AcoustID stockée de façon sécurisée."
 
@@ -899,3 +902,6 @@ msgstr "Impossible de supprimer le jeton de manière sécurisée : {error}"
 
 msgid "Failed to remove the AudD token: {error}"
 msgstr "Échec de la suppression du jeton AudD : {error}"
+
+msgid "No stored secrets found."
+msgstr "Aucun secret enregistré n'a été trouvé."

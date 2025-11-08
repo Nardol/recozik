@@ -16,6 +16,11 @@ from ..cli_support.prompts import prompt_api_key, prompt_service_token
 from .identify import validate_client_key
 
 
+def _announce_backup(path: Path | None) -> None:
+    if path:
+        typer.echo(_("Backup saved to {path}").format(path=path))
+
+
 def config_path(
     ctx: typer.Context,
     config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
@@ -227,7 +232,9 @@ def config_set_key(
         raise typer.Exit(code=1) from exc
 
     existing.acoustid_api_key = key
+    backup = config_module.backup_config_file(config_path)
     target = config_module.write_config(existing, config_path)
+    _announce_backup(backup)
     if key is None:
         typer.echo(_("AcoustID key removed from {path}").format(path=target))
     else:
@@ -306,7 +313,9 @@ def config_set_audd_token(
         raise typer.Exit(code=1) from exc
 
     existing.audd_api_token = token
+    backup = config_module.backup_config_file(config_path)
     target = config_module.write_config(existing, config_path)
+    _announce_backup(backup)
     if token is None:
         typer.echo(_("AudD token removed (config: {path})").format(path=target))
     else:
@@ -346,11 +355,17 @@ def config_clear_secrets(
         removal_failed = True
         typer.echo(_("Failed to remove the AudD token: {error}").format(error=exc), err=True)
 
+    if removal_failed and not (removed_key or removed_token):
+        raise typer.Exit(code=1)
+
+    if not (removed_key or removed_token):
+        typer.echo(_("No stored secrets found."))
+        return
+
+    backup = config_module.backup_config_file(config_path)
     target = config_module.write_config(config, config_path)
+    _announce_backup(backup)
     if removed_key:
         typer.echo(_("AcoustID key removed from {path}").format(path=target))
     if removed_token:
         typer.echo(_("AudD token removed (config: {path})").format(path=target))
-
-    if removal_failed:
-        raise typer.Exit(code=1)

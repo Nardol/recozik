@@ -330,6 +330,7 @@ Les commandes `recozik config set-key` et `set-audd-token` stockent désormais l
 - Lorsqu'un trousseau est disponible, le fichier de configuration ne contient plus que des commentaires d'aide. Les valeurs réelles sont récupérées depuis le trousseau à l'exécution.
 - Sur un serveur sans backend keyring, vous pouvez exporter `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` ou passer `--api-key` / `--audd-token` pour chaque commande.
 - Si votre `config.toml` contenait déjà ces secrets en clair, ils sont migrés automatiquement lors du prochain appel à la CLI : Recozik les enregistre dans le trousseau puis réécrit le fichier sans les valeurs sensibles.
+- Avant toute réécriture, Recozik sauvegarde `config.toml` sous la forme `config.toml.bak-YYYYmmddHHMMSS` dans le même dossier afin de permettre un retour arrière facile.
 - Utilisez `uv run recozik config clear-secrets` (ou les options `--clear` des commandes individuelles décrites ci-dessous) pour supprimer les informations du trousseau lorsque vous changez de machine ou renouvelez vos clés.
 
 ## Tests
