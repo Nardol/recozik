@@ -38,6 +38,9 @@ from .commands.completion import (
     configure_shellingham_helper,
 )
 from .commands.config import (
+    config_clear_secrets as config_clear_secrets_command,
+)
+from .commands.config import (
     config_path as config_path_command,
 )
 from .commands.config import (
@@ -222,6 +225,11 @@ def config_set_key(
         "--skip-validation/--validate",
         help=_("Skip online validation (not recommended)."),
     ),
+    clear: bool = typer.Option(
+        False,
+        "--clear",
+        help=_("Remove the stored AcoustID key."),
+    ),
     config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
 ) -> None:
     """Persist an API key via the shared config handler."""
@@ -230,6 +238,7 @@ def config_set_key(
         api_key_arg=api_key_arg,
         api_key_opt=api_key_opt,
         skip_validation=skip_validation,
+        clear=clear,
         config_path=config_path,
     )
 
@@ -265,6 +274,18 @@ def config_set_audd_token(
         clear=clear,
         config_path=config_path,
     )
+
+
+@config_app.command(
+    "clear-secrets",
+    help=_("Remove the stored AcoustID key and AudD token."),
+)
+def config_clear_secrets(
+    ctx: typer.Context,
+    config_path: Path | None = typer.Option(None, "--config-path", hidden=True),
+) -> None:
+    """Remove stored secrets via the shared config handler."""
+    config_clear_secrets_command(ctx, config_path=config_path)
 
 
 @completion_app.command(

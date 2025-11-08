@@ -844,3 +844,58 @@ msgstr "Erreur"
 
 msgid "Error: {message}"
 msgstr "Erreur : {message}"
+
+msgid "Unable to store the key securely: {error}"
+msgstr "Impossible de stocker la clé de manière sécurisée : {error}"
+
+msgid "Install a system keyring backend or export the ACOUSTID_API_KEY environment variable."
+msgstr ""
+"Installez un backend de trousseau système ou exportez la variable "
+"d'environnement ACOUSTID_API_KEY."
+
+msgid "Failed to store the AcoustID key: {error}"
+msgstr "Échec de l'enregistrement de la clé AcoustID : {error}"
+
+msgid "AcoustID key stored securely (config: {path})"
+msgstr "Clé AcoustID stockée de façon sécurisée (config : {path})"
+
+msgid "Unable to store the token securely: {error}"
+msgstr "Impossible de stocker le jeton de manière sécurisée : {error}"
+
+msgid "Install a system keyring backend or export the AUDD_API_TOKEN environment variable."
+msgstr ""
+"Installez un backend de trousseau système ou exportez la variable "
+"d'environnement AUDD_API_TOKEN."
+
+msgid "Failed to store the AudD token: {error}"
+msgstr "Échec de l'enregistrement du jeton AudD : {error}"
+
+msgid "AudD token removed (config: {path})"
+msgstr "Jeton AudD supprimé (config : {path})"
+
+msgid "AudD token stored securely (config: {path})"
+msgstr "Jeton AudD stocké de façon sécurisée (config : {path})"
+
+msgid "Remove the stored AcoustID key."
+msgstr "Supprimer la clé AcoustID stockée."
+
+msgid "AcoustID key stored securely."
+msgstr "Clé AcoustID stockée de façon sécurisée."
+
+msgid "AcoustID key removed from {path}"
+msgstr "Clé AcoustID supprimée (config : {path})"
+
+msgid "Unable to remove the key securely: {error}"
+msgstr "Impossible de supprimer la clé de manière sécurisée : {error}"
+
+msgid "Failed to remove the AcoustID key: {error}"
+msgstr "Échec de la suppression de la clé AcoustID : {error}"
+
+msgid "Remove the stored AcoustID key and AudD token."
+msgstr "Supprimer la clé AcoustID et le jeton AudD enregistrés."
+
+msgid "Unable to remove the token securely: {error}"
+msgstr "Impossible de supprimer le jeton de manière sécurisée : {error}"
+
+msgid "Failed to remove the AudD token: {error}"
+msgstr "Échec de la suppression du jeton AudD : {error}"

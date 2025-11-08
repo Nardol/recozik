@@ -11,8 +11,10 @@ from typing import Any
 
 import typer
 
+from recozik_core import secrets as secret_store
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.i18n import _
+from recozik_core.secrets import SecretBackendUnavailableError, SecretStoreError
 
 from .. import audd as audd_module
 from ..cli_support.audd_helpers import (
@@ -199,6 +201,7 @@ def identify(
     apply_locale(ctx, config=config)
 
     env_values = os.environ
+    env_acoustid_key = env_values.get("ACOUSTID_API_KEY", "")
     env_audd_token = env_values.get("AUDD_API_TOKEN", "")
     support = get_audd_support()
 
@@ -454,7 +457,7 @@ def identify(
         config.identify_refresh_cache,
     )
 
-    key = (api_key or config.acoustid_api_key or "").strip()
+    key = (api_key or env_acoustid_key or config.acoustid_api_key or "").strip()
     if not key:
         typer.echo(_("No AcoustID API key configured."))
         if prompt_yes_no(_("Would you like to save it now?"), default=True):
@@ -694,52 +697,21 @@ def configure_api_key_interactively(
             typer.echo(_("Key validation failed: {message}").format(message=message))
             return None
 
-    updated = config_module.AppConfig(
-        acoustid_api_key=key,
-        audd_api_token=existing.audd_api_token,
-        audd_endpoint_standard=existing.audd_endpoint_standard,
-        audd_endpoint_enterprise=existing.audd_endpoint_enterprise,
-        audd_mode=existing.audd_mode,
-        audd_force_enterprise=existing.audd_force_enterprise,
-        audd_enterprise_fallback=existing.audd_enterprise_fallback,
-        audd_skip=existing.audd_skip,
-        audd_every=existing.audd_every,
-        audd_limit=existing.audd_limit,
-        audd_skip_first_seconds=existing.audd_skip_first_seconds,
-        audd_accurate_offsets=existing.audd_accurate_offsets,
-        audd_use_timecode=existing.audd_use_timecode,
-        cache_enabled=existing.cache_enabled,
-        cache_ttl_hours=existing.cache_ttl_hours,
-        output_template=existing.output_template,
-        log_format=existing.log_format,
-        log_absolute_paths=existing.log_absolute_paths,
-        metadata_fallback_enabled=existing.metadata_fallback_enabled,
-        locale=existing.locale,
-        rename_log_cleanup=existing.rename_log_cleanup,
-        rename_require_template_fields=existing.rename_require_template_fields,
-        rename_default_mode=existing.rename_default_mode,
-        rename_default_interactive=existing.rename_default_interactive,
-        rename_default_confirm_each=existing.rename_default_confirm_each,
-        rename_conflict_strategy=existing.rename_conflict_strategy,
-        rename_metadata_confirm=existing.rename_metadata_confirm,
-        rename_deduplicate_template=existing.rename_deduplicate_template,
-        identify_default_limit=existing.identify_default_limit,
-        identify_output_json=existing.identify_output_json,
-        identify_refresh_cache=existing.identify_refresh_cache,
-        identify_audd_enabled=existing.identify_audd_enabled,
-        identify_audd_prefer=existing.identify_audd_prefer,
-        identify_announce_source=existing.identify_announce_source,
-        identify_batch_limit=existing.identify_batch_limit,
-        identify_batch_best_only=existing.identify_batch_best_only,
-        identify_batch_recursive=existing.identify_batch_recursive,
-        identify_batch_log_file=existing.identify_batch_log_file,
-        identify_batch_audd_enabled=existing.identify_batch_audd_enabled,
-        identify_batch_audd_prefer=existing.identify_batch_audd_prefer,
-        identify_batch_announce_source=existing.identify_batch_announce_source,
-    )
+    try:
+        secret_store.set_acoustid_api_key(key)
+    except SecretBackendUnavailableError as exc:
+        typer.echo(
+            _("Unable to store the key securely: {error}").format(error=str(exc)),
+            err=True,
+        )
+        return None
+    except SecretStoreError as exc:
+        typer.echo(_("Failed to store the AcoustID key: {error}").format(error=exc), err=True)
+        return None
 
-    target = config_module.write_config(updated, config_path)
-    typer.echo(_("AcoustID key stored in {path}").format(path=target))
+    existing.acoustid_api_key = key
+    config_module.write_config(existing, config_path)
+    typer.echo(_("AcoustID key stored securely."))
     return key
 
 
