@@ -75,7 +75,7 @@ The project uses `uv` to manage dependencies and virtual environments.
 
 - **Typing:** Mypy now covers the entire `src/recozik` tree (plus `recozik_core`). Always run `uv run mypy` before sending changes and keep any new modules within those checked paths.
 
-- **Import-time guard:** `tests/test_cli_import_time.py` enforces that loading `recozik.cli` stays under 0.5 s. You can replicate the measurement with the here-doc shown in the README (`uv run python - <<'PY' …`).
+- **Import-time guard:** `tests/test_cli_import_time.py` enforces that loading `recozik.cli` stays under 0.5 s. Run `uv run python scripts/measure_import_time.py` (or the here-doc from the README) before adding heavy imports.
 
 - **Commit Messages:** Commits should use the imperative mood (e.g., "Add feature for X") and be signed off (`git commit -s`).
 
