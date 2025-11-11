@@ -328,7 +328,7 @@ def identify_batch(
     )
     musicbrainz_enabled_setting = resolve_option(
         ctx,
-        "musicbrainz",
+        "use_musicbrainz",
         use_musicbrainz,
         config.musicbrainz_enabled,
     )
