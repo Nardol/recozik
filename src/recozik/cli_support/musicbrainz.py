@@ -49,6 +49,7 @@ def enrich_matches_with_musicbrainz(
     *,
     options: MusicBrainzOptions,
     settings: MusicBrainzSettings,
+    client: MusicBrainzClient | None = None,
     echo: EchoFn | None = None,
 ) -> bool:
     """Mutate matches in-place when MusicBrainz can fill missing fields."""
@@ -59,7 +60,7 @@ def enrich_matches_with_musicbrainz(
     if not matches:
         return False
 
-    client = MusicBrainzClient(settings)
+    musicbrainz_client = client or MusicBrainzClient(settings)
     cache: dict[str, MusicBrainzRecording | None] = {}
     enriched = False
 
@@ -80,7 +81,7 @@ def enrich_matches_with_musicbrainz(
             continue
         if recording_id not in cache:
             try:
-                cache[recording_id] = client.lookup_recording(recording_id)
+                cache[recording_id] = musicbrainz_client.lookup_recording(recording_id)
             except MusicBrainzError as exc:
                 _warn(str(exc))
                 cache[recording_id] = None

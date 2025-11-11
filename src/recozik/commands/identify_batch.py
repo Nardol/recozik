@@ -27,11 +27,10 @@ from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import write_log_entry
 from ..cli_support.metadata import extract_audio_metadata
 from ..cli_support.musicbrainz import (
+    MusicBrainzClient,
     MusicBrainzOptions,
-    enrich_matches_with_musicbrainz,
-)
-from ..cli_support.musicbrainz import (
     build_settings as build_musicbrainz_settings,
+    enrich_matches_with_musicbrainz,
 )
 from ..cli_support.options import resolve_option
 from ..cli_support.paths import (
@@ -745,6 +744,11 @@ def identify_batch(
         rate_limit_per_second=config.musicbrainz_rate_limit_per_second,
         timeout_seconds=config.musicbrainz_timeout_seconds,
     )
+    musicbrainz_client = (
+        MusicBrainzClient(musicbrainz_settings)
+        if musicbrainz_options.enabled
+        else None
+    )
 
     use_metadata_fallback = (
         config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
@@ -877,6 +881,7 @@ def identify_batch(
                     matches,
                     options=musicbrainz_options,
                     settings=musicbrainz_settings,
+                    client=musicbrainz_client,
                     echo=_mb_echo,
                 )
                 if enriched and match_source == "acoustid" and config.cache_enabled:
