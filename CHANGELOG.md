@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 - Added uv lock/workspace metadata and ensured Ruff/pytest cover both the CLI and the new core package.
 - Stored AcoustID/AudD credentials in the system keyring via `recozik_core.secrets`, added `ACOUSTID_API_KEY` env fallback, and stopped writing secrets in plaintext config files.
 - Automatically migrate legacy plaintext secrets from `config.toml` into the keyring on the next run, rewriting the file with placeholders.
+- Added optional MusicBrainz enrichment for `identify` and `identify-batch`, including new `--with-musicbrainz/--without-musicbrainz` toggles and missing-only controls.
+- Normalized AudD responses now capture MusicBrainz identifiers when returned by the API, letting cached results retain MBIDs and improving downstream metadata merges.
 
 ## [0.10.0] - 2025-10-31
 

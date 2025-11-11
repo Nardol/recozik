@@ -116,6 +116,21 @@ def config_show(
             hours=config.cache_ttl_hours,
         )
     )
+    musicbrainz_state = _("yes") if config.musicbrainz_enabled else _("no")
+    missing_only_state = _("yes") if config.musicbrainz_enrich_missing_only else _("no")
+    contact_display = config.musicbrainz_contact or _("unset")
+    typer.echo(
+        _(
+            "MusicBrainz: enabled {enabled}, missing-only {missing}, rate {rate}/s, "
+            "timeout {timeout}s, contact {contact}"
+        ).format(
+            enabled=musicbrainz_state,
+            missing=missing_only_state,
+            rate=config.musicbrainz_rate_limit_per_second,
+            timeout=config.musicbrainz_timeout_seconds,
+            contact=contact_display,
+        )
+    )
     template = config.output_template or "{artist} - {title}"
     typer.echo(_("Default template: {template}").format(template=template))
     path_mode = _("absolute") if config.log_absolute_paths else _("relative")

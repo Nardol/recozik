@@ -7,6 +7,7 @@ import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,21 @@ CONFIG_ENV_VAR = "RECOZIK_CONFIG_FILE"
 CONFIG_DIR_NAME = "recozik"
 CONFIG_FILE_NAME = "config.toml"
 _LOGGER = logging.getLogger(__name__)
+
+
+def _detect_recozik_version() -> str:
+    candidates = ("recozik", "recozik-core")
+    for dist in candidates:
+        try:
+            version = importlib_metadata.version(dist)
+        except importlib_metadata.PackageNotFoundError:  # pragma: no cover - depends on env
+            continue
+        if version:
+            return version
+    return "unknown"
+
+
+_DEFAULT_APP_VERSION = _detect_recozik_version()
 
 
 @dataclass(slots=True)
@@ -54,6 +70,13 @@ class AppConfig:
     log_format: str = "text"
     log_absolute_paths: bool = False
     metadata_fallback_enabled: bool = True
+    musicbrainz_enabled: bool = True
+    musicbrainz_user_agent_app: str = "recozik"
+    musicbrainz_user_agent_version: str = _DEFAULT_APP_VERSION
+    musicbrainz_contact: str | None = "https://github.com/Nardol/recozik"
+    musicbrainz_rate_limit_per_second: float = 1.0
+    musicbrainz_timeout_seconds: float = 5.0
+    musicbrainz_enrich_missing_only: bool = True
     locale: str | None = None
     rename_log_cleanup: str = "ask"
     rename_require_template_fields: bool = False
@@ -117,6 +140,15 @@ class AppConfig:
             },
             "metadata": {
                 "fallback": self.metadata_fallback_enabled,
+            },
+            "musicbrainz": {
+                "enabled": self.musicbrainz_enabled,
+                "app": self.musicbrainz_user_agent_app,
+                "app_version": self.musicbrainz_user_agent_version,
+                "contact": self.musicbrainz_contact,
+                "rate_limit_per_second": self.musicbrainz_rate_limit_per_second,
+                "timeout_seconds": self.musicbrainz_timeout_seconds,
+                "enrich_missing_only": self.musicbrainz_enrich_missing_only,
             },
             "general": {},
             "identify": {
@@ -266,6 +298,13 @@ def load_config(path: Path | None = None) -> AppConfig:
                 ) from exc
         raise RuntimeError(_("The field {field} must be an integer.").format(field=field))
 
+    def _coerce_optional_str(raw: Any, field: str) -> str | None:
+        if raw is None:
+            return None
+        if isinstance(raw, str):
+            return raw
+        raise RuntimeError(_("The field {field} must be a string.").format(field=field))
+
     force_enterprise_value = _coerce_bool(
         audd_section.get("force_enterprise", False),
         "audd.force_enterprise",
@@ -344,6 +383,38 @@ def load_config(path: Path | None = None) -> AppConfig:
 
     metadata_section = data.get("metadata", {}) or {}
     metadata_fallback = bool(metadata_section.get("fallback", True))
+
+    musicbrainz_section = data.get("musicbrainz", {}) or {}
+    musicbrainz_enabled_value = _coerce_bool(
+        musicbrainz_section.get("enabled", True), "musicbrainz.enabled", True
+    )
+    musicbrainz_app_value = (
+        _coerce_optional_str(musicbrainz_section.get("app"), "musicbrainz.app") or "recozik"
+    )
+    musicbrainz_version_value = (
+        _coerce_optional_str(musicbrainz_section.get("app_version"), "musicbrainz.app_version")
+        or "0.10.0"
+    )
+    musicbrainz_contact_value = _coerce_optional_str(
+        musicbrainz_section.get("contact"), "musicbrainz.contact"
+    )
+    musicbrainz_rate_value = _coerce_optional_float(
+        musicbrainz_section.get("rate_limit_per_second"), "musicbrainz.rate_limit_per_second"
+    )
+    if musicbrainz_rate_value is None:
+        musicbrainz_rate_value = 1.0
+    elif musicbrainz_rate_value < 0:
+        musicbrainz_rate_value = 0.0
+    musicbrainz_timeout_value = _coerce_optional_float(
+        musicbrainz_section.get("timeout_seconds"), "musicbrainz.timeout_seconds"
+    )
+    if musicbrainz_timeout_value is None or musicbrainz_timeout_value <= 0:
+        musicbrainz_timeout_value = 5.0
+    musicbrainz_enrich_missing_only_value = _coerce_bool(
+        musicbrainz_section.get("enrich_missing_only", True),
+        "musicbrainz.enrich_missing_only",
+        True,
+    )
 
     general_section = data.get("general", {}) or {}
     locale_value = general_section.get("locale")
@@ -497,6 +568,13 @@ def load_config(path: Path | None = None) -> AppConfig:
         log_format=log_format,
         log_absolute_paths=log_absolute_paths,
         metadata_fallback_enabled=metadata_fallback,
+        musicbrainz_enabled=musicbrainz_enabled_value,
+        musicbrainz_user_agent_app=musicbrainz_app_value,
+        musicbrainz_user_agent_version=musicbrainz_version_value,
+        musicbrainz_contact=musicbrainz_contact_value,
+        musicbrainz_rate_limit_per_second=musicbrainz_rate_value,
+        musicbrainz_timeout_seconds=musicbrainz_timeout_value,
+        musicbrainz_enrich_missing_only=musicbrainz_enrich_missing_only_value,
         locale=locale_value,
         rename_log_cleanup=cleanup_value,
         rename_require_template_fields=require_template_fields,
@@ -656,6 +734,23 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
 
     lines.append("[metadata]")
     lines.append(f"fallback = {str(data['metadata']['fallback']).lower()}")
+    lines.append("")
+
+    lines.append("[musicbrainz]")
+    lines.append(f"enabled = {str(data['musicbrainz']['enabled']).lower()}")
+    musicbrainz_app = str(data["musicbrainz"]["app"]).replace('"', '\\"')
+    lines.append(f'app = "{musicbrainz_app}"')
+    musicbrainz_version = str(data["musicbrainz"]["app_version"]).replace('"', '\\"')
+    lines.append(f'app_version = "{musicbrainz_version}"')
+    contact_value = data["musicbrainz"].get("contact")
+    if contact_value:
+        escaped_contact = str(contact_value).replace('"', '\\"')
+        lines.append(f'contact = "{escaped_contact}"')
+    else:
+        lines.append('# contact = "you@example.com"')
+    lines.append(f"rate_limit_per_second = {data['musicbrainz']['rate_limit_per_second']}")
+    lines.append(f"timeout_seconds = {data['musicbrainz']['timeout_seconds']}")
+    lines.append(f"enrich_missing_only = {str(data['musicbrainz']['enrich_missing_only']).lower()}")
     lines.append("")
 
     lines.append("[logging]")

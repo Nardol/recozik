@@ -52,6 +52,13 @@ def test_write_and_load_config(tmp_path: Path) -> None:
         identify_batch_audd_enabled=False,
         identify_batch_audd_prefer=True,
         identify_batch_announce_source=False,
+        musicbrainz_enabled=False,
+        musicbrainz_user_agent_app="custom-app",
+        musicbrainz_user_agent_version="1.2.3",
+        musicbrainz_contact="admin@example.com",
+        musicbrainz_rate_limit_per_second=2.0,
+        musicbrainz_timeout_seconds=7.5,
+        musicbrainz_enrich_missing_only=False,
     )
 
     secret_store.set_acoustid_api_key("abcd1234")
@@ -78,6 +85,13 @@ def test_write_and_load_config(tmp_path: Path) -> None:
     assert loaded.log_format == "jsonl"
     assert loaded.log_absolute_paths is True
     assert loaded.metadata_fallback_enabled is False
+    assert loaded.musicbrainz_enabled is False
+    assert loaded.musicbrainz_user_agent_app == "custom-app"
+    assert loaded.musicbrainz_user_agent_version == "1.2.3"
+    assert loaded.musicbrainz_contact == "admin@example.com"
+    assert loaded.musicbrainz_rate_limit_per_second == 2.0
+    assert loaded.musicbrainz_timeout_seconds == 7.5
+    assert loaded.musicbrainz_enrich_missing_only is False
     assert loaded.rename_require_template_fields is True
     assert loaded.rename_default_mode == "apply"
     assert loaded.rename_default_interactive is True
@@ -127,6 +141,13 @@ def test_load_config_missing_returns_default(tmp_path: Path) -> None:
     assert config.log_format == "text"
     assert config.log_absolute_paths is False
     assert config.metadata_fallback_enabled is True
+    assert config.musicbrainz_enabled is True
+    assert config.musicbrainz_user_agent_app == "recozik"
+    assert config.musicbrainz_user_agent_version == "0.10.0"
+    assert config.musicbrainz_contact == "https://github.com/Nardol/recozik"
+    assert config.musicbrainz_rate_limit_per_second == 1.0
+    assert config.musicbrainz_timeout_seconds == 5.0
+    assert config.musicbrainz_enrich_missing_only is True
     assert config.rename_require_template_fields is False
     assert config.rename_default_mode == "dry-run"
     assert config.rename_default_interactive is False

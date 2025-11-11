@@ -30,6 +30,13 @@ from .i18n import (
     resolve_preferred_locale,
     set_locale,
 )
+from .musicbrainz import (
+    MusicBrainzClient,
+    MusicBrainzError,
+    MusicBrainzRecording,
+    MusicBrainzSettings,
+    looks_like_mbid,
+)
 
 __all__ = [
     "AcoustIDMatch",
@@ -41,6 +48,10 @@ __all__ = [
     "FingerprintError",
     "FingerprintResult",
     "LookupCache",
+    "MusicBrainzClient",
+    "MusicBrainzError",
+    "MusicBrainzRecording",
+    "MusicBrainzSettings",
     "ReleaseInfo",
     "SnippetInfo",
     "_",
@@ -52,6 +63,7 @@ __all__ = [
     "get_current_locale",
     "gettext",
     "load_config",
+    "looks_like_mbid",
     "lookup_recordings",
     "needs_audd_snippet",
     "ngettext",
