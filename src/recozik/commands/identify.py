@@ -31,8 +31,10 @@ from ..cli_support.logs import format_match_template
 from ..cli_support.musicbrainz import (
     MusicBrainzClient,
     MusicBrainzOptions,
-    build_settings as build_musicbrainz_settings,
     enrich_matches_with_musicbrainz,
+)
+from ..cli_support.musicbrainz import (
+    build_settings as build_musicbrainz_settings,
 )
 from ..cli_support.options import resolve_option
 from ..cli_support.paths import resolve_path
@@ -547,9 +549,7 @@ def identify(
         timeout_seconds=config.musicbrainz_timeout_seconds,
     )
     musicbrainz_client = (
-        MusicBrainzClient(musicbrainz_settings)
-        if musicbrainz_options.enabled
-        else None
+        MusicBrainzClient(musicbrainz_settings) if musicbrainz_options.enabled else None
     )
 
     matches: list[AcoustIDMatch] | None = None
