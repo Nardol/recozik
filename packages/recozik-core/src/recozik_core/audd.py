@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
 from pathlib import Path
@@ -29,6 +29,7 @@ SNIPPET_DURATION_SECONDS = 12.0
 SNIPPET_OFFSET_SECONDS = 0.0
 _AUDD_TARGET_SAMPLE_RATE = 16_000
 _AUDD_SNIPPET_SUFFIX = ".wav"
+_AUDD_RETURN_FIELDS = "apple_music,spotify,deezer,musicbrainz"
 _TOKEN_PATTERN = re.compile(r"(?i)(['\"]?api_token['\"]?\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^&\s]+)")
 _REDACTED_VALUE = "***redacted***"
 
@@ -87,10 +88,14 @@ class AudDMatch:
     apple_music_id: str | None
     spotify_id: str | None
     deezer_id: str | None
+    musicbrainz_recording_id: str | None = None
+    musicbrainz_release_group_id: str | None = None
+    musicbrainz_release_group_title: str | None = None
+    musicbrainz_releases: list[ReleaseInfo] = field(default_factory=list)
 
     def to_acoustid_match(self) -> AcoustIDMatch:
         """Convert the AudD payload to the internal AcoustIDMatch structure."""
-        release_entries: list[ReleaseInfo] = []
+        release_entries: list[ReleaseInfo] = list(self.musicbrainz_releases)
         if self.album or self.release_date:
             release_entries.append(
                 ReleaseInfo(
@@ -102,7 +107,8 @@ class AudDMatch:
             )
 
         identifier = (
-            self.apple_music_id
+            self.musicbrainz_recording_id
+            or self.apple_music_id
             or self.spotify_id
             or self.deezer_id
             or self.song_link
@@ -120,8 +126,11 @@ class AudDMatch:
             recording_id=identifier,
             title=self.title,
             artist=self.artist,
-            release_group_id=self.apple_music_id or self.spotify_id or self.deezer_id,
-            release_group_title=self.album,
+            release_group_id=self.musicbrainz_release_group_id
+            or self.apple_music_id
+            or self.spotify_id
+            or self.deezer_id,
+            release_group_title=self.musicbrainz_release_group_title or self.album,
             releases=release_entries,
         )
 
@@ -185,7 +194,7 @@ def recognize_with_audd(
                 data = {
                     "api_token": api_token,
                     # Request common catalog identifiers to enrich results if available.
-                    "return": "apple_music,spotify,deezer",
+                    "return": _AUDD_RETURN_FIELDS,
                 }
                 response = requests.post(endpoint, data=data, files=files, timeout=timeout)
         except requests.RequestException as exc:  # pragma: no cover - network failures
@@ -251,7 +260,7 @@ def _recognize_with_enterprise(
 
     data: dict[str, Any] = {
         "api_token": api_token,
-        "return": "apple_music,spotify,deezer",
+        "return": _AUDD_RETURN_FIELDS,
     }
     _apply_enterprise_params(data, enterprise_params)
 
@@ -320,6 +329,14 @@ def _normalize_entry(entry: Any) -> AudDMatch | None:
     apple_music = entry.get("apple_music") or {}
     spotify = entry.get("spotify") or {}
     deezer = entry.get("deezer") or {}
+    musicbrainz_raw = entry.get("musicbrainz")
+
+    (
+        musicbrainz_recording_id,
+        musicbrainz_release_group_id,
+        musicbrainz_release_group_title,
+        musicbrainz_releases,
+    ) = _extract_musicbrainz_details(musicbrainz_raw)
 
     confidence = entry.get("confidence")
     try:
@@ -338,6 +355,10 @@ def _normalize_entry(entry: Any) -> AudDMatch | None:
         apple_music_id=_extract_first_non_empty(apple_music, ("id", "trackId")),
         spotify_id=_extract_first_non_empty(spotify, ("id", "track_id")),
         deezer_id=_extract_first_non_empty(deezer, ("id", "track_id")),
+        musicbrainz_recording_id=musicbrainz_recording_id,
+        musicbrainz_release_group_id=musicbrainz_release_group_id,
+        musicbrainz_release_group_title=musicbrainz_release_group_title,
+        musicbrainz_releases=musicbrainz_releases,
     )
 
 
@@ -370,6 +391,72 @@ def _safe_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _extract_musicbrainz_details(
+    payload: Any,
+) -> tuple[str | None, str | None, str | None, list[ReleaseInfo]]:
+    if payload is None:
+        return None, None, None, []
+
+    records: list[dict[str, Any]] = []
+    if isinstance(payload, list):
+        records = [item for item in payload if isinstance(item, dict)]
+    elif isinstance(payload, dict):
+        records = [payload]
+    else:
+        return None, None, None, []
+
+    recording_id: str | None = None
+    release_group_id: str | None = None
+    release_group_title: str | None = None
+    releases: list[ReleaseInfo] = []
+    seen_releases: set[tuple[str | None, str | None, str | None, str | None]] = set()
+
+    for record in records:
+        if recording_id is None:
+            recording_id = _safe_str(
+                record.get("id")
+                or record.get("recording_id")
+                or record.get("track_id")
+                or record.get("trackid")
+            )
+
+        group = record.get("release_group") or record.get("release-group")
+        if isinstance(group, dict):
+            release_group_id = release_group_id or _safe_str(group.get("id"))
+            release_group_title = release_group_title or _safe_str(group.get("title"))
+        else:
+            release_group_id = release_group_id or _safe_str(record.get("release_group_id"))
+            release_group_title = release_group_title or _safe_str(
+                record.get("release_group_title")
+            )
+
+        releases_payload = record.get("releases") or record.get("release")
+        if isinstance(releases_payload, dict):
+            releases_payload = [releases_payload]
+        if isinstance(releases_payload, list):
+            for release in releases_payload:
+                if not isinstance(release, dict):
+                    continue
+                release_id = _safe_str(release.get("id"))
+                title = _safe_str(release.get("title"))
+                date = _safe_str(release.get("date") or release.get("release_date"))
+                country = _safe_str(release.get("country"))
+                fingerprint = (release_id, title, date, country)
+                if fingerprint in seen_releases:
+                    continue
+                seen_releases.add(fingerprint)
+                releases.append(
+                    ReleaseInfo(
+                        title=title,
+                        release_id=release_id,
+                        date=date,
+                        country=country,
+                    )
+                )
+
+    return recording_id, release_group_id, release_group_title, releases
 
 
 def _build_synthetic_identifier(artist: str | None, title: str | None) -> str:

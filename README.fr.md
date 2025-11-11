@@ -93,6 +93,16 @@ Selon les besoins, vous pouvez toujours désactiver ponctuellement le fallback a
 
 Conseil : laissez le fallback désactivé dans les scripts partagés tant que chaque personne n'a pas accepté les conditions AudD et fourni son jeton.
 
+## Enrichissement MusicBrainz optionnel
+
+Lorsque AcoustID ou AudD retournent un identifiant sans métadonnées complètes, Recozik peut interroger l’API JSON de [MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) pour renseigner l’artiste, le titre et les identifiants de release :
+
+1. Renseignez un User-Agent poli (par défaut `recozik/0.10.0`) et, si possible, une adresse de contact dans la section `[musicbrainz]` du `config.toml`. Aucun token n’est requis pour les requêtes en lecture seule.
+2. Activez/désactivez l’enrichissement à la volée via `--with-musicbrainz/--without-musicbrainz`. Contrôlez si la requête doit se limiter aux correspondances incomplètes avec `--musicbrainz-missing-only/--musicbrainz-always`.
+3. Respectez la limite de une requête par seconde : ajustez `rate_limit_per_second` et `timeout_seconds` si votre usage exige un rythme différent.
+
+L’opération se fait localement : aucun appel n’est envoyé aux mainteneurs de Recozik, et les réponses déjà mises en cache sont automatiquement enrichies si de nouvelles métadonnées sont découvertes.
+
 ## Exemples d'utilisation
 
 Inspection rapide :
@@ -145,6 +155,7 @@ Le flux de renommage respecte également plusieurs clés sous `[rename]` :
 
 Deux sections optionnelles permettent aussi d’ajuster les commandes d’identification :
 
+- `[musicbrainz]` paramètre l'enrichissement des correspondances (activation, User-Agent, contact, limite de requêtes, timeout, mode « missing only », token).
 - `[identify]` configure la limite de résultats (`3`), la sortie JSON (`false`), le rafraîchissement du cache (`false`) et les réglages AudD (`audd_enabled = true`, `prefer_audd = false`) uniquement pour `identify`.
 - `[identify_batch]` règle la limite par fichier (`3`), `best_only` (`false`), la récursivité (`false`), le journal par défaut (non défini → `recozik-batch.log` dans le répertoire courant) et les réglages AudD (`audd_enabled = true`, `prefer_audd = false`) exclusivement pour `identify-batch`.
 
@@ -216,6 +227,16 @@ api_key = "votre_cle"
 # accurate_offsets = false
 # use_timecode = false
 
+[musicbrainz]
+# enabled = true
+# app = "recozik"
+# app_version = "0.10.0"
+# contact = "vous@example.com"
+# rate_limit_per_second = 1.0
+# timeout_seconds = 5.0
+# enrich_missing_only = true
+# api_token = "stocké dans le trousseau"
+
 [cache]
 enabled = true
 ttl_hours = 24
@@ -285,6 +306,12 @@ Chaque commande ne lit que la section qui porte son nom. Les valeurs définies s
 | Fichier `[audd]`           | `use_timecode`             | booléen                                  | `false`                          | Enterprise : demande des timecodes formatés dans la réponse.                 | Édition de `config.toml` ou option `--audd-use-timecode/--no-audd-use-timecode`.               |
 | Fichier `[audd]`           | `snippet_offset`           | flottant / secondes                      | `0.0`                            | Standard : décale l'extrait de 12 s avant l'envoi.                           | Édition de `config.toml` ou option `--audd-snippet-offset`.                                    |
 | Fichier `[audd]`           | `snippet_min_rms`          | flottant                                 | non défini                       | Avertit si l'extrait AudD présente un RMS inférieur au seuil indiqué.        | Édition de `config.toml` ou option `--audd-snippet-min-rms`.                                   |
+| Fichier `[musicbrainz]`    | `enabled`                  | booléen                                  | `true`                           | Active ou désactive l'enrichissement MusicBrainz.                            | Édition de `config.toml` ou option `--with-musicbrainz/--without-musicbrainz`.                 |
+| Fichier `[musicbrainz]`    | `app` / `app_version`      | chaîne                                   | `"recozik"` / `"0.10.0"`         | User-Agent déclaré auprès de MusicBrainz.                                    | Édition de `config.toml`.                                                                      |
+| Fichier `[musicbrainz]`    | `contact`                  | chaîne                                   | non défini                       | Coordonnée facultative ajoutée au User-Agent (email, URL).                   | Édition de `config.toml`.                                                                      |
+| Fichier `[musicbrainz]`    | `rate_limit_per_second`    | flottant                                 | `1.0`                            | Limite de requêtes par seconde.                                              | Édition de `config.toml`.                                                                      |
+| Fichier `[musicbrainz]`    | `timeout_seconds`          | flottant                                 | `5.0`                            | Timeout appliqué à chaque requête.                                           | Édition de `config.toml`.                                                                      |
+| Fichier `[musicbrainz]`    | `enrich_missing_only`      | booléen                                  | `true`                           | Ne requête MusicBrainz que si artiste/titre sont manquants.                  | Édition de `config.toml` ou option `--musicbrainz-missing-only/--musicbrainz-always`.          |
 | Fichier `[cache]`          | `enabled`                  | booléen                                  | `true`                           | Active le cache local des correspondances.                                   | Édition de `config.toml`.                                                                      |
 | Fichier `[cache]`          | `ttl_hours`                | entier                                   | `24`                             | Durée de vie du cache en heures (minimum 1).                                 | Édition de `config.toml`.                                                                      |
 | Fichier `[output]`         | `template`                 | chaîne                                   | `"{artist} - {title}"`           | Modèle par défaut pour l'affichage/renommage.                                | Édition de `config.toml` ou option `--template`.                                               |
@@ -337,7 +364,7 @@ Chaque commande ne lit que la section qui porte son nom. Les valeurs définies s
 Les commandes `recozik config set-key` et `set-audd-token` stockent désormais les identifiants AcoustID/AudD dans le trousseau système (via `python-keyring`) au lieu de les écrire en clair dans `config.toml`.
 
 - Lorsqu'un trousseau est disponible, le fichier de configuration ne contient plus que des commentaires d'aide. Les valeurs réelles sont récupérées depuis le trousseau à l'exécution.
-- Sur un serveur sans backend keyring, vous pouvez exporter `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` ou passer `--api-key` / `--audd-token` pour chaque commande.
+- Sur un serveur sans backend keyring, vous pouvez exporter `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` ou passer `--api-key` / `--audd-token` selon vos besoins.
 - Si votre `config.toml` contenait déjà ces secrets en clair, ils sont migrés automatiquement lors du prochain appel à la CLI : Recozik les enregistre dans le trousseau puis réécrit le fichier sans les valeurs sensibles.
 - Avant toute réécriture, Recozik sauvegarde `config.toml` sous la forme `config.toml.bak-YYYYmmddHHMMSS` dans le même dossier afin de permettre un retour arrière facile.
 - Utilisez `uv run recozik config clear-secrets` (ou les options `--clear` des commandes individuelles décrites ci-dessous) pour supprimer les informations du trousseau lorsque vous changez de machine ou renouvelez vos clés.

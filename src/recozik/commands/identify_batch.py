@@ -26,6 +26,13 @@ from ..cli_support.deps import get_config_module, get_fingerprint_symbols, get_l
 from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import write_log_entry
 from ..cli_support.metadata import extract_audio_metadata
+from ..cli_support.musicbrainz import (
+    MusicBrainzOptions,
+    enrich_matches_with_musicbrainz,
+)
+from ..cli_support.musicbrainz import (
+    build_settings as build_musicbrainz_settings,
+)
 from ..cli_support.options import resolve_option
 from ..cli_support.paths import (
     discover_audio_files,
@@ -73,6 +80,11 @@ def identify_batch(
         None,
         "--use-audd/--no-audd",
         help=_("Enable or disable the AudD integration for this run."),
+    ),
+    use_musicbrainz: bool | None = typer.Option(
+        None,
+        "--with-musicbrainz/--without-musicbrainz",
+        help=_("Enrich matches with MusicBrainz metadata when possible."),
     ),
     prefer_audd: bool | None = typer.Option(
         None,
@@ -148,6 +160,11 @@ def identify_batch(
         None,
         "--audd-use-timecode/--no-audd-use-timecode",
         help=_("Enterprise: request formatted timecodes in the response."),
+    ),
+    musicbrainz_missing_only: bool | None = typer.Option(
+        None,
+        "--musicbrainz-missing-only/--musicbrainz-always",
+        help=_("Query MusicBrainz only when artist/title metadata is missing."),
     ),
     limit: int = typer.Option(
         3,
@@ -308,6 +325,18 @@ def identify_batch(
     audd_enabled_setting = use_audd if use_audd is not None else config.identify_batch_audd_enabled
     audd_prefer_setting = (
         prefer_audd if prefer_audd is not None else config.identify_batch_audd_prefer
+    )
+    musicbrainz_enabled_setting = resolve_option(
+        ctx,
+        "musicbrainz",
+        use_musicbrainz,
+        config.musicbrainz_enabled,
+    )
+    musicbrainz_missing_only_setting = resolve_option(
+        ctx,
+        "musicbrainz_missing_only",
+        musicbrainz_missing_only,
+        config.musicbrainz_enrich_missing_only,
     )
     audd_endpoint_standard_value = resolve_option(
         ctx,
@@ -705,6 +734,18 @@ def identify_batch(
         ttl=timedelta(hours=max(config.cache_ttl_hours, 1)),
     )
 
+    musicbrainz_options = MusicBrainzOptions(
+        enabled=bool(musicbrainz_enabled_setting),
+        enrich_missing_only=bool(musicbrainz_missing_only_setting),
+    )
+    musicbrainz_settings = build_musicbrainz_settings(
+        app_name=config.musicbrainz_user_agent_app,
+        app_version=config.musicbrainz_user_agent_version,
+        contact=config.musicbrainz_contact,
+        rate_limit_per_second=config.musicbrainz_rate_limit_per_second,
+        timeout_seconds=config.musicbrainz_timeout_seconds,
+    )
+
     use_metadata_fallback = (
         config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
     )
@@ -820,6 +861,30 @@ def identify_batch(
                     typer.echo(_("AudD identified {path}.").format(path=relative_display))
                 if error_message:
                     audd_error_message = error_message
+
+            if matches and musicbrainz_options.enabled:
+
+                def _mb_echo(message: str, *, _path=relative_display) -> None:
+                    typer.echo(
+                        _("MusicBrainz enrichment warning for {path}: {message}").format(
+                            path=_path,
+                            message=message,
+                        ),
+                        err=True,
+                    )
+
+                enriched = enrich_matches_with_musicbrainz(
+                    matches,
+                    options=musicbrainz_options,
+                    settings=musicbrainz_settings,
+                    echo=_mb_echo,
+                )
+                if enriched and match_source == "acoustid" and config.cache_enabled:
+                    cache.set(
+                        fingerprint_result.fingerprint,
+                        fingerprint_result.duration_seconds,
+                        matches,
+                    )
 
             if not matches:
                 metadata_payload = metadata_extractor(file_path) if use_metadata_fallback else None

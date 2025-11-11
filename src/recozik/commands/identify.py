@@ -28,6 +28,13 @@ from ..cli_support.audd_helpers import (
 from ..cli_support.deps import get_config_module, get_fingerprint_symbols, get_lookup_cache_cls
 from ..cli_support.locale import apply_locale, resolve_template
 from ..cli_support.logs import format_match_template
+from ..cli_support.musicbrainz import (
+    MusicBrainzOptions,
+    enrich_matches_with_musicbrainz,
+)
+from ..cli_support.musicbrainz import (
+    build_settings as build_musicbrainz_settings,
+)
 from ..cli_support.options import resolve_option
 from ..cli_support.paths import resolve_path
 from ..cli_support.prompts import prompt_api_key, prompt_yes_no
@@ -84,6 +91,11 @@ def identify(
         None,
         "--use-audd/--no-audd",
         help=_("Enable or disable the AudD integration for this run."),
+    ),
+    use_musicbrainz: bool | None = typer.Option(
+        None,
+        "--with-musicbrainz/--without-musicbrainz",
+        help=_("Enrich matches with MusicBrainz metadata when possible."),
     ),
     prefer_audd: bool | None = typer.Option(
         None,
@@ -159,6 +171,11 @@ def identify(
         None,
         "--audd-use-timecode/--no-audd-use-timecode",
         help=_("Enterprise: request formatted timecodes in the response."),
+    ),
+    musicbrainz_missing_only: bool | None = typer.Option(
+        None,
+        "--musicbrainz-missing-only/--musicbrainz-always",
+        help=_("Query MusicBrainz only when artist/title metadata is missing."),
     ),
     limit: int = typer.Option(
         3,
@@ -435,6 +452,19 @@ def identify(
         config.identify_announce_source,
     )
 
+    musicbrainz_enabled_value = resolve_option(
+        ctx,
+        "musicbrainz",
+        use_musicbrainz,
+        config.musicbrainz_enabled,
+    )
+    musicbrainz_missing_only_value = resolve_option(
+        ctx,
+        "musicbrainz_missing_only",
+        musicbrainz_missing_only,
+        config.musicbrainz_enrich_missing_only,
+    )
+
     strategy_description = None
     if not audd_available:
         if fallback_audd_token:
@@ -506,6 +536,18 @@ def identify(
         ttl=timedelta(hours=max(config.cache_ttl_hours, 1)),
     )
 
+    musicbrainz_options = MusicBrainzOptions(
+        enabled=bool(musicbrainz_enabled_value),
+        enrich_missing_only=bool(musicbrainz_missing_only_value),
+    )
+    musicbrainz_settings = build_musicbrainz_settings(
+        app_name=config.musicbrainz_user_agent_app,
+        app_version=config.musicbrainz_user_agent_version,
+        contact=config.musicbrainz_contact,
+        rate_limit_per_second=config.musicbrainz_rate_limit_per_second,
+        timeout_seconds=config.musicbrainz_timeout_seconds,
+    )
+
     matches: list[AcoustIDMatch] | None = None
     match_source = None
     if config.cache_enabled and not refresh_value:
@@ -516,6 +558,24 @@ def identify(
 
     error_cls = support.error_cls
     audd_attempted = False
+
+    def apply_musicbrainz_enrichment() -> None:
+        nonlocal matches
+        if not matches or not musicbrainz_options.enabled:
+            return
+        enriched = enrich_matches_with_musicbrainz(
+            matches,
+            options=musicbrainz_options,
+            settings=musicbrainz_settings,
+            echo=lambda message: typer.echo(message, err=True),
+        )
+        if enriched and match_source == "acoustid" and config.cache_enabled and matches is not None:
+            cache.set(
+                fingerprint_result.fingerprint,
+                fingerprint_result.duration_seconds,
+                matches,
+            )
+            cache.save()
 
     def determine_primary_mode() -> AudDMode:
         if force_enterprise_value:
@@ -640,6 +700,9 @@ def identify(
         if audd_results:
             matches = audd_results
             match_source = "audd"
+
+    if matches:
+        apply_musicbrainz_enrichment()
 
     if not matches:
         typer.echo(_("No matches found."))

@@ -120,6 +120,16 @@ On a per-run basis you can still disable the integration entirely with `--no-aud
 
 Tip: keep the token disabled in shared scripts unless every user has accepted AudD’s terms and provided their own credentials.
 
+## Optional MusicBrainz enrichment
+
+When AcoustID or AudD return a match without full metadata, Recozik can call the public [MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) JSON API to fill in missing artist, title, album, and release identifiers:
+
+1. Configure a polite user agent and optional contact address under the `[musicbrainz]` section of `config.toml` (defaults to `recozik/0.10.0`). No API key is required for read-only lookups.
+2. Enable or disable the extra lookup per run with `--with-musicbrainz/--without-musicbrainz`. Use `--musicbrainz-missing-only/--musicbrainz-always` to control whether enrichment only happens when artist/title data is absent.
+3. Respect the rate limit: the defaults honour MusicBrainz’ one-request-per-second guideline. Increase or decrease `rate_limit_per_second` and `timeout_seconds` in `[musicbrainz]` if your workflow needs different pacing.
+
+Enrichment runs entirely on the client: no match data is sent to Recozik’s maintainers, and cached AcoustID responses will be updated with the extra metadata automatically.
+
 ## Usage examples
 
 Inspect a file:
@@ -173,6 +183,7 @@ The rename workflow also honours configuration keys under `[rename]`:
 Two optional sections also tune the identification commands:
 
 - `[audd]` centralises the AudD integration (token, endpoints, mode, and enterprise parameters such as `skip`, `every`, `limit`, `skip_first_seconds`, `accurate_offsets`, and `use_timecode`).
+- `[musicbrainz]` toggles the metadata enrichment client (token placeholder, polite user agent strings, rate limiting, timeout, and whether enrichment only runs when fields are missing).
 - `[identify]` sets the default limit (`3`), JSON output mode (`false`), cache refresh behaviour (`false`), and the AudD integration defaults (`audd_enabled = true`, `prefer_audd = false`) for the single-file `identify` command only.
 - `[identify_batch]` controls the per-file result limit (`3`), `best_only` mode (`false`), recursion (`false`), log destination (unset → `recozik-batch.log` in the current directory), and the AudD defaults (`audd_enabled = true`, `prefer_audd = false`) exclusively for `identify-batch`.
 
@@ -312,6 +323,12 @@ Each command reads only the section that matches its name. Values under `[identi
 | Config file `[audd]`           | `use_timecode`            | boolean                              | `false`                         | Enterprise: request formatted timecodes in results.                   | Edit `config.toml` or pass `--audd-use-timecode/--no-audd-use-timecode`.               |
 | Config file `[audd]`           | `snippet_offset`          | float / seconds                      | `0.0`                           | Standard: shift the 12-second snippet forward before upload.          | Edit `config.toml` or pass `--audd-snippet-offset`.                                    |
 | Config file `[audd]`           | `snippet_min_rms`         | float                                | unset                           | Warn when the AudD snippet RMS falls below this threshold.            | Edit `config.toml` or pass `--audd-snippet-min-rms`.                                   |
+| Config file `[musicbrainz]`    | `enabled`                 | boolean                              | `true`                          | Controls whether enrichment runs at all.                              | Edit `config.toml` or pass `--with-musicbrainz/--without-musicbrainz`.                 |
+| Config file `[musicbrainz]`    | `app` / `app_version`     | string                               | `"recozik"` / `"0.10.0"`        | User-Agent prefix sent to MusicBrainz.                                | Edit `config.toml`.                                                                    |
+| Config file `[musicbrainz]`    | `contact`                 | string                               | unset                           | Optional contact e-mail/URL appended to the User-Agent.               | Edit `config.toml`.                                                                    |
+| Config file `[musicbrainz]`    | `rate_limit_per_second`   | float                                | `1.0`                           | Maximum request rate against MusicBrainz.                             | Edit `config.toml`.                                                                    |
+| Config file `[musicbrainz]`    | `timeout_seconds`         | float                                | `5.0`                           | Timeout for each MusicBrainz HTTP request.                            | Edit `config.toml`.                                                                    |
+| Config file `[musicbrainz]`    | `enrich_missing_only`     | boolean                              | `true`                          | Only hit MusicBrainz when artist/title metadata is missing.           | Edit `config.toml` or pass `--musicbrainz-missing-only/--musicbrainz-always`.          |
 | Config file `[cache]`          | `enabled`                 | boolean                              | `true`                          | Enables the local lookup cache.                                       | Edit `config.toml`.                                                                    |
 | Config file `[cache]`          | `ttl_hours`               | integer                              | `24`                            | Cache time-to-live in hours (minimum 1).                              | Edit `config.toml`.                                                                    |
 | Config file `[output]`         | `template`                | string                               | `"{artist} - {title}"`          | Default template for identify/rename output.                          | Edit `config.toml` or pass `--template`.                                               |
