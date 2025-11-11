@@ -29,8 +29,10 @@ from ..cli_support.metadata import extract_audio_metadata
 from ..cli_support.musicbrainz import (
     MusicBrainzClient,
     MusicBrainzOptions,
-    build_settings as build_musicbrainz_settings,
     enrich_matches_with_musicbrainz,
+)
+from ..cli_support.musicbrainz import (
+    build_settings as build_musicbrainz_settings,
 )
 from ..cli_support.options import resolve_option
 from ..cli_support.paths import (
@@ -745,9 +747,7 @@ def identify_batch(
         timeout_seconds=config.musicbrainz_timeout_seconds,
     )
     musicbrainz_client = (
-        MusicBrainzClient(musicbrainz_settings)
-        if musicbrainz_options.enabled
-        else None
+        MusicBrainzClient(musicbrainz_settings) if musicbrainz_options.enabled else None
     )
 
     use_metadata_fallback = (
