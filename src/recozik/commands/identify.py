@@ -547,6 +547,8 @@ def identify(
         contact=config.musicbrainz_contact,
         rate_limit_per_second=config.musicbrainz_rate_limit_per_second,
         timeout_seconds=config.musicbrainz_timeout_seconds,
+        cache_size=config.musicbrainz_cache_size,
+        max_retries=config.musicbrainz_max_retries,
     )
     musicbrainz_client = (
         MusicBrainzClient(musicbrainz_settings) if musicbrainz_options.enabled else None

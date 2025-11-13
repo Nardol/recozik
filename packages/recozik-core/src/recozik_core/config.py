@@ -77,6 +77,8 @@ class AppConfig:
     musicbrainz_rate_limit_per_second: float = 1.0
     musicbrainz_timeout_seconds: float = 5.0
     musicbrainz_enrich_missing_only: bool = True
+    musicbrainz_cache_size: int = 256
+    musicbrainz_max_retries: int = 2
     locale: str | None = None
     rename_log_cleanup: str = "ask"
     rename_require_template_fields: bool = False
@@ -149,6 +151,8 @@ class AppConfig:
                 "rate_limit_per_second": self.musicbrainz_rate_limit_per_second,
                 "timeout_seconds": self.musicbrainz_timeout_seconds,
                 "enrich_missing_only": self.musicbrainz_enrich_missing_only,
+                "cache_size": max(int(self.musicbrainz_cache_size), 0),
+                "max_retries": max(int(self.musicbrainz_max_retries), 0),
             },
             "general": {},
             "identify": {
@@ -415,6 +419,20 @@ def load_config(path: Path | None = None) -> AppConfig:
         "musicbrainz.enrich_missing_only",
         True,
     )
+    musicbrainz_cache_size_value = _coerce_optional_int(
+        musicbrainz_section.get("cache_size"), "musicbrainz.cache_size"
+    )
+    if musicbrainz_cache_size_value is None:
+        musicbrainz_cache_size_value = 256
+    elif musicbrainz_cache_size_value < 0:
+        musicbrainz_cache_size_value = 0
+    musicbrainz_max_retries_value = _coerce_optional_int(
+        musicbrainz_section.get("max_retries"), "musicbrainz.max_retries"
+    )
+    if musicbrainz_max_retries_value is None:
+        musicbrainz_max_retries_value = 2
+    elif musicbrainz_max_retries_value < 0:
+        musicbrainz_max_retries_value = 0
 
     general_section = data.get("general", {}) or {}
     locale_value = general_section.get("locale")
@@ -575,6 +593,8 @@ def load_config(path: Path | None = None) -> AppConfig:
         musicbrainz_rate_limit_per_second=musicbrainz_rate_value,
         musicbrainz_timeout_seconds=musicbrainz_timeout_value,
         musicbrainz_enrich_missing_only=musicbrainz_enrich_missing_only_value,
+        musicbrainz_cache_size=musicbrainz_cache_size_value,
+        musicbrainz_max_retries=musicbrainz_max_retries_value,
         locale=locale_value,
         rename_log_cleanup=cleanup_value,
         rename_require_template_fields=require_template_fields,
@@ -751,6 +771,8 @@ def write_config(config: AppConfig, path: Path | None = None) -> Path:
     lines.append(f"rate_limit_per_second = {data['musicbrainz']['rate_limit_per_second']}")
     lines.append(f"timeout_seconds = {data['musicbrainz']['timeout_seconds']}")
     lines.append(f"enrich_missing_only = {str(data['musicbrainz']['enrich_missing_only']).lower()}")
+    lines.append(f"cache_size = {data['musicbrainz'].get('cache_size', 256)}")
+    lines.append(f"max_retries = {data['musicbrainz'].get('max_retries', 2)}")
     lines.append("")
 
     lines.append("[logging]")

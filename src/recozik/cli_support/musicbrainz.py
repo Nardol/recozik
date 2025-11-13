@@ -32,6 +32,8 @@ def build_settings(
     contact: str | None,
     rate_limit_per_second: float,
     timeout_seconds: float,
+    cache_size: int,
+    max_retries: int,
 ) -> MusicBrainzSettings:
     """Return reusable settings for the lightweight MusicBrainz client."""
     return MusicBrainzSettings(
@@ -41,6 +43,8 @@ def build_settings(
         contact=contact,
         rate_limit_per_second=max(rate_limit_per_second, 0.0),
         timeout_seconds=max(timeout_seconds, 0.1),
+        cache_size=max(cache_size, 0),
+        max_retries=max(max_retries, 0),
     )
 
 
