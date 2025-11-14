@@ -11,6 +11,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import (
+    BackgroundTasks,
     Depends,
     FastAPI,
     File,
@@ -36,6 +37,7 @@ from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
 
 from .auth import API_TOKEN_HEADER, RequestContext, get_request_context, resolve_user_from_token
+from .auth_store import TokenRecord, get_token_repository
 from .config import WebSettings, get_settings
 from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
 
@@ -86,6 +88,11 @@ class JobCallbacks(LoggingCallbacks):
         """Record info-level callback output."""
         super().info(message)
         self.repo.append_message(self.job_id, message)
+
+
+def _ensure_admin(context: RequestContext) -> None:
+    if "admin" not in context.user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
 
     def warning(self, message: str) -> None:  # pragma: no cover - logging wrapper
         """Record warning-level callback output."""
@@ -162,6 +169,28 @@ class JobDetailModel(JobSummaryModel):
     error: str | None
 
 
+class TokenResponseModel(BaseModel):
+    """Serialized token metadata returned by admin APIs."""
+
+    token: str
+    user_id: str
+    display_name: str
+    roles: list[str]
+    allowed_features: list[str]
+    quota_limits: dict[str, int | None]
+
+
+class TokenCreateModel(BaseModel):
+    """Payload used to create or update tokens."""
+
+    token: str | None = None
+    user_id: str
+    display_name: str
+    roles: list[str] = Field(default_factory=list)
+    allowed_features: list[str] = Field(default_factory=list)
+    quota_limits: dict[str, int | None] = Field(default_factory=dict)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     """Return service health status."""
@@ -213,6 +242,7 @@ def identify_from_path(
     },
 )
 async def identify_from_upload(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     refresh_cache: bool = Form(False),
     metadata_fallback: bool = Form(True),
@@ -240,14 +270,13 @@ async def identify_from_upload(
     )
     repo = get_job_repository(settings.jobs_database_path)
     job = repo.create_job()
-    _schedule_job(
-        _run_identify_job(
-            job.id,
-            temp_path,
-            payload,
-            settings,
-            context,
-        )
+    background_tasks.add_task(
+        _run_identify_job,
+        job.id,
+        temp_path,
+        payload,
+        settings,
+        context,
     )
     return JobSummaryModel(job_id=job.id, status=job.status)
 
@@ -383,7 +412,7 @@ def whoami(context: RequestContext = Depends(get_request_context)) -> dict[str, 
         "user_id": context.user.user_id,
         "display_name": context.user.display_name,
         "roles": list(context.user.roles),
-        "allowed_features": [feature.value for feature in allowed],
+        "allowed_features": list(allowed),
     }
 
 
@@ -396,29 +425,27 @@ def _status_for_service_error(exc: IdentifyServiceError) -> int:
     return status.HTTP_400_BAD_REQUEST
 
 
-async def _run_identify_job(
+def _run_identify_job(
     job_id: str,
     temp_path: Path,
     payload: IdentifyRequestPayload,
     settings: WebSettings,
     context: RequestContext,
 ) -> None:
+    logger.debug("Job %s started", job_id)
     repo = get_job_repository(settings.jobs_database_path)
     repo.set_status(job_id, JobStatus.RUNNING)
     callbacks = JobCallbacks(job_id, repo)
 
-    def _execute() -> IdentifyResponse:
+    try:
         request = _build_identify_request(payload, temp_path, settings)
-        return identify_track(
+        response = identify_track(
             request,
             callbacks=callbacks,
             user=context.user,
             access_policy=context.access_policy,
             quota_policy=context.quota_policy,
         )
-
-    try:
-        response = await asyncio.to_thread(_execute)
     except IdentifyServiceError as exc:
         repo.append_message(job_id, f"Error: {exc}")
         repo.set_status(job_id, JobStatus.FAILED, error=str(exc))
@@ -427,6 +454,7 @@ async def _run_identify_job(
         repo.set_status(job_id, JobStatus.COMPLETED, result=serialized)
     finally:
         temp_path.unlink(missing_ok=True)
+        logger.debug("Job %s finished", job_id)
 
 
 async def _persist_upload(upload: UploadFile, settings: WebSettings) -> Path:
@@ -513,3 +541,54 @@ async def job_updates(websocket: WebSocket, job_id: str) -> None:
         logger.exception("WebSocket error for job %s", job_id)
         with contextlib.suppress(Exception):
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+
+
+@app.get("/admin/tokens", response_model=list[TokenResponseModel])
+def list_tokens(
+    context: RequestContext = Depends(get_request_context),
+    settings: WebSettings = Depends(get_settings),
+) -> list[TokenResponseModel]:
+    """Return all stored tokens (admin only)."""
+    _ensure_admin(context)
+    repo = get_token_repository(settings.auth_database_path)
+    records = repo.list_tokens()
+    return [
+        TokenResponseModel(
+            token=record.token,
+            user_id=record.user_id,
+            display_name=record.display_name,
+            roles=record.roles,
+            allowed_features=record.allowed_features,
+            quota_limits=record.quota_limits,
+        )
+        for record in records
+    ]
+
+
+@app.post("/admin/tokens", response_model=TokenResponseModel)
+def create_token(
+    payload: TokenCreateModel,
+    context: RequestContext = Depends(get_request_context),
+    settings: WebSettings = Depends(get_settings),
+) -> TokenResponseModel:
+    """Create or update API tokens (admin only)."""
+    _ensure_admin(context)
+    repo = get_token_repository(settings.auth_database_path)
+    token_value = payload.token or uuid4().hex
+    record = TokenRecord(
+        token=token_value,
+        user_id=payload.user_id,
+        display_name=payload.display_name,
+        roles=payload.roles,
+        allowed_features=payload.allowed_features,
+        quota_limits=payload.quota_limits,
+    )
+    repo.upsert(record)
+    return TokenResponseModel(
+        token=record.token,
+        user_id=record.user_id,
+        display_name=record.display_name,
+        roles=record.roles,
+        allowed_features=record.allowed_features,
+        quota_limits=record.quota_limits,
+    )

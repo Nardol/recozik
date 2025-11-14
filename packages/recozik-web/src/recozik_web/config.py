@@ -33,6 +33,7 @@ class WebSettings(BaseSettings):
     max_upload_mb: int = 32
     upload_subdir: str = "uploads"
     jobs_db_filename: str = "jobs.db"
+    auth_db_filename: str = "auth.db"
 
     @model_validator(mode="after")
     def _resolve_media_root(self) -> WebSettings:
@@ -54,6 +55,11 @@ class WebSettings(BaseSettings):
     def jobs_database_path(self) -> Path:
         """Return the SQLite path used for job persistence."""
         return (self.base_media_root / self.jobs_db_filename).resolve()
+
+    @property
+    def auth_database_path(self) -> Path:
+        """Return the SQLite path used for token persistence."""
+        return (self.base_media_root / self.auth_db_filename).resolve()
 
 
 @lru_cache

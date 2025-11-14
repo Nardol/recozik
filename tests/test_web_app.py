@@ -201,3 +201,118 @@ def test_identify_upload_rejects_large_file(monkeypatch, tmp_path: Path) -> None
     )
 
     assert response.status_code == 413
+
+
+def test_job_websocket_stream(monkeypatch, web_app) -> None:
+    """WebSocket endpoint should emit snapshot and result events."""
+    client, _, app_module, _ = web_app
+
+    fingerprint = FingerprintResult(fingerprint="abc", duration_seconds=5.0)
+    match = AcoustIDMatch(
+        score=0.9,
+        recording_id="rec",
+        title="Track",
+        artist="Artist",
+        release_group_id=None,
+        release_group_title=None,
+        releases=[],
+    )
+    fake_response = IdentifyResponse(
+        fingerprint=fingerprint,
+        matches=[match],
+        match_source="acoustid",
+        metadata=None,
+        audd_note=None,
+        audd_error=None,
+    )
+
+    def slow_identify(*args, **kwargs):
+        time.sleep(0.05)
+        return fake_response
+
+    monkeypatch.setattr(app_module, "identify_track", slow_identify)
+
+    resp = client.post(
+        "/identify/upload",
+        files={"file": ("clip.wav", b"audio-bytes", "audio/wav")},
+        headers={"X-API-Token": API_TOKEN},
+    )
+    job_id = resp.json()["job_id"]
+
+    time.sleep(0.05)
+
+    with client.websocket_connect(
+        f"/ws/jobs/{job_id}?token={API_TOKEN}",
+        headers={"X-API-Token": API_TOKEN},
+    ) as websocket:
+        snapshot = websocket.receive_json()
+        assert snapshot["type"] == "snapshot"
+        if snapshot["job"]["status"] == "completed":
+            events = []
+        else:
+            events = []
+            for _ in range(5):
+                event = websocket.receive_json()
+                events.append(event)
+                if event.get("type") == "result":
+                    break
+    assert snapshot["job"]["status"] == "completed" or any(
+        evt.get("type") == "result" for evt in events
+    )
+
+
+def test_admin_can_manage_tokens(monkeypatch, web_app) -> None:
+    """Admin endpoints should create tokens persisted in SQLite."""
+    client, media_root, app_module, _ = web_app
+
+    new_token = "custom-token"  # noqa: S105 - test fixture token
+    payload = {
+        "token": new_token,
+        "user_id": "tester",
+        "display_name": "Tester",
+        "roles": ["operator"],
+        "allowed_features": ["identify"],
+        "quota_limits": {"acoustid_lookup": 1},
+    }
+
+    resp = client.post(
+        "/admin/tokens",
+        json=payload,
+        headers={"X-API-Token": API_TOKEN},
+    )
+    assert resp.status_code == 200
+
+    fingerprint = FingerprintResult(fingerprint="tok", duration_seconds=10.0)
+    match = AcoustIDMatch(score=0.9, recording_id="tok", title="T", artist="A", releases=[])
+    fake_response = IdentifyResponse(
+        fingerprint=fingerprint,
+        matches=[match],
+        match_source="acoustid",
+        metadata=None,
+        audd_note=None,
+        audd_error=None,
+    )
+
+    monkeypatch.setattr(app_module, "identify_track", lambda *args, **kwargs: fake_response)
+    media_root.joinpath("clip.wav").write_bytes(b"audio")
+
+    resp_identify = client.post(
+        "/identify/from-path",
+        json={"audio_path": str((media_root / "clip.wav").resolve())},
+        headers={"X-API-Token": new_token},
+    )
+    assert resp_identify.status_code == 200
+
+
+def test_non_admin_cannot_manage_tokens(monkeypatch, tmp_path: Path) -> None:
+    """Readonly tokens should be forbidden from admin APIs."""
+    settings = _override_settings(tmp_path)
+    settings.admin_token = "admin"  # noqa: S105 - test setup
+    settings.readonly_token = "readonly"  # noqa: S105 - test setup
+    client, _, _, _ = _bootstrap_app(monkeypatch, tmp_path, settings)
+
+    resp = client.get(
+        "/admin/tokens",
+        headers={"X-API-Token": "readonly"},
+    )
+    assert resp.status_code == 403

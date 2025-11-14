@@ -17,6 +17,7 @@ from recozik_services.security import (
     ServiceUser,
 )
 
+from .auth_store import TokenRecord, ensure_seed_tokens, get_token_repository
 from .config import WebSettings, get_settings
 
 API_TOKEN_HEADER = "X-API-Token"  # noqa: S105 - header name, not credential
@@ -138,21 +139,68 @@ def _build_token_rules(settings: WebSettings) -> dict[str, TokenRule]:
     return rules
 
 
+def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
+    defaults: list[TokenRecord] = []
+
+    def _features_for(settings: WebSettings, readonly: bool) -> list[str]:
+        feats = [ServiceFeature.IDENTIFY.value]
+        if settings.musicbrainz_enabled:
+            feats.append(ServiceFeature.MUSICBRAINZ_ENRICH.value)
+        if not readonly:
+            feats.extend([ServiceFeature.RENAME.value, ServiceFeature.IDENTIFY_BATCH.value])
+        return feats
+
+    defaults.append(
+        TokenRecord(
+            token=settings.admin_token,
+            user_id="admin",
+            display_name="Administrator",
+            roles=["admin"],
+            allowed_features=_features_for(settings, readonly=False),
+            quota_limits={},
+        )
+    )
+    if settings.readonly_token:
+        quota_limits: dict[str, int | None] = {}
+        if settings.readonly_quota_acoustid is not None:
+            quota_limits[QuotaScope.ACOUSTID_LOOKUP.value] = settings.readonly_quota_acoustid
+        if settings.readonly_quota_musicbrainz is not None:
+            quota_limits[QuotaScope.MUSICBRAINZ_ENRICH.value] = settings.readonly_quota_musicbrainz
+        if settings.readonly_quota_audd_standard is not None:
+            quota_limits[QuotaScope.AUDD_STANDARD_LOOKUP.value] = (
+                settings.readonly_quota_audd_standard
+            )
+
+        defaults.append(
+            TokenRecord(
+                token=settings.readonly_token,
+                user_id="readonly",
+                display_name="Readonly",
+                roles=["readonly"],
+                allowed_features=_features_for(settings, readonly=True),
+                quota_limits=quota_limits,
+            )
+        )
+
+    return defaults
+
+
 def resolve_user_from_token(token: str, settings: WebSettings) -> ServiceUser:
     """Return the ServiceUser matching the provided API token."""
-    rules = _build_token_rules(settings)
-    rule = rules.get(token)
-    if not rule:
+    repo = get_token_repository(settings.auth_database_path)
+    ensure_seed_tokens(repo, defaults=_seed_defaults(settings))
+    record = repo.get(token)
+    if not record:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API token")
     attributes = {
-        "allowed_features": frozenset(rule.allowed_features),
-        "quota_limits": dict(rule.quota_limits),
+        "allowed_features": frozenset(record.allowed_features),
+        "quota_limits": record.quota_limits,
     }
     return ServiceUser(
-        user_id=rule.user_id,
+        user_id=record.user_id,
         email=None,
-        display_name=rule.display_name,
-        roles=rule.roles,
+        display_name=record.display_name,
+        roles=tuple(record.roles),
         attributes=attributes,
     )
 
