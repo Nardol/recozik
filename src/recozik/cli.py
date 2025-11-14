@@ -6,6 +6,15 @@ from pathlib import Path
 from typing import Any
 
 import typer
+from recozik_services.cli_support.completion import (
+    completion_hint,
+    completion_script_path,
+    completion_source_command,
+    completion_uninstall_hint,
+    detect_shell,
+)
+from recozik_services.cli_support.deps import get_fingerprint_symbols, get_lookup_cache_cls
+from recozik_services.cli_support.metadata import extract_audio_metadata
 from typer.completion import (
     get_completion_script as _typer_generate_completion_script,
 )
@@ -16,15 +25,6 @@ from typer.completion import (
     shellingham as completion_shellingham,
 )
 
-from .cli_support.completion import (
-    completion_hint,
-    completion_script_path,
-    completion_source_command,
-    completion_uninstall_hint,
-    detect_shell,
-)
-from .cli_support.deps import get_fingerprint_symbols, get_lookup_cache_cls
-from .cli_support.metadata import extract_audio_metadata
 from .commands.completion import (
     completion_install as completion_install_command,
 )

@@ -5,11 +5,40 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Callable
-from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import typer
+from recozik_services.cli_support.audd_helpers import (
+    get_audd_support,
+    parse_bool_env,
+    parse_float_env,
+    parse_int_env,
+    parse_int_list_env,
+)
+from recozik_services.cli_support.deps import (
+    get_config_module,
+    get_fingerprint_symbols,
+    get_lookup_cache_cls,
+)
+from recozik_services.cli_support.locale import apply_locale, resolve_template
+from recozik_services.cli_support.logs import format_match_template
+from recozik_services.cli_support.metadata import extract_audio_metadata
+from recozik_services.cli_support.musicbrainz import MusicBrainzOptions
+from recozik_services.cli_support.musicbrainz import (
+    build_settings as build_musicbrainz_settings,
+)
+from recozik_services.cli_support.options import resolve_option
+from recozik_services.cli_support.paths import resolve_path
+from recozik_services.cli_support.prompts import prompt_api_key, prompt_yes_no
+from recozik_services.identify import (
+    AudDConfig as ServiceAudDConfig,
+)
+from recozik_services.identify import (
+    IdentifyRequest,
+    IdentifyServiceError,
+    identify_track,
+)
 
 from recozik_core import secrets as secret_store
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
@@ -18,30 +47,10 @@ from recozik_core.i18n import _
 from recozik_core.secrets import SecretBackendUnavailableError, SecretStoreError
 
 from .. import cli as cli_module
-from ..cli_support.audd_helpers import (
-    get_audd_support,
-    parse_bool_env,
-    parse_float_env,
-    parse_int_env,
-    parse_int_list_env,
-)
-from ..cli_support.deps import get_config_module, get_fingerprint_symbols, get_lookup_cache_cls
-from ..cli_support.locale import apply_locale, resolve_template
-from ..cli_support.logs import format_match_template
-from ..cli_support.musicbrainz import (
-    MusicBrainzClient,
-    MusicBrainzOptions,
-    enrich_matches_with_musicbrainz,
-)
-from ..cli_support.musicbrainz import (
-    build_settings as build_musicbrainz_settings,
-)
-from ..cli_support.options import resolve_option
-from ..cli_support.paths import resolve_path
-from ..cli_support.prompts import prompt_api_key, prompt_yes_no
+from ._callbacks import TyperCallbacks
 
 if TYPE_CHECKING:
-    from recozik_core.audd import SnippetInfo
+    pass
 
 
 T = TypeVar("T")
@@ -223,6 +232,7 @@ def identify(
     configure_key = getattr(
         cli_module, "_configure_api_key_interactively", configure_api_key_interactively
     )
+    metadata_extractor = _cli_override("_extract_audio_metadata", extract_audio_metadata)
 
     resolved_audio = resolve_path(audio_path)
     resolved_fpcalc = resolve_path(fpcalc_path) if fpcalc_path else None
@@ -523,20 +533,6 @@ def identify(
             typer.echo(_("Operation cancelled."))
             raise typer.Exit(code=1)
 
-    try:
-        fingerprint_result = compute_fingerprint(
-            resolved_audio,
-            fpcalc_path=resolved_fpcalc,
-        )
-    except fingerprint_error_cls as exc:
-        typer.echo(str(exc))
-        raise typer.Exit(code=1) from exc
-
-    cache = lookup_cache_cls(
-        enabled=config.cache_enabled,
-        ttl=timedelta(hours=max(config.cache_ttl_hours, 1)),
-    )
-
     musicbrainz_options = MusicBrainzOptions(
         enabled=bool(musicbrainz_enabled_value),
         enrich_missing_only=bool(musicbrainz_missing_only_value),
@@ -550,170 +546,61 @@ def identify(
         cache_size=config.musicbrainz_cache_size,
         max_retries=config.musicbrainz_max_retries,
     )
-    musicbrainz_client = (
-        MusicBrainzClient(musicbrainz_settings) if musicbrainz_options.enabled else None
+    service_audd_config = ServiceAudDConfig(
+        token=fallback_audd_token or None,
+        enabled=audd_enabled_setting,
+        prefer=audd_prefer_setting,
+        endpoint_standard=audd_endpoint_standard_value,
+        endpoint_enterprise=audd_endpoint_enterprise_value,
+        mode=audd_mode_value,
+        force_enterprise=force_enterprise_value,
+        enterprise_fallback=enterprise_fallback_value,
+        params=enterprise_params,
+        snippet_offset=snippet_offset_value,
+        snippet_min_level=snippet_min_level_value,
     )
+    identify_request = IdentifyRequest(
+        audio_path=resolved_audio,
+        fpcalc_path=resolved_fpcalc,
+        api_key=key,
+        refresh_cache=refresh_value,
+        cache_enabled=config.cache_enabled,
+        cache_ttl_hours=max(config.cache_ttl_hours, 1),
+        audd=service_audd_config,
+        musicbrainz_options=musicbrainz_options,
+        musicbrainz_settings=musicbrainz_settings,
+        metadata_fallback=config.metadata_fallback_enabled,
+    )
+    callbacks = TyperCallbacks(use_stderr=json_value)
 
-    matches: list[AcoustIDMatch] | None = None
-    match_source = None
-    if config.cache_enabled and not refresh_value:
-        cached = cache.get(fingerprint_result.fingerprint, fingerprint_result.duration_seconds)
-        if cached is not None:
-            matches = list(cached)
-            match_source = "acoustid"
-
-    error_cls = support.error_cls
-    audd_attempted = False
-
-    def apply_musicbrainz_enrichment() -> None:
-        nonlocal matches
-        if not matches or not musicbrainz_options.enabled:
-            return
-        enriched = enrich_matches_with_musicbrainz(
-            matches,
-            options=musicbrainz_options,
-            settings=musicbrainz_settings,
-            client=musicbrainz_client,
-            echo=lambda message: typer.echo(message, err=True),
+    try:
+        response = identify_track(
+            identify_request,
+            callbacks=callbacks,
+            compute_fingerprint_fn=compute_fingerprint,
+            lookup_recordings_fn=lookup_recordings,
+            fingerprint_error_cls=fingerprint_error_cls,
+            acoustid_error_cls=acoustid_lookup_error_cls,
+            lookup_cache_cls=lookup_cache_cls,
+            metadata_extractor=metadata_extractor,
         )
-        if enriched and match_source == "acoustid" and config.cache_enabled and matches is not None:
-            cache.set(
-                fingerprint_result.fingerprint,
-                fingerprint_result.duration_seconds,
-                matches,
-            )
-            cache.save()
+    except IdentifyServiceError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
 
-    def determine_primary_mode() -> AudDMode:
-        if force_enterprise_value:
-            return AudDMode.ENTERPRISE
-        if audd_mode_value is AudDMode.AUTO:
-            if (
-                enterprise_params.skip
-                or enterprise_params.every is not None
-                or enterprise_params.limit is not None
-                or enterprise_params.skip_first_seconds is not None
-                or enterprise_params.accurate_offsets
-                or enterprise_params.use_timecode
-            ):
-                return AudDMode.ENTERPRISE
-            return AudDMode.STANDARD
-        return audd_mode_value
-
-    def run_audd(will_retry_acoustid: bool) -> list[AcoustIDMatch]:
-        nonlocal audd_attempted
-        audd_attempted = True
-        snippet_announced = False
-        snippet_warned = False
-
-        def handle_snippet(info: SnippetInfo) -> None:
-            nonlocal snippet_announced, snippet_warned
-            display_seconds = int(support.snippet_seconds)
-            if not snippet_announced:
-                if info.offset_seconds > 0:
-                    message = _(
-                        "Preparing AudD snippet (~{seconds}s, mono 16 kHz) starting at "
-                        "~{offset}s before upload."
-                    ).format(
-                        seconds=display_seconds,
-                        offset=f"{info.offset_seconds:.2f}",
-                    )
-                    typer.echo(message, err=json_value)
-                else:
-                    message = _(
-                        "Preparing AudD snippet (~{seconds}s, mono 16 kHz) before upload."
-                    ).format(seconds=display_seconds)
-                    typer.echo(message, err=json_value)
-                snippet_announced = True
-
-            if (
-                snippet_min_level_value is not None
-                and info.rms < snippet_min_level_value
-                and not snippet_warned
-            ):
-                warning = _(
-                    "AudD snippet RMS is low (~{rms:.4f}); consider adjusting the offset or "
-                    "using the enterprise endpoint."
-                ).format(rms=info.rms)
-                typer.echo(warning, err=True)
-                snippet_warned = True
-
-        def _execute(mode: AudDMode) -> list:
-            if mode is AudDMode.STANDARD:
-                try:
-                    return support.recognize_standard(
-                        fallback_audd_token,
-                        resolved_audio,
-                        endpoint=audd_endpoint_standard_value,
-                        snippet_offset=snippet_offset_value or 0.0,
-                        snippet_hook=handle_snippet,
-                    )
-                except error_cls as exc:
-                    message = _("AudD lookup failed: {error}.").format(error=exc)
-                    if will_retry_acoustid:
-                        message = _(
-                            "AudD lookup failed: {error}. Falling back to AcoustID."
-                        ).format(error=exc)
-                    typer.echo(message)
-                    return cast(list[AcoustIDMatch], [])
-
-            try:
-                return support.recognize_enterprise(
-                    fallback_audd_token,
-                    resolved_audio,
-                    endpoint=audd_endpoint_enterprise_value,
-                    params=enterprise_params,
-                )
-            except error_cls as exc:
-                typer.echo(_("AudD lookup failed: {error}.").format(error=exc))
-                return cast(list[AcoustIDMatch], [])
-
-        primary_mode = determine_primary_mode()
-        matches = _execute(primary_mode)
-        if matches or not enterprise_fallback_value:
-            return matches
-
-        secondary_mode = (
-            AudDMode.ENTERPRISE if primary_mode is not AudDMode.ENTERPRISE else AudDMode.STANDARD
-        )
-        if secondary_mode is primary_mode:
-            return matches
-        return _execute(secondary_mode)
-
-    if audd_available and audd_prefer_setting and matches is None:
-        audd_results = run_audd(will_retry_acoustid=True)
-        if audd_results:
-            matches = audd_results
-            match_source = "audd"
-        else:
-            matches = None
-
-    if matches is None:
-        try:
-            matches = list(lookup_recordings(key, fingerprint_result))
-        except acoustid_lookup_error_cls as exc:
-            typer.echo(str(exc))
-            raise typer.Exit(code=1) from exc
-        if config.cache_enabled:
-            cache.set(fingerprint_result.fingerprint, fingerprint_result.duration_seconds, matches)
-            cache.save()
-        match_source = "acoustid" if matches else None
-    elif match_source is None:
-        # Matches may come from cache; assume they were produced by AcoustID.
-        match_source = "acoustid"
-
-    if audd_available and not matches and not audd_attempted:
-        audd_results = run_audd(will_retry_acoustid=False)
-        if audd_results:
-            matches = audd_results
-            match_source = "audd"
-
-    if matches:
-        apply_musicbrainz_enrichment()
+    matches = response.matches
+    match_source = response.match_source
 
     if not matches:
         typer.echo(_("No matches found."))
-        cache.save()
+        if response.metadata:
+            typer.echo(_("Embedded metadata recorded:"))
+            if artist := response.metadata.get("artist"):
+                typer.echo(_("  Artist: {value}").format(value=artist))
+            if title := response.metadata.get("title"):
+                typer.echo(_("  Title: {value}").format(value=title))
+            if album := response.metadata.get("album"):
+                typer.echo(_("  Album: {value}").format(value=album))
         return
 
     if json_value:
@@ -724,7 +611,6 @@ def identify(
             record["source"] = match_source
             payload.append(record)
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
-        cache.save()
         return
 
     template_value = resolve_template(template, config)
@@ -746,8 +632,6 @@ def identify(
             typer.echo(
                 _("  Release Group ID: {identifier}").format(identifier=match.release_group_id)
             )
-
-    cache.save()
 
 
 def _deduplicate_by_template(

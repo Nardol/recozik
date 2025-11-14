@@ -7,12 +7,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import typer
+from recozik_services.cli_support.locale import apply_locale
+from recozik_services.cli_support.metadata import MUTAGEN_AVAILABLE, extract_audio_metadata
+from recozik_services.cli_support.paths import resolve_path
 
 from recozik_core.i18n import _
-
-from ..cli_support.locale import apply_locale
-from ..cli_support.metadata import MUTAGEN_AVAILABLE, extract_audio_metadata
-from ..cli_support.paths import resolve_path
 
 
 def inspect(

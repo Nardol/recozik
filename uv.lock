@@ -11,6 +11,7 @@ resolution-markers = [
 members = [
     "recozik",
     "recozik-core",
+    "recozik-services",
 ]
 
 [[package]]
@@ -308,7 +309,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -368,7 +369,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -1009,6 +1010,7 @@ version = "0.10.0"
 source = { editable = "." }
 dependencies = [
     { name = "recozik-core" },
+    { name = "recozik-services" },
     { name = "typer" },
 ]
 
@@ -1033,6 +1035,7 @@ test = [
 requires-dist = [
     { name = "recozik-core", editable = "packages/recozik-core" },
     { name = "recozik-core", extras = ["ffmpeg-support"], marker = "extra == 'ffmpeg-support'", editable = "packages/recozik-core" },
+    { name = "recozik-services", editable = "packages/recozik-services" },
     { name = "typer", specifier = ">=0.20.0" },
 ]
 provides-extras = ["ffmpeg-support"]
@@ -1082,6 +1085,17 @@ requires-dist = [
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
 ]
 provides-extras = ["ffmpeg-support"]
+
+[[package]]
+name = "recozik-services"
+version = "0.1.0"
+source = { editable = "packages/recozik-services" }
+dependencies = [
+    { name = "recozik-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "recozik-core", editable = "packages/recozik-core" }]
 
 [[package]]
 name = "requests"

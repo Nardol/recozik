@@ -5,14 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from recozik_services.cli_support.deps import get_config_module
+from recozik_services.cli_support.locale import apply_locale
+from recozik_services.cli_support.prompts import prompt_api_key, prompt_service_token
 
 from recozik_core import secrets as secret_store
 from recozik_core.i18n import _
 from recozik_core.secrets import SecretBackendUnavailableError, SecretStoreError
 
-from ..cli_support.deps import get_config_module
-from ..cli_support.locale import apply_locale
-from ..cli_support.prompts import prompt_api_key, prompt_service_token
 from .identify import validate_client_key
 
 

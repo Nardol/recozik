@@ -1,0 +1,23 @@
+[project]
+name = "recozik-services"
+version = "0.1.0"
+description = "Shared service layer for Recozik frontends (CLI, GUI)."
+readme = "../../README.md"
+license = { file = "../../LICENSE" }
+authors = [
+    { name = "Patrick ZAJDA", email = "patrick@zajda.fr" }
+]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "recozik-core"
+]
+
+[project.urls]
+Homepage = "https://github.com/Nardol/recozik"
+Documentation = "https://github.com/Nardol/recozik#readme"
+Issues = "https://github.com/Nardol/recozik/issues"
+Changelog = "https://github.com/Nardol/recozik/releases"
+
+[build-system]
+requires = ["uv_build>=0.9.0,<0.10.0"]
+build-backend = "uv_build"

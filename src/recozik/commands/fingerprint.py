@@ -6,12 +6,11 @@ import json
 from pathlib import Path
 
 import typer
+from recozik_services.cli_support.deps import get_fingerprint_symbols
+from recozik_services.cli_support.locale import apply_locale
+from recozik_services.cli_support.paths import resolve_path
 
 from recozik_core.i18n import _
-
-from ..cli_support.deps import get_fingerprint_symbols
-from ..cli_support.locale import apply_locale
-from ..cli_support.paths import resolve_path
 
 
 def fingerprint(

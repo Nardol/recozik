@@ -36,6 +36,7 @@ classifiers = [
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "recozik-core",
+    "recozik-services",
     "typer>=0.20.0",
 ]
 
@@ -103,6 +104,7 @@ known-first-party = ["recozik", "recozik_core"]
 
 [tool.uv.sources]
 recozik-core = { workspace = true }
+recozik-services = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]

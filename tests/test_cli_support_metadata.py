@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from recozik_services.cli_support import metadata as service_metadata
+
 from recozik.cli_support import metadata
 
 
@@ -28,7 +30,7 @@ def test_coerce_metadata_dict_invalid_input() -> None:  # noqa: D103
 def test_extract_audio_metadata_without_mutagen(monkeypatch, tmp_path: Path) -> None:  # noqa: D103
     audio_path = tmp_path / "song.mp3"
     audio_path.write_bytes(b"fake")
-    monkeypatch.setattr(metadata, "mutagen", None)
+    monkeypatch.setattr(service_metadata, "mutagen", None)
     assert metadata.extract_audio_metadata(audio_path) is None
 
 
@@ -51,6 +53,6 @@ def test_extract_audio_metadata_reads_tags(monkeypatch, tmp_path: Path) -> None:
         assert easy is True
         return DummyAudio()
 
-    monkeypatch.setattr(metadata, "mutagen", SimpleNamespace(File=fake_file))
+    monkeypatch.setattr(service_metadata, "mutagen", SimpleNamespace(File=fake_file))
     result = metadata.extract_audio_metadata(audio_path)
     assert result == {"artist": "Artist", "title": "Title", "album": "{'name': 'Album'}"}
