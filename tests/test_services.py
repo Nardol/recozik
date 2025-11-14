@@ -163,8 +163,8 @@ def test_identify_service_prefers_audd(tmp_path):
 
     response = identify_track(
         request,
-        compute_fingerprint_fn=lambda *args, **kwargs: fp_result,
-        lookup_recordings_fn=lambda api_key, fp: [],
+        compute_fingerprint_fn=lambda *_, **__: fp_result,
+        lookup_recordings_fn=lambda _api_key, _fp: [],
         audd_support=fake_support,
     )
 
@@ -179,13 +179,14 @@ def test_identify_service_respects_access_policy(tmp_path):
 
     class DenyIdentifyPolicy:
         def ensure_feature(self, user, feature, *, context=None):
+            del user, feature, context
             raise AccessDeniedError("identify disabled")
 
     with pytest.raises(IdentifyServiceError) as excinfo:
         identify_track(
             request,
-            compute_fingerprint_fn=lambda *args, **kwargs: fp_result,
-            lookup_recordings_fn=lambda api_key, fp: [],
+            compute_fingerprint_fn=lambda *_, **__: fp_result,
+            lookup_recordings_fn=lambda _api_key, _fp: [],
             access_policy=DenyIdentifyPolicy(),
         )
 
@@ -223,20 +224,22 @@ def test_identify_service_consumes_quota_scopes(tmp_path, monkeypatch):
     class TrackingQuotaPolicy:
         def consume(self, user, scope, *, cost=1, context=None):
             """Record the scope consumed by this request."""
+            del user, cost, context
             consumed_scopes.append(scope)
 
     def fake_enrich(*args, **kwargs):
         """Return False to indicate no enrichment occurred."""
+        del args, kwargs
         return False
 
     monkeypatch.setattr("recozik_services.identify.enrich_matches_with_musicbrainz", fake_enrich)
 
     identify_track(
         request,
-        compute_fingerprint_fn=lambda *args, **kwargs: fp_result,
-        lookup_recordings_fn=lambda api_key, fp: [],
+        compute_fingerprint_fn=lambda *_, **__: fp_result,
+        lookup_recordings_fn=lambda _api_key, _fp: [],
         audd_support=fake_support,
-        metadata_extractor=lambda path: None,
+        metadata_extractor=lambda _path: None,
         quota_policy=TrackingQuotaPolicy(),
     )
 

@@ -19,9 +19,11 @@ from .rename import (
 from .security import (
     AccessDeniedError,
     AccessPolicy,
+    AccessPolicyError,
     AllowAllAccessPolicy,
     QuotaExceededError,
     QuotaPolicy,
+    QuotaPolicyError,
     QuotaScope,
     ServiceFeature,
     ServiceUser,
@@ -31,6 +33,7 @@ from .security import (
 __all__ = [
     "AccessDeniedError",
     "AccessPolicy",
+    "AccessPolicyError",
     "AllowAllAccessPolicy",
     "AudDConfig",
     "BatchRequest",
@@ -41,6 +44,7 @@ __all__ = [
     "PrintCallbacks",
     "QuotaExceededError",
     "QuotaPolicy",
+    "QuotaPolicyError",
     "QuotaScope",
     "RenamePrompts",
     "RenameRequest",

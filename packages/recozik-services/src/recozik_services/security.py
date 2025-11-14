@@ -101,6 +101,7 @@ class AllowAllAccessPolicy:
         context: Mapping[str, Any] | None = None,
     ) -> None:
         """No-op implementation that never denies access."""
+        del user, feature, context
         return None
 
 
@@ -116,6 +117,7 @@ class UnlimitedQuotaPolicy:
         context: Mapping[str, Any] | None = None,
     ) -> None:
         """No-op implementation that never records or rejects usage."""
+        del user, scope, cost, context
         return None
 
 
