@@ -1,0 +1,165 @@
+"""Lightweight auth + quota helpers for the web backend."""
+
+from __future__ import annotations
+
+from collections import Counter, defaultdict
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+from fastapi import Depends, Header, HTTPException, status
+from recozik_services.security import (
+    AccessDeniedError,
+    AccessPolicy,
+    QuotaExceededError,
+    QuotaPolicy,
+    QuotaScope,
+    ServiceFeature,
+    ServiceUser,
+)
+
+from .config import WebSettings, get_settings
+
+API_TOKEN_HEADER = "X-API-Token"  # noqa: S105 - header name, not credential
+
+
+@dataclass(frozen=True)
+class TokenRule:
+    """Describe what a static token may do within the service."""
+
+    token: str
+    user_id: str
+    display_name: str
+    roles: tuple[str, ...]
+    allowed_features: tuple[ServiceFeature, ...]
+    quota_limits: Mapping[QuotaScope, int | None]
+
+
+class TokenAccessPolicy(AccessPolicy):
+    """Authorize features based on attributes stored on the ServiceUser."""
+
+    def ensure_feature(
+        self,
+        user: ServiceUser,
+        feature: ServiceFeature,
+        *,
+        context: Mapping[str, object] | None = None,
+    ) -> None:
+        """Raise AccessDeniedError when the token is not allowed to use the feature."""
+        allowed = user.attributes.get("allowed_features")
+        if allowed and feature not in allowed:
+            raise AccessDeniedError(f"{feature.value} not permitted for this token")
+
+
+class InMemoryQuotaPolicy(QuotaPolicy):
+    """Track quota usage in-process for each ServiceUser."""
+
+    def __init__(self) -> None:
+        """Initialize in-memory counters keyed by user ID."""
+        self._counts: dict[str, Counter[QuotaScope]] = defaultdict(Counter)
+
+    def consume(
+        self,
+        user: ServiceUser,
+        scope: QuotaScope,
+        *,
+        cost: int = 1,
+        context: Mapping[str, object] | None = None,
+    ) -> None:
+        """Increment usage for the provided scope and enforce limits."""
+        limits: Mapping[QuotaScope, int | None] = user.attributes.get("quota_limits", {})
+        limit = limits.get(scope)
+        if limit is None:
+            return
+        user_key = user.user_id or "anonymous"
+        current = self._counts[user_key][scope]
+        if current + cost > limit:
+            raise QuotaExceededError(
+                f"Quota exceeded for {scope.value}: {current + cost} > {limit}"
+            )
+        self._counts[user_key][scope] = current + cost
+
+
+_ACCESS_POLICY = TokenAccessPolicy()
+_QUOTA_POLICY = InMemoryQuotaPolicy()
+
+
+@dataclass
+class RequestContext:
+    """Aggregate the resolved user and shared policies for a request."""
+
+    user: ServiceUser
+    access_policy: AccessPolicy
+    quota_policy: QuotaPolicy
+
+
+def _build_token_rules(settings: WebSettings) -> dict[str, TokenRule]:
+    """Return the static token map enforced by the access/quota policies."""
+    features_all = {
+        ServiceFeature.IDENTIFY,
+        ServiceFeature.IDENTIFY_BATCH,
+        ServiceFeature.RENAME,
+    }
+    if settings.musicbrainz_enabled:
+        features_all.add(ServiceFeature.MUSICBRAINZ_ENRICH)
+    if settings.audd_token:
+        features_all.add(ServiceFeature.AUDD)
+
+    rules: dict[str, TokenRule] = {}
+    rules[settings.admin_token] = TokenRule(
+        token=settings.admin_token,
+        user_id="admin",
+        display_name="Administrator",
+        roles=("admin",),
+        allowed_features=tuple(sorted(features_all, key=lambda item: item.value)),
+        quota_limits={},
+    )
+
+    if settings.readonly_token:
+        allowed_features = {ServiceFeature.IDENTIFY}
+        if settings.musicbrainz_enabled:
+            allowed_features.add(ServiceFeature.MUSICBRAINZ_ENRICH)
+        quota_limits: dict[QuotaScope, int] = {}
+        if settings.readonly_quota_acoustid is not None:
+            quota_limits[QuotaScope.ACOUSTID_LOOKUP] = settings.readonly_quota_acoustid
+        if settings.readonly_quota_musicbrainz is not None:
+            quota_limits[QuotaScope.MUSICBRAINZ_ENRICH] = settings.readonly_quota_musicbrainz
+        if settings.readonly_quota_audd_standard is not None:
+            quota_limits[QuotaScope.AUDD_STANDARD_LOOKUP] = settings.readonly_quota_audd_standard
+            allowed_features.add(ServiceFeature.AUDD)
+        rules[settings.readonly_token] = TokenRule(
+            token=settings.readonly_token,
+            user_id="readonly",
+            display_name="Readonly",
+            roles=("readonly",),
+            allowed_features=tuple(sorted(allowed_features, key=lambda item: item.value)),
+            quota_limits=quota_limits,
+        )
+
+    return rules
+
+
+def _resolve_user_from_token(token: str, settings: WebSettings) -> ServiceUser:
+    rules = _build_token_rules(settings)
+    rule = rules.get(token)
+    if not rule:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API token")
+    attributes = {
+        "allowed_features": frozenset(rule.allowed_features),
+        "quota_limits": dict(rule.quota_limits),
+    }
+    return ServiceUser(
+        user_id=rule.user_id,
+        email=None,
+        display_name=rule.display_name,
+        roles=rule.roles,
+        attributes=attributes,
+    )
+
+
+def get_request_context(
+    api_token: str = Header(..., alias=API_TOKEN_HEADER),
+    settings: WebSettings = Depends(get_settings),
+) -> RequestContext:
+    """FastAPI dependency injecting ServiceUser + policies."""
+    user = _resolve_user_from_token(api_token, settings)
+    return RequestContext(user=user, access_policy=_ACCESS_POLICY, quota_policy=_QUOTA_POLICY)

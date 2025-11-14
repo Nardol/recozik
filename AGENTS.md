@@ -7,6 +7,7 @@
 - `src/recozik/cli_support/` – Thin re-export layer pointing to the shared service helpers (locale resolution, path helpers, metadata/log formatting, prompts, lazy dependency loaders).
 - `packages/recozik-services/src/recozik_services/` – Service layer consumed by the CLI and future GUIs (identify, batch identify, rename runners plus callback/ prompt protocols). Implement new behaviour here first so every frontend stays in sync.
 - `packages/recozik-services/src/recozik_services/security.py` – Auth/authorization/quota protocols + default policies every frontend must wire up.
+- `packages/recozik-web/src/recozik_web/` – FastAPI backend exposing the shared services over HTTP (token auth, quota policy wiring, filesystem-based identify endpoint).
 - `packages/recozik-core/src/recozik_core/` – Core libraries (`fingerprint.py`, `cache.py`, `config.py`, `audd.py`, `i18n.py`, locales) consumed by the CLI and future GUIs.
 - `tests/` – Pytest suites mirroring CLI features and performance guards (includes `test_cli_import_time.py`).
 - `README.md` – User-facing quick start; AGENTS should cross-check when updating commands.

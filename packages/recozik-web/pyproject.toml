@@ -1,0 +1,32 @@
+[project]
+name = "recozik-web"
+version = "0.1.0"
+description = "FastAPI backend for the Recozik services layer."
+readme = "../../README.md"
+license = { file = "../../LICENSE" }
+authors = [
+    { name = "Patrick ZAJDA", email = "patrick@zajda.fr" }
+]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "recozik-services",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "pydantic-settings>=2.6.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+cli = [
+    "uvicorn[standard]>=0.32.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Nardol/recozik"
+Documentation = "https://github.com/Nardol/recozik#readme"
+Issues = "https://github.com/Nardol/recozik/issues"
+Changelog = "https://github.com/Nardol/recozik/releases"
+
+[build-system]
+requires = ["uv_build>=0.9.0,<0.10.0"]
+build-backend = "uv_build"
