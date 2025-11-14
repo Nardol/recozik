@@ -282,22 +282,32 @@ async def identify_from_upload(
 
 
 def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
+    if not path_value.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing audio path")
+
     candidate = Path(path_value)
-    if not candidate.is_absolute():
-        candidate = (settings.base_media_root / candidate).resolve()
-    else:
-        candidate = candidate.resolve()
+    if candidate.is_absolute() or candidate.anchor:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Absolute paths disabled"
+        )
+
+    if any(part in {"..", ""} for part in candidate.parts):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path segments in audio_path"
+        )
+
+    resolved = (settings.base_media_root / candidate).resolve()
 
     try:
-        candidate.relative_to(settings.base_media_root)
+        resolved.relative_to(settings.base_media_root)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         ) from exc
 
-    if not candidate.is_file():
+    if not resolved.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
-    return candidate
+    return resolved
 
 
 def _build_identify_request(

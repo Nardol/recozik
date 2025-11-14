@@ -125,6 +125,31 @@ def test_identify_from_path_invokes_service(monkeypatch, web_app) -> None:
     assert captured_paths == [file_path]
 
 
+def test_identify_rejects_traversal(web_app) -> None:
+    """The API should reject attempts to escape the media root."""
+    client, _, _, _ = web_app
+    response = client.post(
+        "/identify/from-path",
+        json={"audio_path": "../secret.flac"},
+        headers={"X-API-Token": API_TOKEN},
+    )
+    assert response.status_code == 400
+    assert "invalid" in response.json()["detail"].lower()
+
+
+def test_identify_rejects_absolute_path(web_app) -> None:
+    """Absolute paths must be denied to avoid leaking server files."""
+    client, media_root, _, _ = web_app
+    absolute_path = (media_root / "clip.wav").resolve()
+    response = client.post(
+        "/identify/from-path",
+        json={"audio_path": str(absolute_path)},
+        headers={"X-API-Token": API_TOKEN},
+    )
+    assert response.status_code == 400
+    assert "absolute paths" in response.json()["detail"].lower()
+
+
 def test_whoami_returns_context(web_app) -> None:
     """Token metadata should be visible through /whoami."""
     client, _, _, _ = web_app
@@ -298,7 +323,7 @@ def test_admin_can_manage_tokens(monkeypatch, web_app) -> None:
 
     resp_identify = client.post(
         "/identify/from-path",
-        json={"audio_path": str((media_root / "clip.wav").resolve())},
+        json={"audio_path": "clip.wav"},
         headers={"X-API-Token": new_token},
     )
     assert resp_identify.status_code == 200
