@@ -4,10 +4,17 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from recozik_services.batch import BatchRequest, run_batch_identify
 from recozik_services.cli_support.musicbrainz import MusicBrainzOptions, build_settings
-from recozik_services.identify import AudDConfig, IdentifyRequest, identify_track
+from recozik_services.identify import (
+    AudDConfig,
+    IdentifyRequest,
+    IdentifyServiceError,
+    identify_track,
+)
 from recozik_services.rename import RenamePrompts, RenameRequest, rename_from_log
+from recozik_services.security import AccessDeniedError, QuotaScope
 
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch, FingerprintResult, ReleaseInfo
@@ -163,6 +170,79 @@ def test_identify_service_prefers_audd(tmp_path):
 
     assert response.match_source == "audd"
     assert response.matches[0].recording_id == "audd"
+
+
+def test_identify_service_respects_access_policy(tmp_path):
+    """Surface identify authorization errors as service failures."""
+    request = _identify_request(tmp_path)
+    fp_result = FingerprintResult(fingerprint="abc", duration_seconds=120.0)
+
+    class DenyIdentifyPolicy:
+        def ensure_feature(self, user, feature, *, context=None):
+            raise AccessDeniedError("identify disabled")
+
+    with pytest.raises(IdentifyServiceError) as excinfo:
+        identify_track(
+            request,
+            compute_fingerprint_fn=lambda *args, **kwargs: fp_result,
+            lookup_recordings_fn=lambda api_key, fp: [],
+            access_policy=DenyIdentifyPolicy(),
+        )
+
+    assert "identify disabled" in str(excinfo.value)
+
+
+def test_identify_service_consumes_quota_scopes(tmp_path, monkeypatch):
+    """Invoke quota policies for AcoustID, AudD, and MusicBrainz lookups."""
+    request = _identify_request(tmp_path)
+    audd_config = replace(
+        request.audd,
+        token="token",  # noqa: S106 - test stub
+        enabled=True,
+        prefer=False,
+    )
+    request = replace(
+        request,
+        audd=audd_config,
+        metadata_fallback=False,
+        musicbrainz_options=MusicBrainzOptions(enabled=True, enrich_missing_only=False),
+    )
+    fp_result = FingerprintResult(fingerprint="abc", duration_seconds=120.0)
+    audd_match = AcoustIDMatch(
+        score=0.95,
+        recording_id="audd",
+        title="AudD Track",
+        artist="AudD Artist",
+        release_group_id=None,
+        release_group_title=None,
+        releases=[],
+    )
+    fake_support = FakeAudDSupport([audd_match])
+    consumed_scopes: list[QuotaScope] = []
+
+    class TrackingQuotaPolicy:
+        def consume(self, user, scope, *, cost=1, context=None):
+            consumed_scopes.append(scope)
+
+    def fake_enrich(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr("recozik_services.identify.enrich_matches_with_musicbrainz", fake_enrich)
+
+    identify_track(
+        request,
+        compute_fingerprint_fn=lambda *args, **kwargs: fp_result,
+        lookup_recordings_fn=lambda api_key, fp: [],
+        audd_support=fake_support,
+        metadata_extractor=lambda path: None,
+        quota_policy=TrackingQuotaPolicy(),
+    )
+
+    assert consumed_scopes == [
+        QuotaScope.ACOUSTID_LOOKUP,
+        QuotaScope.AUDD_STANDARD_LOOKUP,
+        QuotaScope.MUSICBRAINZ_ENRICH,
+    ]
 
 
 def test_batch_service_invokes_log_consumer(tmp_path):
