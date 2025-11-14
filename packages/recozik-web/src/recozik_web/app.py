@@ -299,9 +299,10 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
 
     base_root = settings.base_media_root.resolve()
     resolved = (base_root / candidate).resolve()
+    base_root_str = str(base_root)
+    resolved_str = str(resolved)
 
-    common_root = Path(os.path.commonpath((str(base_root), str(resolved))))
-    if common_root != base_root:
+    if os.path.commonpath((base_root_str, resolved_str)) != base_root_str:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         )
