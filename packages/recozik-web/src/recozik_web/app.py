@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -299,7 +300,8 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     base_root = settings.base_media_root.resolve()
     resolved = (base_root / candidate).resolve()
 
-    if not resolved.is_relative_to(base_root):
+    common_root = Path(os.path.commonpath((str(base_root), str(resolved))))
+    if common_root != base_root:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         )
