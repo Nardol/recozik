@@ -296,14 +296,13 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path segments in audio_path"
         )
 
-    resolved = (settings.base_media_root / candidate).resolve()
+    base_root = settings.base_media_root.resolve()
+    resolved = (base_root / candidate).resolve()
 
-    try:
-        resolved.relative_to(settings.base_media_root)
-    except ValueError as exc:
+    if not resolved.is_relative_to(base_root):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
-        ) from exc
+        )
 
     if not resolved.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
