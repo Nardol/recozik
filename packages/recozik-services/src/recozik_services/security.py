@@ -39,21 +39,11 @@ class ServiceUser:
 
     @classmethod
     def anonymous(cls) -> ServiceUser:
-        """Sentinel ServiceUser representing an unauthenticated (anonymous) caller.
-
-        Returns:
-            ServiceUser: A ServiceUser with user_id set to None and roles set to ("anonymous",).
-
-        """
+        """Return a sentinel user representing an anonymous caller."""
         return cls(user_id=None, roles=("anonymous",))
 
     def has_role(self, role: str) -> bool:
-        """Check whether the user has the specified role.
-
-        Returns:
-            `true` if the user's roles include `role`, `false` otherwise.
-
-        """
+        """Return True if the user claims the provided role."""
         return role in self.roles
 
 
@@ -83,18 +73,7 @@ class AccessPolicy(Protocol):
         *,
         context: Mapping[str, Any] | None = None,
     ) -> None:
-        """Validate that the given user is permitted to invoke the specified service feature.
-
-        Parameters
-        ----------
-            context (Mapping[str, Any] | None): Optional additional information (for example request metadata or resource identifiers)
-                that the policy may use when deciding access. May be None.
-
-        Raises
-        ------
-            AccessPolicyError: If the user is not allowed to use the requested feature.
-
-        """
+        """Raise AccessPolicyError when the user cannot use the requested feature."""
 
 
 class QuotaPolicy(Protocol):
@@ -108,18 +87,7 @@ class QuotaPolicy(Protocol):
         cost: int = 1,
         context: Mapping[str, Any] | None = None,
     ) -> None:
-        """Permit a quota consumption request without enforcing any limits.
-
-        This implementation is a no-op: it does not track usage and will not raise quota-related errors.
-
-        Parameters
-        ----------
-            user (ServiceUser): The actor consuming the quota.
-            scope (QuotaScope): The quota scope to consume from.
-            cost (int): The consumption cost to apply (default 1).
-            context (Mapping[str, Any] | None): Optional additional context.
-
-        """
+        """Raise QuotaPolicyError when the caller exceeds the allowed budget."""
 
 
 class AllowAllAccessPolicy:
@@ -132,15 +100,7 @@ class AllowAllAccessPolicy:
         *,
         context: Mapping[str, Any] | None = None,
     ) -> None:
-        """Allow access to the specified service feature for any user.
-
-        Parameters
-        ----------
-            user: The actor invoking the feature.
-            feature: The service-level capability being requested.
-            context: Optional additional information about the request that policies may inspect.
-
-        """
+        """No-op implementation that never denies access."""
         return None
 
 
@@ -155,16 +115,7 @@ class UnlimitedQuotaPolicy:
         cost: int = 1,
         context: Mapping[str, Any] | None = None,
     ) -> None:
-        """Permit the call to proceed without enforcing or recording any quota usage.
-
-        Parameters
-        ----------
-            user (ServiceUser): The actor invoking the operation (ignored).
-            scope (QuotaScope): The quota scope for the attempted operation (ignored).
-            cost (int): Logical cost of the operation; default is 1 (ignored).
-            context (Mapping[str, Any] | None): Optional metadata relevant to quota checks; may be None and is ignored.
-
-        """
+        """No-op implementation that never records or rejects usage."""
         return None
 
 

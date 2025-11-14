@@ -179,19 +179,6 @@ def test_identify_service_respects_access_policy(tmp_path):
 
     class DenyIdentifyPolicy:
         def ensure_feature(self, user, feature, *, context=None):
-            """Ensure the given feature is permitted for the user, otherwise deny access.
-
-            Parameters
-            ----------
-                user: The user requesting the feature; typically an authenticated user object.
-                feature (str): The feature name being checked (e.g., "identify").
-                context (dict | None): Optional additional context for the check.
-
-            Raises
-            ------
-                AccessDeniedError: Always raised to indicate the feature is disabled for the user.
-
-            """
             raise AccessDeniedError("identify disabled")
 
     with pytest.raises(IdentifyServiceError) as excinfo:
@@ -235,25 +222,11 @@ def test_identify_service_consumes_quota_scopes(tmp_path, monkeypatch):
 
     class TrackingQuotaPolicy:
         def consume(self, user, scope, *, cost=1, context=None):
-            """Record a quota consumption event for a user by registering the consumed scope.
-
-            Parameters
-            ----------
-                user: The user performing the consumption; can be any identifier used by the policy.
-                scope: The quota scope to record (typically a QuotaScope value or identifier).
-                cost (int): Units to consume for this event; defaults to 1.
-                context: Optional mapping or object with additional context for the consumption; may be ignored.
-
-            """
+            """Record the scope consumed by this request."""
             consumed_scopes.append(scope)
 
     def fake_enrich(*args, **kwargs):
-        """Stub enrichment function that always indicates no enrichment was performed.
-
-        Returns:
-            bool: `False` to indicate enrichment was not applied.
-
-        """
+        """Return False to indicate no enrichment occurred."""
         return False
 
     monkeypatch.setattr("recozik_services.identify.enrich_matches_with_musicbrainz", fake_enrich)

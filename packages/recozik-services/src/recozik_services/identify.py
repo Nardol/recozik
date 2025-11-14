@@ -114,30 +114,7 @@ def identify_track(
     access_policy: AccessPolicy | None = None,
     quota_policy: QuotaPolicy | None = None,
 ) -> IdentifyResponse:
-    """Identify an audio file by computing its fingerprint and retrieving matches from AudD or AcoustID, with optional MusicBrainz enrichment, caching, and policy-driven quota/access controls.
-
-    Parameters
-    ----------
-        request (IdentifyRequest): Inputs and options for this identification run (audio path, API keys, cache and AudD/musicbrainz settings).
-        callbacks (ServiceCallbacks | None): Optional callbacks for progress, info, and warnings; defaults to a print-based implementation.
-        compute_fingerprint_fn (Callable[..., FingerprintResult] | None): Optional fingerprinting function; used to produce the fingerprint for the audio file.
-        lookup_recordings_fn (Callable[[str, FingerprintResult], Sequence[AcoustIDMatch]] | None): Optional AcoustID lookup function; called when performing AcoustID lookups.
-        fingerprint_error_cls (type[Exception]): Exception class raised by the fingerprint function; used to wrap fingerprint errors.
-        acoustid_error_cls (type[Exception]): Exception class raised by the AcoustID lookup; used to wrap lookup errors.
-        lookup_cache_cls (type[LookupCache]): Cache implementation class used when no cache instance is provided.
-        metadata_extractor (Callable[[Path], dict[str, str] | None]): Function to extract fallback metadata from the audio file when no matches are found.
-        audd_support (AudDSupport | None): Optional AudD integration provider; used for AudD lookups when enabled.
-        cache (LookupCache | None): Optional pre-created cache instance; if None, an instance is created using lookup_cache_cls and request cache settings.
-        persist_cache (bool): Whether to persist cache changes before returning.
-        user (ServiceUser | None): Optional user context used by access and quota policies; defaults to an anonymous user.
-        access_policy (AccessPolicy | None): Optional access control policy; used to enforce feature access for the request.
-        quota_policy (QuotaPolicy | None): Optional quota policy; used to consume quotas for lookups and enrichment.
-
-    Returns
-    -------
-        IdentifyResponse: Result object containing the computed fingerprint, a list of matches (possibly empty), the match source ("acoustid" or "audd") when available, optional fallback metadata, and any AudD note or error.
-
-    """
+    """Identify a file using Chromaprint + AcoustID/AudD with optional enrichment."""
     if callbacks is None:
         callbacks = _default_callbacks()
     if compute_fingerprint_fn is None:
@@ -152,35 +129,14 @@ def identify_track(
     quota_policy = quota_policy or UnlimitedQuotaPolicy()
 
     def _require(feature: ServiceFeature) -> None:
-        """Ensure the current user is authorized to use the given service feature.
-
-        Parameters
-        ----------
-            feature (ServiceFeature): The feature to require for the current request.
-
-        Raises
-        ------
-            IdentifyServiceError: If the access policy denies the feature or an access-check error occurs.
-
-        """
+        """Raise IdentifyServiceError if the access policy denies this feature."""
         try:
             access_policy.ensure_feature(user, feature, context={"request": request})
         except AccessPolicyError as exc:  # pragma: no cover - helper wrapper
             raise IdentifyServiceError(str(exc)) from exc
 
     def _consume(scope: QuotaScope, *, cost: int = 1) -> None:
-        """Consume quota for the given scope on behalf of the current user and request.
-
-        Parameters
-        ----------
-            scope (QuotaScope): The quota scope to consume from (e.g., ACOUSTID_LOOKUP, AUDD_STANDARD_LOOKUP).
-            cost (int): The amount of quota units to consume (default 1).
-
-        Raises
-        ------
-            IdentifyServiceError: If the quota policy rejects the consumption.
-
-        """
+        """Raise IdentifyServiceError if the quota policy rejects consumption."""
         try:
             quota_policy.consume(user, scope, cost=cost, context={"request": request})
         except QuotaPolicyError as exc:  # pragma: no cover - helper wrapper
@@ -219,14 +175,7 @@ def identify_track(
         musicbrainz_client = MusicBrainzClient(request.musicbrainz_settings)
 
     def determine_primary_mode() -> AudDMode:
-        """Selects the primary AudD recognition mode based on the identify request configuration.
-
-        If `request.audd.force_enterprise` is true, chooses `AudDMode.ENTERPRISE`. When `request.audd.mode` is `AudDMode.AUTO`, selects `ENTERPRISE` if any enterprise-specific parameters are active (`params.skip`, `params.every` is not None, `params.limit` is not None, `params.skip_first_seconds` is not None, `params.accurate_offsets`, or `params.use_timecode`); otherwise selects `STANDARD`. For any other configured mode, returns that mode unchanged.
-
-        Returns:
-            AudDMode: `AudDMode.ENTERPRISE` if enterprise is required or AUTO detects enterprise parameters, `AudDMode.STANDARD` if AUTO resolves to standard, otherwise the configured `request.audd.mode`.
-
-        """
+        """Return the AudD mode that should be attempted first."""
         if request.audd.force_enterprise:
             return AudDMode.ENTERPRISE
         if request.audd.mode is AudDMode.AUTO:
@@ -244,19 +193,7 @@ def identify_track(
         return request.audd.mode
 
     def run_audd(will_retry_acoustid: bool) -> list[AcoustIDMatch]:
-        """Perform an AudD lookup (standard or enterprise) for the current request, with snippet handling and optional fallback.
-
-        Performs an AudD recognition attempt using the configured primary AudD mode; if that attempt yields no results and enterprise_fallback is allowed, it will try the alternate mode. Updates the nonlocal variables `audd_note` and `audd_error` to reflect successful use or any error message. When a token is not present, returns an empty list.
-
-        Parameters
-        ----------
-            will_retry_acoustid (bool): If true, failure messages will indicate that AcoustID may be tried as a fallback.
-
-        Returns
-        -------
-            list[AcoustIDMatch]: A list of matches returned by AudD, or an empty list if no matches were found or the lookup could not be performed.
-
-        """
+        """Perform an AudD lookup and optionally fall back between modes."""
         nonlocal audd_note, audd_error
         _require(ServiceFeature.AUDD)
         snippet_announced = False
@@ -292,22 +229,7 @@ def identify_track(
                 snippet_warned = True
 
         def _execute(mode: AudDMode) -> list[AcoustIDMatch]:
-            """Perform an AudD lookup using the specified mode and return any matches.
-
-            Consumes the appropriate quota for the chosen mode, sets the nonlocal
-            variables `audd_note` (on success) and `audd_error` (on failure), and may
-            emit warnings via the `callbacks` object.
-
-            Parameters
-            ----------
-                mode (AudDMode): The AudD execution mode to use (STANDARD or ENTERPRISE).
-
-            Returns
-            -------
-                list[AcoustIDMatch]: Matches returned by AudD, or an empty list if no
-                matches were found or an error occurred.
-
-            """
+            """Run AudD in the requested mode and return any matches."""
             nonlocal audd_note, audd_error
             token = request.audd.token
             if not token:
