@@ -286,21 +286,21 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     if not path_value.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing audio path")
 
-    candidate = Path(path_value)
-    if candidate.is_absolute() or candidate.anchor:
+    raw_value = path_value.replace("\\", "/")
+    if raw_value.startswith("/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Absolute paths disabled"
         )
 
-    if any(part in {"..", ""} for part in candidate.parts):
+    if ".." in Path(raw_value).parts:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path segments in audio_path"
         )
 
     base_root = str(settings.base_media_root.resolve())
-    normalized = os.path.normpath(os.path.join(base_root, candidate.as_posix()))
-
-    if os.path.commonpath((base_root, normalized)) != base_root:
+    normalized = os.path.normpath(os.path.join(base_root, raw_value))
+    base_prefix = base_root if base_root.endswith(os.sep) else f"{base_root}{os.sep}"
+    if not normalized.startswith(base_prefix):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         )
