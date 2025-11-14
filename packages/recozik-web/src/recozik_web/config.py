@@ -34,6 +34,8 @@ class WebSettings(BaseSettings):
     upload_subdir: str = "uploads"
     jobs_db_filename: str = "jobs.db"
     auth_db_filename: str = "auth.db"
+    jobs_database_url: str | None = None
+    auth_database_url: str | None = None
 
     @model_validator(mode="after")
     def _resolve_media_root(self) -> WebSettings:
@@ -60,6 +62,16 @@ class WebSettings(BaseSettings):
     def auth_database_path(self) -> Path:
         """Return the SQLite path used for token persistence."""
         return (self.base_media_root / self.auth_db_filename).resolve()
+
+    @property
+    def jobs_database_url_resolved(self) -> str:
+        """Return the configured jobs DB URL, defaulting to SQLite in base dir."""
+        return self.jobs_database_url or f"sqlite:///{self.jobs_database_path}"
+
+    @property
+    def auth_database_url_resolved(self) -> str:
+        """Return the configured auth DB URL, defaulting to SQLite in base dir."""
+        return self.auth_database_url or f"sqlite:///{self.auth_database_path}"
 
 
 @lru_cache

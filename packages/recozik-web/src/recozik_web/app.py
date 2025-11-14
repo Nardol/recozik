@@ -268,7 +268,7 @@ async def identify_from_upload(
         force_audd_enterprise=force_audd_enterprise,
         enable_audd=enable_audd,
     )
-    repo = get_job_repository(settings.jobs_database_path)
+    repo = get_job_repository(settings.jobs_database_url_resolved)
     job = repo.create_job()
     background_tasks.add_task(
         _run_identify_job,
@@ -433,7 +433,7 @@ def _run_identify_job(
     context: RequestContext,
 ) -> None:
     logger.debug("Job %s started", job_id)
-    repo = get_job_repository(settings.jobs_database_path)
+    repo = get_job_repository(settings.jobs_database_url_resolved)
     repo.set_status(job_id, JobStatus.RUNNING)
     callbacks = JobCallbacks(job_id, repo)
 
@@ -502,7 +502,7 @@ def get_job_detail(
     settings: WebSettings = Depends(get_settings),
 ) -> JobDetailModel:
     """Return the persisted state for a job."""
-    repo = get_job_repository(settings.jobs_database_path)
+    repo = get_job_repository(settings.jobs_database_url_resolved)
     job = repo.get(job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -517,7 +517,7 @@ async def job_updates(websocket: WebSocket, job_id: str) -> None:
     settings = get_settings()
     try:
         resolve_user_from_token(token or "", settings)
-        repo = get_job_repository(settings.jobs_database_path)
+        repo = get_job_repository(settings.jobs_database_url_resolved)
         job = repo.get(job_id)
         if job is None:
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
@@ -550,7 +550,7 @@ def list_tokens(
 ) -> list[TokenResponseModel]:
     """Return all stored tokens (admin only)."""
     _ensure_admin(context)
-    repo = get_token_repository(settings.auth_database_path)
+    repo = get_token_repository(settings.auth_database_url_resolved)
     records = repo.list_tokens()
     return [
         TokenResponseModel(
@@ -573,7 +573,7 @@ def create_token(
 ) -> TokenResponseModel:
     """Create or update API tokens (admin only)."""
     _ensure_admin(context)
-    repo = get_token_repository(settings.auth_database_path)
+    repo = get_token_repository(settings.auth_database_url_resolved)
     token_value = payload.token or uuid4().hex
     record = TokenRecord(
         token=token_value,

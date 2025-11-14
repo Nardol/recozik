@@ -187,7 +187,7 @@ def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
 
 def resolve_user_from_token(token: str, settings: WebSettings) -> ServiceUser:
     """Return the ServiceUser matching the provided API token."""
-    repo = get_token_repository(settings.auth_database_path)
+    repo = get_token_repository(settings.auth_database_url_resolved)
     ensure_seed_tokens(repo, defaults=_seed_defaults(settings))
     record = repo.get(token)
     if not record:

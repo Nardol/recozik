@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from sqlmodel import JSON, Column, Field, Session, SQLModel, create_engine, select
 
@@ -21,13 +22,14 @@ class TokenRecord(SQLModel, table=True):
 class TokenRepository:
     """Repository used to manage API tokens in SQLite."""
 
-    def __init__(self, db_path: Path) -> None:
-        """Initialize the SQLite engine for token persistence."""
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._engine = create_engine(
-            f"sqlite:///{db_path}",
-            connect_args={"check_same_thread": False},
-        )
+    def __init__(self, database_url: str) -> None:
+        """Initialize the SQLModel engine for token persistence."""
+        connect_args: dict[str, Any] = {}
+        if database_url.startswith("sqlite:///"):
+            sqlite_path = Path(database_url.replace("sqlite:///", "", 1))
+            sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+            connect_args = {"check_same_thread": False}
+        self._engine = create_engine(database_url, connect_args=connect_args)
         SQLModel.metadata.create_all(self._engine)
 
     def list_tokens(self) -> list[TokenRecord]:
@@ -49,15 +51,15 @@ class TokenRepository:
             return session.get(TokenRecord, record.token)
 
 
-_REPOSITORIES: dict[Path, TokenRepository] = {}
+_REPOSITORIES: dict[str, TokenRepository] = {}
 
 
-def get_token_repository(db_path: Path) -> TokenRepository:
+def get_token_repository(database_url: str) -> TokenRepository:
     """Return cached token repository for the given path."""
-    repo = _REPOSITORIES.get(db_path)
+    repo = _REPOSITORIES.get(database_url)
     if repo is None:
-        repo = TokenRepository(db_path)
-        _REPOSITORIES[db_path] = repo
+        repo = TokenRepository(database_url)
+        _REPOSITORIES[database_url] = repo
     return repo
 
 

@@ -38,12 +38,14 @@ class JobRecord(SQLModel, table=True):
 class JobRepository:
     """Simple SQLModel-backed repository for jobs."""
 
-    def __init__(self, db_path: Path) -> None:
-        """Initialize the SQLite engine for job persistence."""
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._engine = create_engine(
-            f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
-        )
+    def __init__(self, database_url: str) -> None:
+        """Initialize the SQLModel engine for job persistence."""
+        connect_args: dict[str, Any] = {}
+        if database_url.startswith("sqlite:///"):
+            sqlite_path = Path(database_url.replace("sqlite:///", "", 1))
+            sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+            connect_args = {"check_same_thread": False}
+        self._engine = create_engine(database_url, connect_args=connect_args)
         SQLModel.metadata.create_all(self._engine)
 
     def create_job(self) -> JobRecord:
@@ -188,16 +190,16 @@ class JobNotifier:
             loop.call_soon_threadsafe(queue.put_nowait, payload)
 
 
-_REPOSITORIES: dict[Path, JobRepository] = {}
+_REPOSITORIES: dict[str, JobRepository] = {}
 _NOTIFIER = JobNotifier()
 
 
-def get_job_repository(db_path: Path) -> JobRepository:
-    """Return cached job repository for the given database path."""
-    repo = _REPOSITORIES.get(db_path)
+def get_job_repository(database_url: str) -> JobRepository:
+    """Return cached job repository for the given database URL."""
+    repo = _REPOSITORIES.get(database_url)
     if repo is None:
-        repo = JobRepository(db_path)
-        _REPOSITORIES[db_path] = repo
+        repo = JobRepository(database_url)
+        _REPOSITORIES[database_url] = repo
     return repo
 
 
