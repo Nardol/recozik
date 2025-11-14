@@ -31,6 +31,17 @@ from .cli_support.musicbrainz import (
     MusicBrainzOptions,
     enrich_matches_with_musicbrainz,
 )
+from .security import (
+    AccessPolicy,
+    AccessPolicyError,
+    AllowAllAccessPolicy,
+    QuotaPolicy,
+    QuotaPolicyError,
+    QuotaScope,
+    ServiceFeature,
+    ServiceUser,
+    UnlimitedQuotaPolicy,
+)
 
 
 @dataclass(slots=True)
@@ -99,8 +110,11 @@ def identify_track(
     audd_support: AudDSupport | None = None,
     cache: LookupCache | None = None,
     persist_cache: bool = True,
+    user: ServiceUser | None = None,
+    access_policy: AccessPolicy | None = None,
+    quota_policy: QuotaPolicy | None = None,
 ) -> IdentifyResponse:
-    """Identify a single audio file and return the matches."""
+    """Identify a file using Chromaprint + AcoustID/AudD with optional enrichment."""
     if callbacks is None:
         callbacks = _default_callbacks()
     if compute_fingerprint_fn is None:
@@ -109,6 +123,26 @@ def identify_track(
         lookup_recordings_fn = _lookup_recordings_impl
     if audd_support is None:
         audd_support = get_audd_support()
+
+    user = user or ServiceUser.anonymous()
+    access_policy = access_policy or AllowAllAccessPolicy()
+    quota_policy = quota_policy or UnlimitedQuotaPolicy()
+
+    def _require(feature: ServiceFeature) -> None:
+        """Raise IdentifyServiceError if the access policy denies this feature."""
+        try:
+            access_policy.ensure_feature(user, feature, context={"request": request})
+        except AccessPolicyError as exc:  # pragma: no cover - helper wrapper
+            raise IdentifyServiceError(str(exc)) from exc
+
+    def _consume(scope: QuotaScope, *, cost: int = 1) -> None:
+        """Raise IdentifyServiceError if the quota policy rejects consumption."""
+        try:
+            quota_policy.consume(user, scope, cost=cost, context={"request": request})
+        except QuotaPolicyError as exc:  # pragma: no cover - helper wrapper
+            raise IdentifyServiceError(str(exc)) from exc
+
+    _require(ServiceFeature.IDENTIFY)
 
     cache_instance = cache or lookup_cache_cls(
         enabled=request.cache_enabled,
@@ -135,13 +169,13 @@ def identify_track(
             match_source = "acoustid"
 
     audd_available = bool(request.audd.token) and request.audd.enabled
-    musicbrainz_client = (
-        MusicBrainzClient(request.musicbrainz_settings)
-        if request.musicbrainz_options.enabled
-        else None
-    )
+    musicbrainz_client = None
+    if request.musicbrainz_options.enabled:
+        _require(ServiceFeature.MUSICBRAINZ_ENRICH)
+        musicbrainz_client = MusicBrainzClient(request.musicbrainz_settings)
 
     def determine_primary_mode() -> AudDMode:
+        """Return the AudD mode that should be attempted first."""
         if request.audd.force_enterprise:
             return AudDMode.ENTERPRISE
         if request.audd.mode is AudDMode.AUTO:
@@ -159,7 +193,9 @@ def identify_track(
         return request.audd.mode
 
     def run_audd(will_retry_acoustid: bool) -> list[AcoustIDMatch]:
+        """Perform an AudD lookup and optionally fall back between modes."""
         nonlocal audd_note, audd_error
+        _require(ServiceFeature.AUDD)
         snippet_announced = False
         snippet_warned = False
 
@@ -193,10 +229,17 @@ def identify_track(
                 snippet_warned = True
 
         def _execute(mode: AudDMode) -> list[AcoustIDMatch]:
+            """Run AudD in the requested mode and return any matches."""
             nonlocal audd_note, audd_error
             token = request.audd.token
             if not token:
                 return []
+            scope = (
+                QuotaScope.AUDD_ENTERPRISE_LOOKUP
+                if mode is AudDMode.ENTERPRISE
+                else QuotaScope.AUDD_STANDARD_LOOKUP
+            )
+            _consume(scope)
             if mode is AudDMode.STANDARD:
                 try:
                     result = audd_support.recognize_standard(
@@ -254,6 +297,7 @@ def identify_track(
             match_source = "audd"
 
     if matches is None:
+        _consume(QuotaScope.ACOUSTID_LOOKUP)
         try:
             matches = list(lookup_recordings_fn(request.api_key, fingerprint))
         except acoustid_error_cls as exc:  # pragma: no cover - propagated upstream
@@ -278,6 +322,8 @@ def identify_track(
             match_source = "audd"
 
     if matches:
+        if request.musicbrainz_options.enabled:
+            _consume(QuotaScope.MUSICBRAINZ_ENRICH)
         enriched = enrich_matches_with_musicbrainz(
             matches,
             options=request.musicbrainz_options,

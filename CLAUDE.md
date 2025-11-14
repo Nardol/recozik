@@ -105,7 +105,7 @@ The codebase is structured for **fast import times** and **maintainability**:
   - `config.py`: Configuration management (API keys, settings)
   - `completion.py`: Shell completion script management
 - **`src/recozik/cli_support/`**: Re-export shims for shared helpers hosted in `recozik-services` (locale, metadata, filesystem, logging, prompts, lazy dependency loaders).
-- **`packages/recozik-services/src/recozik_services/`**: Service layer consumed by the CLI and future GUIs. Exposes identify/batch/rename runners, callback/prompt protocols, and helper utilities.
+- **`packages/recozik-services/src/recozik_services/`**: Service layer consumed by the CLI and future GUIs. Exposes identify/batch/rename runners, callback/prompt protocols, and helper utilities. Includes `security.py` where auth/quota policies live (defaulting to allow-all) so every frontend wires consistent access control.
 
 ### Core Modules
 
