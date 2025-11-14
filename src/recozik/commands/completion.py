@@ -8,12 +8,7 @@ from typing import Any
 
 import click
 import typer
-from typer.completion import get_completion_script as generate_completion_script
-from typer.completion import install as install_completion
-
-from recozik_core.i18n import _
-
-from ..cli_support.completion import (
+from recozik_services.cli_support.completion import (
     completion_hint,
     completion_script_path,
     completion_source_command,
@@ -21,8 +16,12 @@ from ..cli_support.completion import (
     detect_shell,
     normalize_shell,
 )
-from ..cli_support.locale import apply_locale
-from ..cli_support.paths import resolve_path
+from recozik_services.cli_support.locale import apply_locale
+from recozik_services.cli_support.paths import resolve_path
+from typer.completion import get_completion_script as generate_completion_script
+from typer.completion import install as install_completion
+
+from recozik_core.i18n import _
 
 ShellDetectorFn = Callable[[str | None], str | None]
 

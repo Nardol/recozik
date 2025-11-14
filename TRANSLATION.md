@@ -1,6 +1,6 @@
 # Gestion des traductions
 
-Recozik utilise `gettext` pour traduire les chaînes de la CLI. Les messages sources sont en anglais dans le code ; les catalogues se trouvent dans `packages/recozik-core/src/recozik_core/locales/`.
+Recozik utilise `gettext` pour traduire les chaînes de la CLI **et** des services partagés (`recozik-services`). Les messages sources sont en anglais dans le code ; les catalogues se trouvent dans `packages/recozik-core/src/recozik_core/locales/`.
 
 ## Structure
 

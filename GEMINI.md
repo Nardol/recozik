@@ -6,7 +6,7 @@ This document summarizes the repository context for code assistants working on `
 
 `recozik` is a command-line tool written in Python for music recognition. It generates audio fingerprints using Chromaprint, queries the AcoustID service to identify tracks, and provides utilities to batch-process and rename audio files based on the retrieved metadata.
 
-The CLI is built using the Typer framework. It also includes an optional fallback to the AudD music recognition API. The project emphasizes a clean, terminal-first user experience and includes internationalization support (English and French).
+The CLI is built using the Typer framework, but most business logic is exposed via the `recozik-services` package so other front-ends (and tests) can share the same runners. It also includes an optional fallback to the AudD music recognition API. The project emphasizes a clean, terminal-first user experience and includes internationalization support (English and French).
 
 ### Key Technologies
 
@@ -20,11 +20,12 @@ The CLI is built using the Typer framework. It also includes an optional fallbac
 ### Code Structure
 
 - `src/recozik/cli.py`: The main Typer application entry point where all commands are registered.
-- `src/recozik/commands/`: Contains the implementation for each CLI command (e.g., `inspect`, `identify`, `rename-from-log`).
-- `src/recozik/cli_support/`: Shared helper modules for tasks like configuration, locale handling, and file system operations.
-- `packages/recozik-core/src/recozik_core/locales/`: Contains translation files (`.po`, `.mo`) for internationalization using gettext.
-- `tests/`: Contains the pytest test suite.
-- `scripts/`: Utility scripts, such as for compiling translations.
+- `src/recozik/commands/`: Thin adapters that gather CLI options, build request dataclasses, and delegate to the service layer.
+- `src/recozik/cli_support/`: Re-export shims for shared helpers (locale, prompts, filesystem utilities) hosted in `recozik-services`.
+- `packages/recozik-services/src/recozik_services/`: Service layer consumed by the CLI, tests, and future GUIs (identify/batch/rename runners, callback protocols, shared utilities).
+- `packages/recozik-core/src/recozik_core/`: Core primitives (fingerprinting, AudD integration, caching, config, gettext locales).
+- `tests/`: Contains the pytest test suite (`tests/test_services.py` exercises the service APIs directly).
+- `scripts/`: Utility scripts, such as for compiling translations or measuring import time.
 
 ## Building and Running
 

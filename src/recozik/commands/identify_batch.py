@@ -4,48 +4,46 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import typer
-
-from recozik_core.audd import AudDEnterpriseParams, AudDMode
-from recozik_core.fingerprint import AcoustIDMatch
-from recozik_core.i18n import _
-
-from .. import cli as cli_module
-from ..cli_support.audd_helpers import (
+from recozik_services.batch import BatchRequest, run_batch_identify
+from recozik_services.cli_support.audd_helpers import (
     get_audd_support,
     parse_bool_env,
     parse_float_env,
     parse_int_env,
     parse_int_list_env,
 )
-from ..cli_support.deps import get_config_module, get_fingerprint_symbols, get_lookup_cache_cls
-from ..cli_support.locale import apply_locale, resolve_template
-from ..cli_support.logs import write_log_entry
-from ..cli_support.metadata import extract_audio_metadata
-from ..cli_support.musicbrainz import (
-    MusicBrainzClient,
-    MusicBrainzOptions,
-    enrich_matches_with_musicbrainz,
+from recozik_services.cli_support.deps import (
+    get_config_module,
+    get_fingerprint_symbols,
+    get_lookup_cache_cls,
 )
-from ..cli_support.musicbrainz import (
+from recozik_services.cli_support.locale import apply_locale, resolve_template
+from recozik_services.cli_support.logs import write_log_entry
+from recozik_services.cli_support.metadata import extract_audio_metadata
+from recozik_services.cli_support.musicbrainz import MusicBrainzOptions
+from recozik_services.cli_support.musicbrainz import (
     build_settings as build_musicbrainz_settings,
 )
-from ..cli_support.options import resolve_option
-from ..cli_support.paths import (
+from recozik_services.cli_support.options import resolve_option
+from recozik_services.cli_support.paths import (
     discover_audio_files,
     normalize_extensions,
     resolve_path,
 )
-from ..cli_support.prompts import prompt_yes_no
-from ..commands.identify import DEFAULT_AUDIO_EXTENSIONS, configure_api_key_interactively
+from recozik_services.cli_support.prompts import prompt_yes_no
+from recozik_services.identify import AudDConfig as ServiceAudDConfig
 
-if TYPE_CHECKING:
-    from recozik_core.audd import SnippetInfo
+from recozik_core.audd import AudDEnterpriseParams, AudDMode, SnippetInfo
+from recozik_core.fingerprint import AcoustIDMatch
+from recozik_core.i18n import _
 
+from .. import cli as cli_module
+from ._callbacks import TyperCallbacks
+from .identify import DEFAULT_AUDIO_EXTENSIONS, configure_api_key_interactively
 
 T = TypeVar("T")
 
@@ -730,11 +728,6 @@ def identify_batch(
 
     resolved_fpcalc = resolve_path(fpcalc_path) if fpcalc_path else None
 
-    cache = lookup_cache_cls(
-        enabled=config.cache_enabled,
-        ttl=timedelta(hours=max(config.cache_ttl_hours, 1)),
-    )
-
     musicbrainz_options = MusicBrainzOptions(
         enabled=bool(musicbrainz_enabled_setting),
         enrich_missing_only=bool(musicbrainz_missing_only_setting),
@@ -748,15 +741,10 @@ def identify_batch(
         cache_size=config.musicbrainz_cache_size,
         max_retries=config.musicbrainz_max_retries,
     )
-    musicbrainz_client = (
-        MusicBrainzClient(musicbrainz_settings) if musicbrainz_options.enabled else None
-    )
 
     use_metadata_fallback = (
         config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
     )
-
-    effective_limit = 1 if best_only_value else limit_value
 
     log_path = (
         resolve_path(log_file_option) if log_file_option else Path.cwd() / "recozik-batch.log"
@@ -764,193 +752,99 @@ def identify_batch(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     mode = "a" if append else "w"
 
-    success = 0
-    unmatched = 0
-    failures = 0
+    service_audd_config = ServiceAudDConfig(
+        token=fallback_audd_token or None,
+        enabled=audd_enabled_setting,
+        prefer=audd_prefer_setting,
+        endpoint_standard=audd_endpoint_standard_value,
+        endpoint_enterprise=audd_endpoint_enterprise_value,
+        mode=audd_mode_value,
+        force_enterprise=force_enterprise_value,
+        enterprise_fallback=enterprise_fallback_value,
+        params=enterprise_params,
+        snippet_offset=snippet_offset_value,
+        snippet_min_level=snippet_min_level_value,
+    )
+
+    batch_request = BatchRequest(
+        files=files,
+        base_directory=resolved_dir,
+        fpcalc_path=resolved_fpcalc,
+        api_key=key,
+        cache_enabled=config.cache_enabled,
+        cache_ttl_hours=max(config.cache_ttl_hours, 1),
+        refresh_cache=refresh,
+        audd=service_audd_config,
+        musicbrainz_options=musicbrainz_options,
+        musicbrainz_settings=musicbrainz_settings,
+        metadata_fallback=use_metadata_fallback,
+        limit=limit_value,
+        best_only=bool(best_only_value),
+        metadata_extractor=metadata_extractor,
+    )
+
+    path_cache: dict[Path, str] = {}
+
+    def format_display(path: Path) -> str:
+        cached = path_cache.get(path)
+        if cached is not None:
+            return cached
+        if use_absolute:
+            display = str(path)
+        else:
+            try:
+                display = str(path.relative_to(resolved_dir))
+            except ValueError:
+                display = str(path)
+        path_cache[path] = display
+        return display
+
+    callbacks_bridge = TyperCallbacks(use_stderr=False)
+    identify_kwargs = {
+        "compute_fingerprint_fn": compute_fingerprint,
+        "lookup_recordings_fn": lookup_recordings,
+        "fingerprint_error_cls": fingerprint_error_cls,
+        "acoustid_error_cls": acoustid_lookup_error_cls,
+        "lookup_cache_cls": lookup_cache_cls,
+    }
 
     with log_path.open(mode, encoding="utf-8") as handle:
-        for file_path in files:
-            if use_absolute:
-                relative_display = str(file_path)
-            else:
-                try:
-                    relative_display = str(file_path.relative_to(resolved_dir))
-                except ValueError:
-                    relative_display = str(file_path)
 
-            try:
-                fingerprint_result = compute_fingerprint(file_path, fpcalc_path=resolved_fpcalc)
-            except fingerprint_error_cls as exc:
-                write_log_entry(
-                    handle,
-                    log_format_value,
-                    relative_display,
-                    [],
-                    str(exc),
-                    template_value,
-                    None,
-                    status="error",
-                    metadata=None,
-                )
-                failures += 1
-                continue
-
-            matches: list[AcoustIDMatch] | None = None
-            match_source = None
-            if config.cache_enabled and not refresh:
-                cached = cache.get(
-                    fingerprint_result.fingerprint,
-                    fingerprint_result.duration_seconds,
-                )
-                if cached is not None:
-                    matches = list(cached)
-                    match_source = "acoustid"
-
-            audd_note: str | None = None
-            audd_error_message: str | None = None
-            audd_attempted = False
-
-            if audd_prefer_setting and not matches:
-                audd_results, audd_note_candidate, error_message, attempted = run_audd_for_file(
-                    file_path,
-                    relative_display,
-                    will_retry_acoustid=True,
-                )
-                if attempted:
-                    audd_attempted = True
-                if audd_results:
-                    matches = audd_results
-                    audd_note = audd_note_candidate
-                    match_source = "audd"
-                    typer.echo(_("AudD identified {path}.").format(path=relative_display))
-                if error_message:
-                    audd_error_message = error_message
-
-            if matches is None:
-                try:
-                    matches = list(lookup_recordings(key, fingerprint_result))
-                except acoustid_lookup_error_cls as exc:
-                    write_log_entry(
-                        handle,
-                        log_format_value,
-                        relative_display,
-                        [],
-                        str(exc),
-                        template_value,
-                        fingerprint_result,
-                        status="error",
-                        metadata=None,
-                    )
-                    failures += 1
-                    continue
-                if config.cache_enabled:
-                    cache.set(
-                        fingerprint_result.fingerprint,
-                        fingerprint_result.duration_seconds,
-                        matches,
-                    )
-                if matches and match_source is None:
-                    match_source = "acoustid"
-
-            if audd_available and not matches and not audd_attempted:
-                audd_results, audd_note_candidate, error_message, attempted = run_audd_for_file(
-                    file_path,
-                    relative_display,
-                    will_retry_acoustid=False,
-                )
-                if attempted:
-                    audd_attempted = True
-                if audd_results:
-                    matches = audd_results
-                    audd_note = audd_note_candidate
-                    match_source = "audd"
-                    typer.echo(_("AudD identified {path}.").format(path=relative_display))
-                if error_message:
-                    audd_error_message = error_message
-
-            if matches and musicbrainz_options.enabled:
-
-                def _mb_echo(message: str, *, _path=relative_display) -> None:
-                    typer.echo(
-                        _("MusicBrainz enrichment warning for {path}: {message}").format(
-                            path=_path,
-                            message=message,
-                        ),
-                        err=True,
-                    )
-
-                enriched = enrich_matches_with_musicbrainz(
-                    matches,
-                    options=musicbrainz_options,
-                    settings=musicbrainz_settings,
-                    client=musicbrainz_client,
-                    echo=_mb_echo,
-                )
-                if enriched and match_source == "acoustid" and config.cache_enabled:
-                    cache.set(
-                        fingerprint_result.fingerprint,
-                        fingerprint_result.duration_seconds,
-                        matches,
-                    )
-
-            if not matches:
-                metadata_payload = metadata_extractor(file_path) if use_metadata_fallback else None
-                note_parts = [_("No match.")]
-                if audd_error_message:
-                    note_parts.append(
-                        _("AudD lookup failed: {error}").format(error=audd_error_message)
-                    )
-                note_text = " ".join(note_parts)
-                write_log_entry(
-                    handle,
-                    log_format_value,
-                    relative_display,
-                    [],
-                    None,
-                    template_value,
-                    fingerprint_result,
-                    status="unmatched",
-                    note=note_text,
-                    metadata=metadata_payload,
-                )
-                if metadata_payload:
-                    typer.echo(
-                        _("No match for {path}, embedded metadata recorded in the log.").format(
-                            path=relative_display
-                        )
-                    )
-                unmatched += 1
-                continue
-
-            selected = matches[:effective_limit]
-            success_note_parts: list[str] = []
-            if match_source == "audd" and audd_note:
-                success_note_parts.append(audd_note)
-            if audd_error_message and match_source != "audd":
-                success_note_parts.append(
-                    _("AudD lookup failed: {error}").format(error=audd_error_message)
-                )
-            success_note = " ".join(success_note_parts) if success_note_parts else None
+        def consume(entry) -> None:
             write_log_entry(
                 handle,
                 log_format_value,
-                relative_display,
-                selected,
-                None,
+                entry.display_path,
+                entry.matches,
+                entry.error,
                 template_value,
-                fingerprint_result,
-                note=success_note,
-                metadata=None,
+                entry.fingerprint,
+                status=entry.status,
+                note=entry.note,
+                metadata=entry.metadata,
             )
-            success += 1
+            if entry.status == "unmatched" and entry.metadata:
+                typer.echo(
+                    _("No match for {path}, embedded metadata recorded in the log.").format(
+                        path=entry.display_path
+                    )
+                )
 
-    cache.save()
+        summary = run_batch_identify(
+            batch_request,
+            callbacks=callbacks_bridge,
+            log_consumer=consume,
+            path_formatter=format_display,
+            lookup_cache_cls=lookup_cache_cls,
+            identify_kwargs=identify_kwargs,
+        )
+
     typer.echo(_("Processing complete."))
     typer.echo(
         _("Results: {identified} identified, {unmatched} unmatched, {failed} failures.").format(
-            identified=success,
-            unmatched=unmatched,
-            failed=failures,
+            identified=summary.success,
+            unmatched=summary.unmatched,
+            failed=summary.failures,
         )
     )
     typer.echo(_("Log: {path}").format(path=log_path))

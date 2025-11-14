@@ -377,10 +377,55 @@ Recozik stores the AcoustID key and AudD token in the system keyring (via `pytho
 
 - `src/recozik/cli.py` registers the Typer application and exposes backwards-compatible aliases for tests and integrations.
 - `src/recozik/commands/` contains the command implementations split by feature (`inspect`, `identify`, `identify-batch`, `rename-from-log`, `config`, `completion`).
-- `src/recozik/cli_support/` provides shared helpers (locale handling, filesystem utilities, metadata parsing, logging helpers, and lazy dependency loaders).
+- `src/recozik/cli_support/` re-exports shared helpers from `recozik-services` so the CLI keeps minimal glue code (locale handling, filesystem utilities, metadata parsing, logging helpers, and lazy dependency loaders).
 - `packages/recozik-core/src/recozik_core/` hosts the reusable core library (fingerprinting, AudD integration, caching, config, gettext locales) consumed by the CLI and future front-ends.
+- `packages/recozik-services/src/recozik_services/` exposes the high-level “service” API (identify, batch identify, rename) that both the Typer CLI and upcoming GUIs call. Tests in `tests/test_services.py` interact with these runners directly without importing the CLI.
 
 This layout keeps the import-time fast while making the command code easier to navigate and test.
+
+### Service layer (CLI + GUI friendly)
+
+```python
+from pathlib import Path
+from recozik_services.identify import AudDConfig, IdentifyRequest, identify_track
+from recozik_services.cli_support.musicbrainz import MusicBrainzOptions, build_settings
+
+request = IdentifyRequest(
+    audio_path=Path("song.wav"),
+    fpcalc_path=None,
+    api_key="1234",
+    refresh_cache=False,
+    cache_enabled=True,
+    cache_ttl_hours=24,
+    audd=AudDConfig(
+        token=None,
+        enabled=False,
+        prefer=False,
+        endpoint_standard="https://api.audd.io/",
+        endpoint_enterprise="https://enterprise.audd.io/",
+        mode="standard",
+        force_enterprise=False,
+        enterprise_fallback=False,
+        params=None,
+        snippet_offset=None,
+        snippet_min_level=None,
+    ),
+    musicbrainz_options=MusicBrainzOptions(enabled=True, enrich_missing_only=True),
+    musicbrainz_settings=build_settings(
+        app_name="recozik",
+        app_version="0.10.0",
+        contact="https://github.com/Nardol/recozik",
+        rate_limit_per_second=1.0,
+        timeout_seconds=5.0,
+        cache_size=256,
+        max_retries=2,
+    ),
+)
+response = identify_track(request)
+print(response.matches)
+```
+
+Any new feature should be implemented in the relevant service module first (so every front-end stays in sync) before adding the CLI glue. The same pattern applies to batch identification (`recozik_services.batch.run_batch_identify`) and rename workflows (`recozik_services.rename.rename_from_log`). This is the API future GUI packages will call, so keep it front-of-mind when adding options.
 
 ## Testing
 

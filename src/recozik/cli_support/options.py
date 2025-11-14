@@ -1,37 +1,8 @@
-"""Helpers for reconciling CLI options with configuration defaults."""
+"""Re-export option helpers from ``recozik_services``."""
 
-from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from collections.abc import Callable
-from typing import TypeVar, cast
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    from recozik_services.cli_support.options import *  # noqa: F403
 
-import typer
-from click.core import ParameterSource
-
-T = TypeVar("T")
-U = TypeVar("U")
-
-
-def resolve_option(
-    ctx: typer.Context,
-    param_name: str,
-    cli_value: T,
-    default_value: U,
-    *,
-    env_value: T | None = None,
-    transform: Callable[[T], U] | None = None,
-) -> U:
-    """Return the effective option value honoring configuration defaults."""
-    source = ctx.get_parameter_source(param_name)
-    if source is ParameterSource.DEFAULT:
-        if env_value is not None:
-            if transform is not None:
-                return transform(env_value)
-            return cast(U, env_value)
-        return default_value
-    if transform is not None:
-        return transform(cli_value)
-    return cast(U, cli_value)
-
-
-__all__ = ["resolve_option"]
+from recozik_services.cli_support.options import *  # noqa: F403

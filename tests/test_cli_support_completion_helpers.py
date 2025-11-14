@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from recozik_services.cli_support import completion as service_completion
+
 from recozik.cli_support import completion
 
 
@@ -67,7 +69,7 @@ def test_completion_hint_includes_command(tmp_path) -> None:  # noqa: D103
 
 
 def test_completion_script_path_respects_home(monkeypatch, tmp_path) -> None:  # noqa: D103
-    monkeypatch.setattr(completion.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(service_completion.Path, "home", lambda: tmp_path)
     expected_fish = tmp_path / ".config/fish/completions/recozik.fish"
     assert completion.completion_script_path("fish") == expected_fish
     assert completion.completion_script_path("zsh") == tmp_path / ".zfunc" / "_recozik"
@@ -75,7 +77,7 @@ def test_completion_script_path_respects_home(monkeypatch, tmp_path) -> None:  #
 
 def test_completion_script_path_powershell(monkeypatch, tmp_path) -> None:  # noqa: D103
     target = tmp_path / "profile.ps1"
-    monkeypatch.setattr(completion, "powershell_profile_path", lambda shell: target)
+    monkeypatch.setattr(service_completion, "powershell_profile_path", lambda shell: target)
     assert completion.completion_script_path("pwsh") == target
 
 
@@ -86,7 +88,7 @@ def test_powershell_profile_path_success(monkeypatch, tmp_path) -> None:  # noqa
         assert command[0] in {"pwsh", "powershell"}
         return SimpleNamespace(stdout=str(expected) + "\n")
 
-    monkeypatch.setattr(completion.subprocess, "run", fake_run)
+    monkeypatch.setattr(service_completion.subprocess, "run", fake_run)
     assert completion.powershell_profile_path("pwsh") == expected
 
 
@@ -94,7 +96,7 @@ def test_powershell_profile_path_missing(monkeypatch) -> None:  # noqa: D103
     def fake_run(*_args, **_kwargs):
         raise FileNotFoundError
 
-    monkeypatch.setattr(completion.subprocess, "run", fake_run)
+    monkeypatch.setattr(service_completion.subprocess, "run", fake_run)
     assert completion.powershell_profile_path("pwsh") is None
 
 

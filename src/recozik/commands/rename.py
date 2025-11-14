@@ -2,87 +2,103 @@
 
 from __future__ import annotations
 
-import json
-import shutil
+from dataclasses import replace
 from pathlib import Path
 
 import click
 import typer
-
-from recozik_core.i18n import _
-
-from ..cli_support.deps import get_config_module
-from ..cli_support.locale import apply_locale, resolve_template
-from ..cli_support.logs import (
-    extract_template_fields,
-    format_score,
-    load_jsonl_log,
-    render_log_template,
-)
-from ..cli_support.metadata import build_metadata_match, coerce_metadata_dict
-from ..cli_support.options import resolve_option
-from ..cli_support.paths import (
-    compute_backup_path,
-    resolve_conflict_path,
-    resolve_path,
-    sanitize_filename,
-)
-from ..cli_support.prompts import (
+from recozik_services.cli_support.deps import get_config_module
+from recozik_services.cli_support.locale import apply_locale, resolve_template
+from recozik_services.cli_support.options import resolve_option
+from recozik_services.cli_support.paths import resolve_path
+from recozik_services.cli_support.prompts import (
     prompt_interactive_interrupt_decision,
     prompt_match_selection,
     prompt_rename_interrupt_decision,
     prompt_yes_no,
 )
+from recozik_services.rename import (
+    RenamePrompts as ServiceRenamePrompts,
+)
+from recozik_services.rename import (
+    RenameRequest as ServiceRenameRequest,
+)
+from recozik_services.rename import (
+    RenameServiceError,
+)
+from recozik_services.rename import (
+    rename_from_log as rename_service,
+)
 
-_TEMPLATE_FIELDS_SUPPORTED = {
-    "artist",
-    "title",
-    "album",
-    "score",
-    "recording_id",
-    "release_group_id",
-    "release_id",
-    "ext",
-    "stem",
-}
+from recozik_core.i18n import _
 
-
-def _normalize_template_value(value: object) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        text = value.strip()
-        return text or None
-    try:
-        text = str(value).strip()
-    except Exception:
-        return None
-    return text or None
+from ._callbacks import TyperCallbacks
 
 
-def _missing_template_fields(
-    match: dict[str, object],
-    required_fields: set[str],
-    source_path: Path,
-) -> set[str]:
-    missing: set[str] = set()
-    if not required_fields:
-        return missing
+class _TyperRenamePrompts(ServiceRenamePrompts):
+    """Bridge service-layer prompts to Typer helpers."""
 
-    for field in required_fields:
-        if field == "ext":
-            candidate = _normalize_template_value(source_path.suffix)
-        elif field == "stem":
-            candidate = _normalize_template_value(source_path.stem)
-        elif field == "score":
-            candidate = _normalize_template_value(format_score(match.get("score")))
+    def yes_no(self, message: str, *, default: bool = True, require_answer: bool = False) -> bool:
+        try:
+            return prompt_yes_no(message, default=default, require_answer=require_answer)
+        except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+            raise KeyboardInterrupt from None
+
+    def select_match(self, matches: list[dict], source_path: Path) -> int | None:
+        try:
+            return prompt_match_selection(matches, source_path)
+        except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+            raise KeyboardInterrupt from None
+
+    def interactive_interrupt_decision(self, has_planned: bool) -> str:
+        return prompt_interactive_interrupt_decision(has_planned)
+
+    def rename_interrupt_decision(self, remaining: int) -> str:
+        return prompt_rename_interrupt_decision(remaining)
+
+
+def _handle_log_cleanup(resolved_log: Path, mode: str) -> None:
+    valid_modes = {"ask", "always", "never"}
+    normalized = mode if mode in valid_modes else "ask"
+
+    def delete_log_file() -> None:
+        try:
+            resolved_log.unlink()
+        except FileNotFoundError:
+            typer.echo(_("Log file already removed: {path}").format(path=resolved_log))
+        except OSError as exc:
+            typer.echo(
+                _("Unable to delete log file {path}: {error}").format(path=resolved_log, error=exc)
+            )
         else:
-            candidate = _normalize_template_value(match.get(field))
+            typer.echo(_("Log file deleted: {path}").format(path=resolved_log))
 
-        if candidate is None:
-            missing.add(field)
+    if not resolved_log.exists():
+        typer.echo(_("Log file already removed: {path}").format(path=resolved_log))
+        return
 
-    return missing
+    if normalized == "always":
+        delete_log_file()
+        return
+
+    if normalized == "never":
+        typer.echo(_("Log file kept: {path}").format(path=resolved_log))
+        return
+
+    while True:
+        try:
+            if prompt_yes_no(
+                _("Delete the log file {path}?").format(path=resolved_log),
+                default=False,
+                require_answer=True,
+            ):
+                delete_log_file()
+            else:
+                typer.echo(_("Log file kept: {path}").format(path=resolved_log))
+            break
+        except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
+            typer.echo(_("Operation cancelled; log file kept."))
+            break
 
 
 def rename_from_log(
@@ -170,10 +186,6 @@ def rename_from_log(
     config_module = get_config_module()
 
     resolved_log = resolve_path(log_path)
-    if not resolved_log.is_file():
-        typer.echo(_("Log file not found: {path}").format(path=resolved_log))
-        raise typer.Exit(code=1)
-
     root_path = resolve_path(root) if root else resolved_log.parent
 
     try:
@@ -190,10 +202,6 @@ def rename_from_log(
         if require_template_fields is None
         else require_template_fields
     )
-    template_fields_used = extract_template_fields(template_value)
-    template_fields_to_check = {
-        field for field in template_fields_used if field in _TEMPLATE_FIELDS_SUPPORTED
-    }
 
     conflict_choice = resolve_option(
         ctx,
@@ -211,11 +219,11 @@ def rename_from_log(
         config.metadata_fallback_enabled if metadata_fallback is None else metadata_fallback
     )
 
-    dry_run = config.rename_default_mode == "dry-run" if dry_run is None else dry_run
-    interactive = config.rename_default_interactive if interactive is None else interactive
-    confirm = config.rename_default_confirm_each if confirm is None else confirm
+    dry_run_value = config.rename_default_mode == "dry-run" if dry_run is None else dry_run
+    interactive_value = config.rename_default_interactive if interactive is None else interactive
+    confirm_value = config.rename_default_confirm_each if confirm is None else confirm
 
-    metadata_fallback_confirm = resolve_option(
+    metadata_fallback_confirm_value = resolve_option(
         ctx,
         "metadata_fallback_confirm",
         metadata_fallback_confirm,
@@ -247,446 +255,36 @@ def rename_from_log(
     if cleanup_mode not in valid_cleanup_modes:
         cleanup_mode = "ask"
 
-    def filter_template_matches(
-        matches: list[dict[str, object]], source_path: Path
-    ) -> list[dict[str, object]]:
-        if not require_template_fields_enabled or not template_fields_to_check:
-            return [dict(match) for match in matches]
+    backup_path = resolve_path(backup_dir) if backup_dir else None
 
-        accepted: list[dict[str, object]] = []
-        for match in matches:
-            missing = _missing_template_fields(match, template_fields_to_check, source_path)
-            if missing:
-                field_list = ", ".join(sorted(missing))
-                typer.echo(
-                    _("Match skipped for {name}: missing template values ({fields}).").format(
-                        name=source_path.name,
-                        fields=field_list,
-                    )
-                )
-                continue
-            accepted.append(dict(match))
-        return accepted
+    service_request = ServiceRenameRequest(
+        log_path=resolved_log,
+        root=root_path,
+        template=template_value,
+        require_template_fields=require_template_fields_enabled,
+        dry_run=dry_run_value,
+        interactive=interactive_value,
+        confirm_each=confirm_value,
+        on_conflict=conflict_strategy,
+        backup_dir=backup_path,
+        export_path=export_path,
+        metadata_fallback=metadata_fallback_enabled,
+        metadata_fallback_confirm=metadata_fallback_confirm_value,
+        deduplicate_template=deduplicate_template_enabled,
+    )
 
-    def render_target_filename(match: dict[str, object], source_path: Path) -> str:
-        rendered = render_log_template(match, template_value, source_path)
-        sanitized = sanitize_filename(rendered)
-        if not sanitized:
-            sanitized = source_path.stem
-
-        candidate = sanitized
-        ext = source_path.suffix
-        if ext and not candidate.lower().endswith(ext.lower()):
-            candidate = f"{candidate}{ext}"
-
-        return candidate
-
-    def deduplicate_template_matches(
-        matches: list[dict[str, object]], source_path: Path
-    ) -> list[dict[str, object]]:
-        if not deduplicate_template_enabled:
-            return list(matches)
-
-        unique: list[dict[str, object]] = []
-        seen: set[str] = set()
-
-        for match in matches:
-            candidate = render_target_filename(match, source_path)
-            fingerprint = candidate.casefold()
-            if fingerprint in seen:
-                continue
-            seen.add(fingerprint)
-            unique.append(match)
-
-        return unique
-
-    def prepare_matches(
-        raw_matches: list[dict[str, object]], source_path: Path
-    ) -> list[dict[str, object]]:
-        filtered = filter_template_matches(raw_matches, source_path)
-        if not filtered:
-            return filtered
-        return deduplicate_template_matches(filtered, source_path)
+    prompts = _TyperRenamePrompts()
+    callbacks = TyperCallbacks(use_stderr=False, warning_stderr=False)
 
     try:
-        entries = load_jsonl_log(resolved_log)
-    except ValueError as exc:
+        summary = rename_service(service_request, callbacks=callbacks, prompts=prompts)
+    except RenameServiceError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
 
-    if not entries:
-        typer.echo(_("No entries found in the log."))
-        return
+    final_summary = summary
 
-    backup_path = resolve_path(backup_dir) if backup_dir else None
-    if backup_path:
-        backup_path.mkdir(parents=True, exist_ok=True)
-
-    planned: list[tuple[Path, Path, dict]] = []
-    export_entries: list[dict] = []
-    occupied: set[Path] = set()
-    skipped = 0
-    errors = 0
-    apply_after_interrupt = False
-
-    for entry in entries:
-        raw_path = entry.get("path")
-        if not raw_path:
-            errors += 1
-            typer.echo(_("Entry without a path: skipped."))
-            continue
-
-        source_path = Path(raw_path)
-        if not source_path.is_absolute():
-            source_path = (root_path / source_path).resolve()
-
-        if not source_path.exists():
-            errors += 1
-            typer.echo(_("File not found, skipped: {path}").format(path=source_path))
-            continue
-
-        status = entry.get("status")
-        error_message = entry.get("error")
-        note = entry.get("note")
-
-        matches = prepare_matches(list(entry.get("matches") or []), source_path)
-        metadata_entry = coerce_metadata_dict(entry.get("metadata"))
-
-        if status == "unmatched" and not matches:
-            context = f" ({note})" if note else ""
-            if metadata_fallback_enabled and metadata_entry:
-                typer.echo(
-                    _("No AcoustID match for {path}, using embedded metadata.").format(
-                        path=source_path
-                    )
-                )
-                matches = prepare_matches(
-                    [build_metadata_match(metadata_entry)],
-                    source_path,
-                )
-                if not matches:
-                    skipped += 1
-                    typer.echo(
-                        _("No proposal for: {path}{context}").format(
-                            path=source_path, context=context
-                        )
-                    )
-                    continue
-            else:
-                skipped += 1
-                typer.echo(
-                    _("No proposal for: {path}{context}").format(path=source_path, context=context)
-                )
-                continue
-
-        if error_message:
-            if matches:
-                skipped += 1
-                typer.echo(
-                    _("Entry with error, skipped: {path} ({error})").format(
-                        path=source_path, error=error_message
-                    )
-                )
-                continue
-            if metadata_fallback_enabled and metadata_entry:
-                typer.echo(
-                    _("No AcoustID match for {path}, using embedded metadata.").format(
-                        path=source_path
-                    )
-                )
-                matches = prepare_matches(
-                    [build_metadata_match(metadata_entry)],
-                    source_path,
-                )
-                if not matches:
-                    skipped += 1
-                    typer.echo(_("No proposal for: {path}").format(path=source_path))
-                    continue
-                error_message = None
-            else:
-                skipped += 1
-                typer.echo(
-                    _("Entry with error, skipped: {path} ({error})").format(
-                        path=source_path, error=error_message
-                    )
-                )
-                continue
-
-        if not matches:
-            if metadata_fallback_enabled and metadata_entry:
-                typer.echo(
-                    _("No AcoustID match for {path}, using embedded metadata.").format(
-                        path=source_path
-                    )
-                )
-                matches = prepare_matches(
-                    [build_metadata_match(metadata_entry)],
-                    source_path,
-                )
-                if not matches:
-                    skipped += 1
-                    typer.echo(_("No proposal for: {path}").format(path=source_path))
-                    continue
-            else:
-                skipped += 1
-                typer.echo(_("No proposal for: {path}").format(path=source_path))
-                continue
-
-        selected_match_index: int | None = 0
-        if interactive and len(matches) > 1:
-            while True:
-                try:
-                    selected_match_index = prompt_match_selection(matches, source_path)
-                except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
-                    decision = prompt_interactive_interrupt_decision(bool(planned))
-                    if decision == "cancel":
-                        typer.echo(_("Operation cancelled; no files renamed."))
-                        raise typer.Exit(code=1) from None
-                    if decision == "apply":
-                        apply_after_interrupt = True
-                        break
-                    continue
-                else:
-                    break
-
-            if apply_after_interrupt:
-                break
-
-            if selected_match_index is None:
-                skipped += 1
-                typer.echo(
-                    _("No selection made for {name}; skipping.").format(name=source_path.name)
-                )
-                continue
-
-        assert selected_match_index is not None
-        match_data = matches[selected_match_index]
-        is_metadata_match = match_data.get("source") == "metadata"
-        new_name = render_target_filename(match_data, source_path)
-        target_path = source_path.with_name(new_name)
-        if target_path == source_path:
-            skipped += 1
-            typer.echo(_("Already named correctly: {name}").format(name=source_path.name))
-            continue
-
-        final_target = resolve_conflict_path(
-            target_path,
-            source_path,
-            conflict_strategy,
-            occupied,
-            dry_run,
-        )
-
-        if final_target is None:
-            skipped += 1
-            typer.echo(
-                _("Unresolved collision, file skipped: {name}").format(name=source_path.name)
-            )
-            continue
-
-        metadata_confirmation_done = False
-
-        if is_metadata_match and metadata_fallback_confirm:
-            question = _("Confirm rename based on embedded metadata: {source} -> {target}?").format(
-                source=source_path.name, target=final_target.name
-            )
-            skip_current = False
-            while True:
-                try:
-                    if not prompt_yes_no(question, default=True):
-                        skip_current = True
-                        break
-                    metadata_confirmation_done = True
-                    break
-                except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
-                    decision = prompt_interactive_interrupt_decision(bool(planned))
-                    if decision == "cancel":
-                        typer.echo(_("Operation cancelled; no files renamed."))
-                        raise typer.Exit(code=1) from None
-                    if decision == "apply":
-                        apply_after_interrupt = True
-                        break
-                    continue
-
-            if apply_after_interrupt:
-                break
-
-            if skip_current:
-                skipped += 1
-                typer.echo(
-                    _("Metadata-based rename skipped for {name}.").format(name=source_path.name)
-                )
-                continue
-
-        if confirm and not metadata_confirmation_done:
-            question = _("Rename {source} -> {target}?").format(
-                source=source_path.name,
-                target=final_target.name,
-            )
-            skip_current = False
-            while True:
-                try:
-                    if not prompt_yes_no(question, default=True):
-                        skip_current = True
-                        break
-                    break
-                except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
-                    decision = prompt_interactive_interrupt_decision(bool(planned))
-                    if decision == "cancel":
-                        typer.echo(_("Operation cancelled; no files renamed."))
-                        raise typer.Exit(code=1) from None
-                    if decision == "apply":
-                        apply_after_interrupt = True
-                        break
-                    continue
-
-            if apply_after_interrupt:
-                break
-
-            if skip_current:
-                skipped += 1
-                typer.echo(_("Rename skipped for {name}").format(name=source_path.name))
-                continue
-
-        planned.append((source_path, final_target, match_data))
-        occupied.add(final_target)
-
-    if not planned:
-        typer.echo(
-            _("No rename performed ({skipped} skipped, {errors} errors).").format(
-                skipped=skipped, errors=errors
-            )
-        )
-        return
-
-    if apply_after_interrupt and planned:
-        typer.echo(_("Continuing with renames confirmed before the interruption."))
-
-    def execute_planned(run_dry_run: bool) -> tuple[int, bool, list[dict]]:
-        renamed_count = 0
-        index = 0
-        interrupted = False
-        entries: list[dict] = []
-
-        while index < len(planned):
-            source_path, target_path, match_data = planned[index]
-            action = _("DRY-RUN") if run_dry_run else _("RENAMED")
-            typer.echo(
-                _("{action}: {source} -> {target}").format(
-                    action=action,
-                    source=source_path,
-                    target=target_path,
-                )
-            )
-
-            if run_dry_run:
-                entries.append(
-                    {
-                        "source": str(source_path),
-                        "target": str(target_path),
-                        "applied": False,
-                        "match": match_data,
-                    }
-                )
-                index += 1
-                continue
-
-            try:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-
-                if backup_path:
-                    backup_file = compute_backup_path(source_path, root_path, backup_path)
-                    backup_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(source_path, backup_file)
-
-                if target_path.exists() and conflict_strategy == "overwrite":
-                    target_path.unlink()
-
-                source_path.rename(target_path)
-            except KeyboardInterrupt:
-                decision = prompt_rename_interrupt_decision(len(planned) - index)
-                if decision == "continue":
-                    typer.echo(_("Continuing renaming."))
-                    continue
-
-                interrupted = True
-                typer.echo(
-                    _(
-                        "Renaming interrupted; {completed} file(s) already renamed, "
-                        "{remaining} file(s) left untouched."
-                    ).format(
-                        completed=renamed_count,
-                        remaining=len(planned) - index,
-                    )
-                )
-                break
-
-            renamed_count += 1
-            entries.append(
-                {
-                    "source": str(source_path),
-                    "target": str(target_path),
-                    "applied": True,
-                    "match": match_data,
-                }
-            )
-            index += 1
-
-        return renamed_count, interrupted, entries
-
-    def handle_log_cleanup(mode: str) -> None:
-        normalized = mode if mode in valid_cleanup_modes else "ask"
-
-        def delete_log_file() -> None:
-            try:
-                resolved_log.unlink()
-            except FileNotFoundError:
-                typer.echo(_("Log file already removed: {path}").format(path=resolved_log))
-            except OSError as exc:
-                typer.echo(
-                    _("Unable to delete log file {path}: {error}").format(
-                        path=resolved_log, error=exc
-                    )
-                )
-            else:
-                typer.echo(_("Log file deleted: {path}").format(path=resolved_log))
-
-        if not resolved_log.exists():
-            typer.echo(_("Log file already removed: {path}").format(path=resolved_log))
-            return
-
-        if normalized == "always":
-            delete_log_file()
-            return
-
-        if normalized == "never":
-            typer.echo(_("Log file kept: {path}").format(path=resolved_log))
-            return
-
-        while True:
-            try:
-                if prompt_yes_no(
-                    _("Delete the log file {path}?").format(path=resolved_log),
-                    default=False,
-                    require_answer=True,
-                ):
-                    delete_log_file()
-                else:
-                    typer.echo(_("Log file kept: {path}").format(path=resolved_log))
-                break
-            except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
-                typer.echo(_("Operation cancelled; log file kept."))
-                break
-
-    renamed_count, interrupted_during_rename, export_entries = execute_planned(dry_run)
-
-    if dry_run and not interrupted_during_rename:
-        typer.echo(
-            _(
-                "Dry-run complete: {planned} potential renames, {skipped} skipped, {errors} errors."
-            ).format(planned=len(planned), skipped=skipped, errors=errors)
-        )
-
+    if summary.dry_run and not summary.interrupted and summary.planned > 0 and summary.plan_entries:
         while True:
             try:
                 apply_now = prompt_yes_no(
@@ -696,33 +294,32 @@ def rename_from_log(
                 )
                 break
             except (typer.Abort, KeyboardInterrupt, click.exceptions.Abort):
-                typer.echo(_("Operation cancelled; no files renamed."))
-                return
+                decision = prompt_interactive_interrupt_decision(summary.planned > 0)
+                if decision == "cancel":
+                    typer.echo(_("Operation cancelled; no files renamed."))
+                    raise typer.Exit(code=1) from None
+                if decision == "apply":
+                    apply_now = True
+                    break
+                continue
 
         if apply_now:
-            dry_run = False
-            renamed_count, interrupted_during_rename, export_entries = execute_planned(False)
+            apply_request = replace(
+                service_request,
+                dry_run=False,
+                preplanned_entries=summary.plan_entries,
+            )
+            try:
+                final_summary = rename_service(apply_request, callbacks=callbacks, prompts=prompts)
+            except RenameServiceError as exc:
+                typer.echo(str(exc))
+                raise typer.Exit(code=1) from exc
         else:
             typer.echo(_("Use --apply to run the renames."))
+            return
 
-    if not dry_run and not interrupted_during_rename:
-        typer.echo(
-            _("Renaming complete: {renamed} file(s), {skipped} skipped, {errors} errors.").format(
-                renamed=renamed_count, skipped=skipped, errors=errors
-            )
-        )
+    if not final_summary.dry_run and not final_summary.interrupted and final_summary.applied > 0:
+        _handle_log_cleanup(resolved_log, cleanup_mode)
 
-    if export_path and export_entries:
-        resolved_export = resolve_path(export_path)
-        resolved_export.parent.mkdir(parents=True, exist_ok=True)
-        resolved_export.write_text(
-            json.dumps(export_entries, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        typer.echo(_("Summary written to {path}").format(path=resolved_export))
-
-    if not dry_run and not interrupted_during_rename and renamed_count > 0:
-        handle_log_cleanup(cleanup_mode)
-
-    if interrupted_during_rename:
+    if final_summary.interrupted:
         raise typer.Exit(code=1)

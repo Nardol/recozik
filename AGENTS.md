@@ -4,7 +4,8 @@
 
 - `src/recozik/cli.py` – Typer app registration + backward-compatible shims (exposes lazy symbols such as `compute_fingerprint`, `LookupCache`, completion helpers).
 - `src/recozik/commands/` – Feature-focused command modules (`inspect`, `fingerprint`, `identify`, `identify_batch`, `rename`, `config`, `completion`).
-- `src/recozik/cli_support/` – Shared CLI utilities (locale resolution, path helpers, metadata/log formatting, prompts, lazy dependency loaders).
+- `src/recozik/cli_support/` – Thin re-export layer pointing to the shared service helpers (locale resolution, path helpers, metadata/log formatting, prompts, lazy dependency loaders).
+- `packages/recozik-services/src/recozik_services/` – Service layer consumed by the CLI and future GUIs (identify, batch identify, rename runners plus callback/ prompt protocols). Implement new behaviour here first so every frontend stays in sync.
 - `packages/recozik-core/src/recozik_core/` – Core libraries (`fingerprint.py`, `cache.py`, `config.py`, `audd.py`, `i18n.py`, locales) consumed by the CLI and future GUIs.
 - `tests/` – Pytest suites mirroring CLI features and performance guards (includes `test_cli_import_time.py`).
 - `README.md` – User-facing quick start; AGENTS should cross-check when updating commands.
@@ -28,6 +29,7 @@
 - Python 3.10–3.13, 4-space indentation, type hints encouraged. Python 3.14 remains experimental until upstream (librosa/numba) ships stable wheels.
 - CLI options use kebab-case (e.g., `--log-format`); internal functions use snake_case.
 - Keep Typer command logic inside the relevant module under `src/recozik/commands/`; `cli.py` should only register commands and surface compatibility wrappers.
+- When adding or modifying core behaviour (identify/batch/rename workflows), write it under `packages/recozik-services` first, then add the thin CLI glue that builds requests and forwards callbacks/prompts.
 - When touching completion logic, update both `src/recozik/commands/completion.py` and the wrapper wiring in `cli.py` so tests that monkeypatch `recozik.cli` continue to work.
 - Sanitize filenames using `_sanitize_filename`; reuse helpers instead of ad-hoc logic.
 - Route every user-facing string through `recozik_core.i18n._` using an English msgid. Update the relevant `.po` file under `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.

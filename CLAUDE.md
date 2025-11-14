@@ -96,21 +96,16 @@ uv build
 The codebase is structured for **fast import times** and **maintainability**:
 
 - **`src/recozik/cli.py`**: Typer application entry point. Registers all commands and subcommands. Uses lazy loading for heavy dependencies to keep import times fast.
-- **`src/recozik/commands/`**: Individual command implementations:
+- **`src/recozik/commands/`**: Thin adapters that parse CLI options and delegate to the service layer:
   - `inspect.py`: Extract basic audio metadata
   - `fingerprint.py`: Generate Chromaprint fingerprints
-  - `identify.py`: Single-file AcoustID lookup
-  - `identify_batch.py`: Batch processing with caching
-  - `rename.py`: Apply renaming from JSONL logs
+  - `identify.py`: Single-file AcoustID lookup via `recozik-services.identify`
+  - `identify_batch.py`: Batch processing via `recozik-services.batch`
+  - `rename.py`: Apply renaming plans via `recozik-services.rename`
   - `config.py`: Configuration management (API keys, settings)
   - `completion.py`: Shell completion script management
-- **`src/recozik/cli_support/`**: Shared utilities for commands:
-  - `locale.py`: i18n locale detection and management
-  - `metadata.py`: Audio metadata extraction (mutagen wrapper)
-  - `paths.py`: Filesystem utilities and path handling
-  - `logs.py`: Logging helpers for batch operations
-  - `prompts.py`: Interactive prompts for CLI
-  - `deps.py`: **Lazy dependency loaders** to defer expensive imports
+- **`src/recozik/cli_support/`**: Re-export shims for shared helpers hosted in `recozik-services` (locale, metadata, filesystem, logging, prompts, lazy dependency loaders).
+- **`packages/recozik-services/src/recozik_services/`**: Service layer consumed by the CLI and future GUIs. Exposes identify/batch/rename runners, callback/prompt protocols, and helper utilities.
 
 ### Core Modules
 
