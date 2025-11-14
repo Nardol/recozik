@@ -2,12 +2,25 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    WebSocket,
+    status,
+)
+from fastapi.websockets import WebSocketDisconnect
 from pydantic import BaseModel, Field
 from recozik_services import (
     AudDConfig,
@@ -22,11 +35,13 @@ from recozik_services.security import AccessPolicyError, QuotaPolicyError
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
 
-from .auth import RequestContext, get_request_context
+from .auth import API_TOKEN_HEADER, RequestContext, get_request_context, resolve_user_from_token
 from .config import WebSettings, get_settings
+from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
 
 logger = logging.getLogger("recozik.web")
 app = FastAPI(title="Recozik Web API", version="0.1.0")
+_pending_jobs: set[asyncio.Task[None]] = set()
 
 
 class LoggingCallbacks:
@@ -46,6 +61,41 @@ class LoggingCallbacks:
 
 
 CALLBACKS = LoggingCallbacks()
+
+
+def _schedule_job(coro: Any) -> None:
+    """Fire-and-forget helper used for background job execution."""
+    task = asyncio.create_task(coro)
+
+    def _cleanup(future: asyncio.Task) -> None:
+        _pending_jobs.discard(future)
+
+    _pending_jobs.add(task)
+    task.add_done_callback(_cleanup)
+
+
+class JobCallbacks(LoggingCallbacks):
+    """Callback wrapper that records messages for a job."""
+
+    def __init__(self, job_id: str, repo) -> None:
+        """Store repository used to persist callback messages."""
+        self.job_id = job_id
+        self.repo = repo
+
+    def info(self, message: str) -> None:  # pragma: no cover - logging wrapper
+        """Record info-level callback output."""
+        super().info(message)
+        self.repo.append_message(self.job_id, message)
+
+    def warning(self, message: str) -> None:  # pragma: no cover - logging wrapper
+        """Record warning-level callback output."""
+        super().warning(message)
+        self.repo.append_message(self.job_id, message)
+
+    def error(self, message: str) -> None:  # pragma: no cover - logging wrapper
+        """Record error-level callback output."""
+        super().error(message)
+        self.repo.append_message(self.job_id, message)
 
 
 class IdentifyRequestPayload(BaseModel):
@@ -94,6 +144,24 @@ class IdentifyResponseModel(BaseModel):
     duration_seconds: float
 
 
+class JobSummaryModel(BaseModel):
+    """Minimal job information returned after enqueuing."""
+
+    job_id: str
+    status: JobStatus
+
+
+class JobDetailModel(JobSummaryModel):
+    """Detailed job payload for polling endpoints."""
+
+    created_at: datetime
+    updated_at: datetime
+    finished_at: datetime | None
+    messages: list[str]
+    result: IdentifyResponseModel | None
+    error: str | None
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     """Return service health status."""
@@ -135,13 +203,13 @@ def identify_from_path(
 
 @app.post(
     "/identify/upload",
-    response_model=IdentifyResponseModel,
+    response_model=JobSummaryModel,
     responses={
         400: {"description": "Invalid upload"},
         401: {"description": "Missing or invalid API token"},
         403: {"description": "Feature not allowed"},
-        413: {"description": "Upload too large"},
         415: {"description": "Unsupported media type"},
+        429: {"description": "Quota exceeded"},
     },
 )
 async def identify_from_upload(
@@ -153,8 +221,8 @@ async def identify_from_upload(
     enable_audd: bool | None = Form(None),
     context: RequestContext = Depends(get_request_context),
     settings: WebSettings = Depends(get_settings),
-) -> IdentifyResponseModel:
-    """Identify an uploaded audio file."""
+) -> JobSummaryModel:
+    """Enqueue an identify job for an uploaded file."""
     if file.content_type and not file.content_type.startswith("audio/"):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -170,22 +238,18 @@ async def identify_from_upload(
         force_audd_enterprise=force_audd_enterprise,
         enable_audd=enable_audd,
     )
-
-    try:
-        request = _build_identify_request(payload, temp_path, settings)
-        response = identify_track(
-            request,
-            callbacks=CALLBACKS,
-            user=context.user,
-            access_policy=context.access_policy,
-            quota_policy=context.quota_policy,
+    repo = get_job_repository(settings.jobs_database_path)
+    job = repo.create_job()
+    _schedule_job(
+        _run_identify_job(
+            job.id,
+            temp_path,
+            payload,
+            settings,
+            context,
         )
-    except IdentifyServiceError as exc:
-        raise HTTPException(status_code=_status_for_service_error(exc), detail=str(exc)) from exc
-    finally:
-        temp_path.unlink(missing_ok=True)
-
-    return _serialize_response(response)
+    )
+    return JobSummaryModel(job_id=job.id, status=job.status)
 
 
 def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
@@ -297,6 +361,20 @@ def _serialize_match(match: AcoustIDMatch) -> MatchModel:
     )
 
 
+def _job_to_model(job: JobRecord) -> JobDetailModel:
+    result_payload = IdentifyResponseModel.model_validate(job.result) if job.result else None
+    return JobDetailModel(
+        job_id=job.id,
+        status=job.status,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        finished_at=job.finished_at,
+        messages=list(job.messages),
+        result=result_payload,
+        error=job.error,
+    )
+
+
 @app.get("/whoami")
 def whoami(context: RequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Return details about the token (useful for quick diagnostics)."""
@@ -316,6 +394,39 @@ def _status_for_service_error(exc: IdentifyServiceError) -> int:
     if isinstance(cause, QuotaPolicyError):
         return status.HTTP_429_TOO_MANY_REQUESTS
     return status.HTTP_400_BAD_REQUEST
+
+
+async def _run_identify_job(
+    job_id: str,
+    temp_path: Path,
+    payload: IdentifyRequestPayload,
+    settings: WebSettings,
+    context: RequestContext,
+) -> None:
+    repo = get_job_repository(settings.jobs_database_path)
+    repo.set_status(job_id, JobStatus.RUNNING)
+    callbacks = JobCallbacks(job_id, repo)
+
+    def _execute() -> IdentifyResponse:
+        request = _build_identify_request(payload, temp_path, settings)
+        return identify_track(
+            request,
+            callbacks=callbacks,
+            user=context.user,
+            access_policy=context.access_policy,
+            quota_policy=context.quota_policy,
+        )
+
+    try:
+        response = await asyncio.to_thread(_execute)
+    except IdentifyServiceError as exc:
+        repo.append_message(job_id, f"Error: {exc}")
+        repo.set_status(job_id, JobStatus.FAILED, error=str(exc))
+    else:
+        serialized = _serialize_response(response).model_dump()
+        repo.set_status(job_id, JobStatus.COMPLETED, result=serialized)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 async def _persist_upload(upload: UploadFile, settings: WebSettings) -> Path:
@@ -354,3 +465,51 @@ async def _persist_upload(upload: UploadFile, settings: WebSettings) -> Path:
         temp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload")
     return temp_path
+
+
+@app.get("/jobs/{job_id}", response_model=JobDetailModel)
+def get_job_detail(
+    job_id: str,
+    context: RequestContext = Depends(get_request_context),
+    settings: WebSettings = Depends(get_settings),
+) -> JobDetailModel:
+    """Return the persisted state for a job."""
+    repo = get_job_repository(settings.jobs_database_path)
+    job = repo.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return _job_to_model(job)
+
+
+@app.websocket("/ws/jobs/{job_id}")
+async def job_updates(websocket: WebSocket, job_id: str) -> None:
+    """Stream job updates over WebSocket."""
+    logger.debug("WebSocket connect for %s", job_id)
+    token = websocket.headers.get(API_TOKEN_HEADER) or websocket.query_params.get("token")
+    settings = get_settings()
+    try:
+        resolve_user_from_token(token or "", settings)
+        repo = get_job_repository(settings.jobs_database_path)
+        job = repo.get(job_id)
+        if job is None:
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+            return
+
+        await websocket.accept()
+        logger.debug("WebSocket snapshot for %s", job_id)
+        await websocket.send_json({"type": "snapshot", "job": repo.as_dict(job)})
+        notifier = get_notifier()
+        queue = notifier.subscribe(job_id)
+        try:
+            while True:
+                payload = await queue.get()
+                await websocket.send_json(payload)
+        except WebSocketDisconnect:
+            notifier.unsubscribe(job_id, queue)
+        except Exception:
+            notifier.unsubscribe(job_id, queue)
+            raise
+    except Exception:  # pragma: no cover - defensive logging
+        logger.exception("WebSocket error for job %s", job_id)
+        with contextlib.suppress(Exception):
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)

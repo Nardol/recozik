@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from importlib import import_module, reload
 from pathlib import Path
 
@@ -48,6 +49,7 @@ def _bootstrap_app(monkeypatch, tmp_path: Path, settings: WebSettings):
 
     app_module.app.dependency_overrides[config_module.get_settings] = _get_settings
     app_module.app.dependency_overrides[auth_module.get_settings] = _get_settings
+    app_module.get_settings = _get_settings
 
     client = TestClient(app_module.app)
     return client, tmp_path, app_module, settings
@@ -167,9 +169,20 @@ def test_identify_upload_invokes_service(monkeypatch, web_app) -> None:
         headers={"X-API-Token": API_TOKEN},
     )
 
-    assert response.status_code == 200, response.json()
-    data = response.json()
-    assert data["match_source"] == "audd"
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    job_id = payload["job_id"]
+
+    for _ in range(60):
+        job_response = client.get(f"/jobs/{job_id}", headers={"X-API-Token": API_TOKEN})
+        job_data = job_response.json()
+        if job_data["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("identify job did not complete")
+
+    assert job_data["result"]["match_source"] == "audd"
 
     upload_dir = media_root / settings.upload_subdir
     assert not any(upload_dir.glob("*"))

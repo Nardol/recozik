@@ -138,7 +138,8 @@ def _build_token_rules(settings: WebSettings) -> dict[str, TokenRule]:
     return rules
 
 
-def _resolve_user_from_token(token: str, settings: WebSettings) -> ServiceUser:
+def resolve_user_from_token(token: str, settings: WebSettings) -> ServiceUser:
+    """Return the ServiceUser matching the provided API token."""
     rules = _build_token_rules(settings)
     rule = rules.get(token)
     if not rule:
@@ -161,5 +162,5 @@ def get_request_context(
     settings: WebSettings = Depends(get_settings),
 ) -> RequestContext:
     """FastAPI dependency injecting ServiceUser + policies."""
-    user = _resolve_user_from_token(api_token, settings)
+    user = resolve_user_from_token(api_token, settings)
     return RequestContext(user=user, access_policy=_ACCESS_POLICY, quota_policy=_QUOTA_POLICY)

@@ -32,6 +32,7 @@ class WebSettings(BaseSettings):
     readonly_quota_audd_standard: int | None = None
     max_upload_mb: int = 32
     upload_subdir: str = "uploads"
+    jobs_db_filename: str = "jobs.db"
 
     @model_validator(mode="after")
     def _resolve_media_root(self) -> WebSettings:
@@ -48,6 +49,11 @@ class WebSettings(BaseSettings):
     def upload_directory(self) -> Path:
         """Return the absolute upload directory."""
         return (self.base_media_root / self.upload_subdir).resolve()
+
+    @property
+    def jobs_database_path(self) -> Path:
+        """Return the SQLite path used for job persistence."""
+        return (self.base_media_root / self.jobs_db_filename).resolve()
 
 
 @lru_cache
