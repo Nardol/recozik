@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 import os
@@ -44,7 +43,6 @@ from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
 
 logger = logging.getLogger("recozik.web")
 app = FastAPI(title="Recozik Web API", version="0.1.0")
-_pending_jobs: set[asyncio.Task[None]] = set()
 
 
 class LoggingCallbacks:
@@ -64,17 +62,6 @@ class LoggingCallbacks:
 
 
 CALLBACKS = LoggingCallbacks()
-
-
-def _schedule_job(coro: Any) -> None:
-    """Fire-and-forget helper used for background job execution."""
-    task = asyncio.create_task(coro)
-
-    def _cleanup(future: asyncio.Task) -> None:
-        _pending_jobs.discard(future)
-
-    _pending_jobs.add(task)
-    task.add_done_callback(_cleanup)
 
 
 class JobCallbacks(LoggingCallbacks):

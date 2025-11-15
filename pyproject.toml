@@ -93,7 +93,6 @@ select = [
 ]
 ignore = [
     "S101",
-    "B008",
     "D203",
     "D213"
 ]
@@ -103,6 +102,8 @@ known-first-party = ["recozik", "recozik_core"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
+"packages/recozik-web/src/recozik_web/app.py" = ["B008"]
+"packages/recozik-web/src/recozik_web/auth.py" = ["B008"]
 
 [tool.uv.sources]
 recozik-core = { workspace = true }
