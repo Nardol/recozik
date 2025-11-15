@@ -26,6 +26,7 @@ class JobRecord(SQLModel, table=True):
     """Database representation of an identify job."""
 
     id: str = Field(default_factory=lambda: uuid4().hex, primary_key=True)
+    user_id: str | None = Field(default=None, index=True)
     status: JobStatus = Field(default=JobStatus.QUEUED)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -48,9 +49,9 @@ class JobRepository:
         self._engine = create_engine(database_url, connect_args=connect_args)
         SQLModel.metadata.create_all(self._engine)
 
-    def create_job(self) -> JobRecord:
-        """Insert a new job record and return it."""
-        job = JobRecord()
+    def create_job(self, *, user_id: str | None) -> JobRecord:
+        """Insert a new job record owned by the provided user and return it."""
+        job = JobRecord(user_id=user_id)
         with Session(self._engine) as session:
             session.add(job)
             session.commit()

@@ -7,9 +7,11 @@ from importlib import import_module, reload
 from pathlib import Path
 
 import pytest
+from fastapi import status
 from fastapi.testclient import TestClient
 from recozik_services.identify import IdentifyResponse
 from recozik_web.config import WebSettings
+from starlette.websockets import WebSocketDisconnect
 
 from recozik_core.fingerprint import AcoustIDMatch, FingerprintResult, ReleaseInfo
 
@@ -64,6 +66,21 @@ def web_app_fixture(monkeypatch, tmp_path: Path):
     """Yield a configured TestClient plus helper context."""
     settings = _override_settings(tmp_path)
     return _bootstrap_app(monkeypatch, tmp_path, settings)
+
+
+def _create_token(client: TestClient, token_value: str, user_id: str) -> str:
+    """Create an API token through the admin endpoint for test purposes."""
+    payload = {
+        "token": token_value,
+        "user_id": user_id,
+        "display_name": user_id,
+        "roles": [],
+        "allowed_features": ["identify"],
+        "quota_limits": {},
+    }
+    resp = client.post("/admin/tokens", json=payload, headers={"X-API-Token": API_TOKEN})
+    assert resp.status_code == 200, resp.text
+    return token_value
 
 
 def test_health_endpoint(web_app) -> None:
@@ -268,6 +285,10 @@ def test_job_websocket_stream(monkeypatch, web_app) -> None:
     )
     job_id = resp.json()["job_id"]
 
+    repo = app_module.get_job_repository(app_module.get_settings().jobs_database_url_resolved)
+    job = repo.get(job_id)
+    assert job.user_id == "admin"
+
     time.sleep(0.05)
 
     with client.websocket_connect(
@@ -288,6 +309,82 @@ def test_job_websocket_stream(monkeypatch, web_app) -> None:
     assert snapshot["job"]["status"] == "completed" or any(
         evt.get("type") == "result" for evt in events
     )
+
+
+def test_job_detail_rejects_other_user(monkeypatch, web_app) -> None:
+    """Job polling endpoint must not leak other users' jobs."""
+    client, _, app_module, _ = web_app
+    other_token = _create_token(client, "other-token", "other")
+
+    fingerprint = FingerprintResult(fingerprint="abc", duration_seconds=5.0)
+    match = AcoustIDMatch(
+        score=0.9, recording_id="rec", title="Track", artist="Artist", releases=[]
+    )
+    fake_response = IdentifyResponse(
+        fingerprint=fingerprint,
+        matches=[match],
+        match_source="acoustid",
+        metadata=None,
+        audd_note=None,
+        audd_error=None,
+    )
+    monkeypatch.setattr(app_module, "identify_track", lambda *_args, **_kwargs: fake_response)
+
+    resp = client.post(
+        "/identify/upload",
+        files={"file": ("clip.wav", b"audio-bytes", "audio/wav")},
+        headers={"X-API-Token": API_TOKEN},
+    )
+    job_id = resp.json()["job_id"]
+
+    for _ in range(60):
+        job_response = client.get(f"/jobs/{job_id}", headers={"X-API-Token": API_TOKEN})
+        job_data = job_response.json()
+        if job_data["status"] == "completed":
+            break
+        time.sleep(0.05)
+    else:  # pragma: no cover - defensive timeout
+        pytest.fail("job did not complete")
+
+    forbidden = client.get(f"/jobs/{job_id}", headers={"X-API-Token": other_token})
+    assert forbidden.status_code == 403
+
+
+def test_job_websocket_rejects_other_user(monkeypatch, web_app) -> None:
+    """WebSocket streaming should enforce job ownership."""
+    client, _, app_module, _ = web_app
+    other_token = _create_token(client, "ws-other-token", "ws-other")
+
+    fingerprint = FingerprintResult(fingerprint="abc", duration_seconds=5.0)
+    match = AcoustIDMatch(
+        score=0.9, recording_id="rec", title="Track", artist="Artist", releases=[]
+    )
+    fake_response = IdentifyResponse(
+        fingerprint=fingerprint,
+        matches=[match],
+        match_source="acoustid",
+        metadata=None,
+        audd_note=None,
+        audd_error=None,
+    )
+    monkeypatch.setattr(app_module, "identify_track", lambda *_args, **_kwargs: fake_response)
+
+    resp = client.post(
+        "/identify/upload",
+        files={"file": ("clip.wav", b"audio-bytes", "audio/wav")},
+        headers={"X-API-Token": API_TOKEN},
+    )
+    job_id = resp.json()["job_id"]
+
+    time.sleep(0.05)
+
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect(
+            f"/ws/jobs/{job_id}?token={other_token}",
+            headers={"X-API-Token": other_token},
+        ) as websocket:
+            websocket.receive_json()
+    assert excinfo.value.code == status.WS_1008_POLICY_VIOLATION
 
 
 def test_admin_can_manage_tokens(monkeypatch, web_app) -> None:

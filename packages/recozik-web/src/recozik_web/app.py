@@ -32,7 +32,7 @@ from recozik_services import (
     identify_track,
 )
 from recozik_services.cli_support.musicbrainz import MusicBrainzOptions, build_settings
-from recozik_services.security import AccessPolicyError, QuotaPolicyError
+from recozik_services.security import AccessPolicyError, QuotaPolicyError, ServiceUser
 
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
@@ -270,7 +270,7 @@ async def identify_from_upload(
         enable_audd=enable_audd,
     )
     repo = get_job_repository(settings.jobs_database_url_resolved)
-    job = repo.create_job()
+    job = repo.create_job(user_id=context.user.user_id or "anonymous")
     background_tasks.add_task(
         _run_identify_job,
         job.id,
@@ -421,6 +421,21 @@ def _job_to_model(job: JobRecord) -> JobDetailModel:
     )
 
 
+def _job_is_accessible(job: JobRecord, user: ServiceUser) -> bool:
+    """Return True when the provided user may read the given job."""
+    if user.has_role("admin"):
+        return True
+    if job.user_id is None:
+        return False
+    return job.user_id == user.user_id
+
+
+def _ensure_job_access(job: JobRecord, context: RequestContext) -> None:
+    """Raise when the request user is not allowed to read the job."""
+    if not _job_is_accessible(job, context.user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+
 @app.get("/whoami")
 def whoami(context: RequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Return details about the token (useful for quick diagnostics)."""
@@ -523,6 +538,7 @@ def get_job_detail(
     job = repo.get(job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    _ensure_job_access(job, context)
     return _job_to_model(job)
 
 
@@ -533,11 +549,17 @@ async def job_updates(websocket: WebSocket, job_id: str) -> None:
     token = websocket.headers.get(API_TOKEN_HEADER) or websocket.query_params.get("token")
     settings = get_settings()
     try:
-        resolve_user_from_token(token or "", settings)
+        if not token:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+        user = resolve_user_from_token(token, settings)
         repo = get_job_repository(settings.jobs_database_url_resolved)
         job = repo.get(job_id)
         if job is None:
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+            return
+        if not _job_is_accessible(job, user):
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
         await websocket.accept()
