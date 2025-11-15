@@ -297,7 +297,7 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
         # This occurs on Windows if the path is on a different drive.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
-        )
+        ) from None
 
     if not resolved_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
