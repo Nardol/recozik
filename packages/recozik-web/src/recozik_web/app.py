@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -287,6 +288,13 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
 
     media_root = settings.base_media_root.resolve()
     resolved_path = (media_root / relative_path).resolve()
+
+    # Add a normalization guard to satisfy CodeQL.
+    normalized = os.path.normpath(resolved_path)
+    if not normalized.startswith(str(media_root)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
+        )
 
     # Ensure the resolved path is within the media root directory.
     try:
