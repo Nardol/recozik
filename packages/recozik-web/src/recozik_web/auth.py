@@ -212,14 +212,14 @@ def resolve_user_from_token(
     record = repo.get(token)
 
     if not record:
-        # Log failed authentication attempt
+        # Log failed authentication attempt (without token for security)
         client_ip = "unknown"
         if request and request.client:
             client_ip = request.client.host
         logger.warning(
-            "Failed authentication attempt with invalid token from IP %s (token: %s...)",
+            "Failed authentication attempt with invalid token from IP %s (token length: %d)",
             client_ip,
-            token[:8] if len(token) >= 8 else "***",
+            len(token),
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API token")
 
