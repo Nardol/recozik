@@ -204,7 +204,7 @@ def test_identify_upload_invokes_service(monkeypatch, web_app) -> None:
         audd_error=None,
     )
 
-    def fake_identify(request, **_kwargs):
+    def fake_identify(_request, **_kwargs):
         return fake_response
 
     monkeypatch.setattr(app_module, "identify_track", fake_identify)
