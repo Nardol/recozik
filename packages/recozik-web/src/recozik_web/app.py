@@ -290,17 +290,17 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     media_root = settings.base_media_root.resolve()
     candidate_path = (media_root / relative_path).resolve()
 
-    # Ensure the candidate path is within media_root.
-    try:
-        if not candidate_path.is_relative_to(media_root):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
-            )
-    except ValueError:
-        # This occurs on Windows if the path is on a different drive.
+    # Ensure the candidate path is strictly contained within media_root.
+    media_root_str = str(media_root)
+    candidate_path_str = str(candidate_path)
+    if not (
+        candidate_path_str == media_root_str
+        or candidate_path_str.startswith(media_root_str + str(candidate_path.anchor or candidate_path.root or "/"))
+        or candidate_path_str.startswith(media_root_str + "/")  # For POSIX systems
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
-        ) from None
+        )
 
     if not candidate_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
