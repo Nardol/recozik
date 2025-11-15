@@ -288,38 +288,35 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
             detail="Absolute paths or directory traversal components are not allowed.",
         )
 
-    # Validate each path component to prevent any malicious patterns
-    for part in relative_path.parts:
-        if not part or part in (".", "..") or os.sep in part or (os.altsep and os.altsep in part):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid path component",
-            )
-
     # Get absolute media root path
     media_root = settings.base_media_root.resolve()
 
-    # Build the candidate path by joining validated components
-    # This breaks the taint flow for CodeQL as we're reconstructing from validated parts
-    candidate_path = media_root
-    for part in relative_path.parts:
-        candidate_path = candidate_path / part
+    # Construct candidate path and normalize it (CodeQL recognizes os.path.normpath as a sanitizer)
+    candidate_path = media_root / relative_path
+    normalized_candidate = Path(os.path.normpath(candidate_path))
+    normalized_root = Path(os.path.normpath(media_root))
 
-    # Final safety check: ensure the constructed path is within media_root
+    # String prefix check (CodeQL recognizes this pattern)
+    if not str(normalized_candidate).startswith(str(normalized_root) + os.sep):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
+        )
+
+    # Also use relative_to as a secondary check
     try:
-        candidate_path.relative_to(media_root)
+        normalized_candidate.relative_to(normalized_root)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         ) from e
 
     # Verify the path points to an actual file (without following symlinks for extra safety)
-    if not candidate_path.exists():
+    if not normalized_candidate.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
-    if not candidate_path.is_file():
+    if not normalized_candidate.is_file():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Path is not a file")
 
-    return candidate_path
+    return normalized_candidate
 
 
 def _build_identify_request(
