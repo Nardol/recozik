@@ -60,6 +60,7 @@ class PersistentQuotaPolicy(QuotaPolicy):
 
         self._engine = create_engine(database_url, connect_args=connect_args)
         SQLModel.metadata.create_all(self._engine)
+        self._last_cleanup = datetime.now(timezone.utc)
         logger.info("Persistent quota policy initialized with %dh window", window_hours)
 
     def consume(
@@ -97,11 +98,13 @@ class PersistentQuotaPolicy(QuotaPolicy):
 
         with Session(self._engine) as session:
             # Get or create usage record for current window
+            # IMPORTANT: Use period_end > cutoff to include bins that partially overlap
+            # the window (e.g., a bin from 12:00-13:00 when cutoff is 12:45)
             statement = (
                 select(QuotaUsageRecord)
                 .where(QuotaUsageRecord.user_id == user_key)
                 .where(QuotaUsageRecord.scope == scope_key)
-                .where(QuotaUsageRecord.period_start >= period_start)
+                .where(QuotaUsageRecord.period_end > period_start)
             )
             records = list(session.exec(statement))
 
@@ -158,6 +161,20 @@ class PersistentQuotaPolicy(QuotaPolicy):
                 cost,
             )
 
+        # Periodic cleanup to prevent database growth
+        # Clean up once per hour to avoid performance impact
+        if (now - self._last_cleanup).total_seconds() > 3600:
+            self._last_cleanup = now
+            try:
+                # Keep records for 2x window_hours (e.g., 48h for 24h window)
+                # Convert hours to days, keeping at least 2 days
+                days_to_keep = max(2, (self.window_hours * 2) // 24)
+                deleted = self.cleanup_old_records(days_to_keep=days_to_keep)
+                if deleted > 0:
+                    logger.info("Periodic cleanup removed %d old quota records", deleted)
+            except Exception as e:
+                logger.warning("Quota cleanup failed: %s", e)
+
     def get_usage(self, user_id: str, scope: QuotaScope) -> int:
         """Get current usage for a user and scope in the rolling window.
 
@@ -173,11 +190,12 @@ class PersistentQuotaPolicy(QuotaPolicy):
         period_start = now - timedelta(hours=self.window_hours)
 
         with Session(self._engine) as session:
+            # IMPORTANT: Use period_end > cutoff to include bins that partially overlap
             statement = (
                 select(QuotaUsageRecord)
                 .where(QuotaUsageRecord.user_id == user_id)
                 .where(QuotaUsageRecord.scope == scope.value)
-                .where(QuotaUsageRecord.period_start >= period_start)
+                .where(QuotaUsageRecord.period_end > period_start)
             )
             records = list(session.exec(statement))
             return sum(record.usage_count for record in records)
