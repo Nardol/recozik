@@ -231,9 +231,20 @@ def resolve_user_from_token(
             request.client.host,
         )
 
+    # Convert quota_limits from string keys to QuotaScope enum keys
+    raw_limits = record.quota_limits or {}
+    quota_limits: dict[QuotaScope, int | None] = {}
+    for scope_key, value in raw_limits.items():
+        try:
+            quota_limits[QuotaScope(scope_key)] = value
+        except ValueError:
+            # Skip invalid quota scope keys
+            logger.warning("Invalid quota scope key in token: %s", scope_key)
+            continue
+
     attributes = {
         "allowed_features": frozenset(record.allowed_features),
-        "quota_limits": record.quota_limits,
+        "quota_limits": quota_limits,
     }
     return ServiceUser(
         user_id=record.user_id,
@@ -266,7 +277,9 @@ def get_request_context(
     # Apply rate limiting if enabled
     if settings.rate_limit_enabled:
         auth_limiter = get_auth_rate_limiter(
-            max_requests=settings.rate_limit_per_minute, window_seconds=60
+            max_requests=settings.rate_limit_per_minute,
+            window_seconds=60,
+            trusted_proxies=settings.rate_limit_trusted_proxies,
         )
         try:
             auth_limiter.check_auth_attempt(request)
@@ -282,7 +295,9 @@ def get_request_context(
         # Record failed attempt if rate limiting is enabled
         if settings.rate_limit_enabled:
             auth_limiter = get_auth_rate_limiter(
-                max_requests=settings.rate_limit_per_minute, window_seconds=60
+                max_requests=settings.rate_limit_per_minute,
+                window_seconds=60,
+                trusted_proxies=settings.rate_limit_trusted_proxies,
             )
             auth_limiter.record_failed_auth(request)
         raise
@@ -290,7 +305,9 @@ def get_request_context(
     # Record successful auth if rate limiting is enabled
     if settings.rate_limit_enabled:
         auth_limiter = get_auth_rate_limiter(
-            max_requests=settings.rate_limit_per_minute, window_seconds=60
+            max_requests=settings.rate_limit_per_minute,
+            window_seconds=60,
+            trusted_proxies=settings.rate_limit_trusted_proxies,
         )
         auth_limiter.record_successful_auth(request)
 

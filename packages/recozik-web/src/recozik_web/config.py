@@ -45,6 +45,7 @@ class WebSettings(BaseSettings):
     cors_origins: list[str] = []
     rate_limit_enabled: bool = True
     rate_limit_per_minute: int = 60
+    rate_limit_trusted_proxies: int = 0
     allowed_upload_extensions: list[str] = [
         ".mp3",
         ".flac",
@@ -56,27 +57,20 @@ class WebSettings(BaseSettings):
         ".wma",
     ]
 
-    @field_validator("admin_token")
-    @classmethod
-    def validate_admin_token(cls, value: str, info) -> str:
-        """Ensure admin token is secure in production mode."""
-        production_mode = info.data.get("production_mode", False)
-        if production_mode and value == "dev-admin":
-            msg = (
-                "SECURITY ERROR: Default admin token detected in production mode!\n"
-                "Set RECOZIK_WEB_ADMIN_TOKEN to a secure random value.\n"
-                f"Example: RECOZIK_WEB_ADMIN_TOKEN={secrets.token_urlsafe(32)}"
-            )
-            print(msg, file=sys.stderr)
-            raise ValueError(msg)
-        return value
-
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value) -> list[str]:
         """Parse CORS origins from comma-separated string or list."""
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value or []
+
+    @field_validator("allowed_upload_extensions", mode="before")
+    @classmethod
+    def normalize_extensions(cls, value) -> list[str]:
+        """Normalize file extensions to lowercase."""
+        if isinstance(value, list):
+            return [ext.lower() if isinstance(ext, str) else ext for ext in value]
         return value or []
 
     @model_validator(mode="after")
@@ -88,6 +82,19 @@ class WebSettings(BaseSettings):
             msg = "upload_subdir must be a relative, safe path"
             raise ValueError(msg)
         self.upload_subdir = subdir.as_posix()
+        return self
+
+    @model_validator(mode="after")
+    def _validate_production_security(self) -> WebSettings:
+        """Ensure admin token is secure in production mode."""
+        if self.production_mode and self.admin_token == "dev-admin":  # noqa: S105
+            msg = (
+                "SECURITY ERROR: Default admin token detected in production mode!\n"
+                "Set RECOZIK_WEB_ADMIN_TOKEN to a secure random value.\n"
+                f"Example: RECOZIK_WEB_ADMIN_TOKEN={secrets.token_urlsafe(32)}"
+            )
+            print(msg, file=sys.stderr)
+            raise ValueError(msg)
         return self
 
     @property

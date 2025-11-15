@@ -51,6 +51,7 @@ export RECOZIK_WEB_AUDD_TOKEN="your-audd-token"  # Optional
 # Security settings
 export RECOZIK_WEB_RATE_LIMIT_ENABLED=true
 export RECOZIK_WEB_RATE_LIMIT_PER_MINUTE=60
+export RECOZIK_WEB_RATE_LIMIT_TRUSTED_PROXIES=0  # Set to 1+ if behind proxy
 export RECOZIK_WEB_MAX_UPLOAD_MB=32
 
 # CORS (if serving a web frontend)
@@ -116,7 +117,18 @@ Rate limiting is **enabled by default** to prevent brute-force attacks and API a
 ```bash
 export RECOZIK_WEB_RATE_LIMIT_ENABLED=true
 export RECOZIK_WEB_RATE_LIMIT_PER_MINUTE=60  # Max requests per minute per IP
+export RECOZIK_WEB_RATE_LIMIT_TRUSTED_PROXIES=0  # Number of trusted proxies (default: 0)
 ```
+
+### Trusted Proxies
+
+If your application is behind a reverse proxy (nginx, traefik, etc.), set `RECOZIK_WEB_RATE_LIMIT_TRUSTED_PROXIES` to the number of proxies in your infrastructure:
+
+- `0` (default): Don't trust X-Forwarded-For headers (most secure, direct connections only)
+- `1`: Behind one proxy (e.g., nginx → app)
+- `2`: Behind two proxies (e.g., cloudflare → nginx → app)
+
+**SECURITY WARNING**: Only set this if you control the proxy infrastructure. An incorrect value allows attackers to bypass rate limiting by spoofing the X-Forwarded-For header.
 
 ### Behavior
 
@@ -124,6 +136,7 @@ export RECOZIK_WEB_RATE_LIMIT_PER_MINUTE=60  # Max requests per minute per IP
 - Failed authentication attempts are logged with client IP
 - HTTP 429 (Too Many Requests) returned when limit exceeded
 - `Retry-After` header indicates when to retry
+- Rate limits are applied per client IP address
 
 ### Monitoring Rate Limits
 
@@ -309,6 +322,7 @@ RECOZIK_WEB_UPLOAD_SUBDIR="uploads"
 # Security
 RECOZIK_WEB_RATE_LIMIT_ENABLED=true
 RECOZIK_WEB_RATE_LIMIT_PER_MINUTE=60
+RECOZIK_WEB_RATE_LIMIT_TRUSTED_PROXIES=0
 RECOZIK_WEB_MAX_UPLOAD_MB=32
 
 # CORS
