@@ -105,6 +105,7 @@ known-first-party = ["recozik", "recozik_core"]
 "packages/recozik-web/src/recozik_web/app.py" = ["B008"]
 "packages/recozik-web/src/recozik_web/auth.py" = ["B008"]
 "src/recozik/commands/**/*.py" = ["B008"]
+"src/recozik/cli.py" = ["B008"]
 
 [tool.uv.sources]
 recozik-core = { workspace = true }
