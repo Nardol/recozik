@@ -276,8 +276,9 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     if not path_value.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing audio path")
 
-    # Disallow absolute paths and path traversal components.
-    relative_path = Path(path_value)
+    # Normalize separators and disallow absolute paths/traversal.
+    normalized_path = path_value.replace("\\", "/")
+    relative_path = Path(normalized_path)
     if relative_path.is_absolute() or ".." in relative_path.parts:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
