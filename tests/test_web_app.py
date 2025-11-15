@@ -30,7 +30,11 @@ def _override_settings(tmp_path: Path) -> WebSettings:
 
 
 def _bootstrap_app(monkeypatch, tmp_path: Path, settings: WebSettings):
-    """Reload FastAPI modules so they pick up test settings."""
+    """Reload FastAPI modules so they pick up test settings.
+
+    Warning: This reload-based bootstrap is tightly coupled to module init order.
+    Adjustments to recozik_web startup code may require updating this helper.
+    """
 
     def _get_settings() -> WebSettings:
         return settings
@@ -106,7 +110,7 @@ def test_identify_from_path_invokes_service(monkeypatch, web_app) -> None:
 
     captured_paths: list[Path] = []
 
-    def fake_identify(request, **kwargs):
+    def fake_identify(request, **_kwargs):
         captured_paths.append(request.audio_path)
         return fake_response
 
@@ -183,7 +187,7 @@ def test_identify_upload_invokes_service(monkeypatch, web_app) -> None:
         audd_error=None,
     )
 
-    def fake_identify(request, **kwargs):
+    def fake_identify(request, **_kwargs):
         return fake_response
 
     monkeypatch.setattr(app_module, "identify_track", fake_identify)
@@ -251,7 +255,7 @@ def test_job_websocket_stream(monkeypatch, web_app) -> None:
         audd_error=None,
     )
 
-    def slow_identify(*args, **kwargs):
+    def slow_identify(*_args, **_kwargs):
         time.sleep(0.05)
         return fake_response
 
@@ -318,7 +322,11 @@ def test_admin_can_manage_tokens(monkeypatch, web_app) -> None:
         audd_error=None,
     )
 
-    monkeypatch.setattr(app_module, "identify_track", lambda *args, **kwargs: fake_response)
+    monkeypatch.setattr(
+        app_module,
+        "identify_track",
+        lambda *_args, **_kwargs: fake_response,
+    )
     media_root.joinpath("clip.wav").write_bytes(b"audio")
 
     resp_identify = client.post(

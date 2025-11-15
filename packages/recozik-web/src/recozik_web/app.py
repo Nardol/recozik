@@ -90,11 +90,6 @@ class JobCallbacks(LoggingCallbacks):
         super().info(message)
         self.repo.append_message(self.job_id, message)
 
-
-def _ensure_admin(context: RequestContext) -> None:
-    if "admin" not in context.user.roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
-
     def warning(self, message: str) -> None:  # pragma: no cover - logging wrapper
         """Record warning-level callback output."""
         super().warning(message)
@@ -104,6 +99,11 @@ def _ensure_admin(context: RequestContext) -> None:
         """Record error-level callback output."""
         super().error(message)
         self.repo.append_message(self.job_id, message)
+
+
+def _ensure_admin(context: RequestContext) -> None:
+    if "admin" not in context.user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
 
 
 class IdentifyRequestPayload(BaseModel):
@@ -479,7 +479,7 @@ async def _persist_upload(upload: UploadFile, settings: WebSettings) -> Path:
     if max_bytes == 0:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail="Upload exceeds configured size limit",
+            detail="File uploads are disabled (max_upload_mb=0)",
         )
 
     written = 0
