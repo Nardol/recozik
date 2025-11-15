@@ -274,31 +274,26 @@ async def identify_from_upload(
 
 
 def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
-    if not path_value.strip():
+    if not path_value or not path_value.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing audio path")
 
-    # Normalize separators and disallow absolute paths/traversal.
-    normalized_path = path_value.replace("\\", "/")
+    # Normalize to POSIX-style separators and create a relative Path object.
+    normalized_path = path_value.strip().replace("\\", "/")
     relative_path = Path(normalized_path)
-    if relative_path.is_absolute() or ".." in relative_path.parts:
+
+    # Disallow absolute, rooted, or traversal paths.
+    if relative_path.is_absolute() or any(part == ".." for part in relative_path.parts):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Absolute paths or directory traversal components are not allowed.",
         )
 
     media_root = settings.base_media_root.resolve()
-    resolved_path = (media_root / relative_path).resolve()
+    candidate_path = (media_root / relative_path).resolve()
 
-    # Add a normalization guard to satisfy CodeQL.
-    normalized = os.path.normpath(resolved_path)
-    if not normalized.startswith(str(media_root)):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
-        )
-
-    # Ensure the resolved path is within the media root directory.
+    # Ensure the candidate path is within media_root.
     try:
-        if not resolved_path.is_relative_to(media_root):
+        if not candidate_path.is_relative_to(media_root):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
             )
@@ -308,9 +303,9 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         ) from None
 
-    if not resolved_path.is_file():
+    if not candidate_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
-    return resolved_path
+    return candidate_path
 
 
 def _build_identify_request(
