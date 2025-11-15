@@ -23,6 +23,7 @@ The CLI is built using the Typer framework, but most business logic is exposed v
 - `src/recozik/commands/`: Thin adapters that gather CLI options, build request dataclasses, and delegate to the service layer.
 - `src/recozik/cli_support/`: Re-export shims for shared helpers (locale, prompts, filesystem utilities) hosted in `recozik-services`.
 - `packages/recozik-services/src/recozik_services/`: Service layer consumed by the CLI, tests, and future GUIs (identify/batch/rename runners, callback protocols, shared utilities). The new `security.py` module defines auth/quota policies (with allow-all defaults) so every frontend enforces consistent access limits.
+- `packages/recozik-web/src/recozik_web/`: FastAPI backend module that reuses `recozik-services` and exposes HTTP endpoints with token-based auth/quota enforcement (including async upload → job queue + polling/WebSocket APIs) for future GUIs.
 - `packages/recozik-core/src/recozik_core/`: Core primitives (fingerprinting, AudD integration, caching, config, gettext locales).
 - `tests/`: Contains the pytest test suite (`tests/test_services.py` exercises the service APIs directly).
 - `scripts/`: Utility scripts, such as for compiling translations or measuring import time.

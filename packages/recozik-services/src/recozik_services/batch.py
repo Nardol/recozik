@@ -138,12 +138,12 @@ def run_batch_identify(
 
         if not response.matches:
             unmatched += 1
-            note_parts = [_("No match.")]
+            unmatched_note_parts = [_("No match.")]
             if response.audd_error:
-                note_parts.append(
+                unmatched_note_parts.append(
                     _("AudD lookup failed: {error}").format(error=response.audd_error)
                 )
-            note = " ".join(note_parts)
+            unmatched_note = " ".join(unmatched_note_parts)
             if log_consumer:
                 log_consumer(
                     BatchFileResult(
@@ -152,7 +152,7 @@ def run_batch_identify(
                         fingerprint=response.fingerprint,
                         matches=[],
                         status="unmatched",
-                        note=note,
+                        note=unmatched_note,
                         error=None,
                         metadata=response.metadata,
                     )
@@ -160,13 +160,15 @@ def run_batch_identify(
             continue
 
         selected = response.matches[:effective_limit]
-        note_parts: list[str] = []
+        success_note_parts: list[str] = []
         if response.match_source == "audd":
             callbacks.info(_("AudD identified {path}.").format(path=display_path))
-            note_parts.append(response.audd_note or _("Source: AudD."))
+            success_note_parts.append(response.audd_note or _("Source: AudD."))
         if response.audd_error and response.match_source != "audd":
-            note_parts.append(_("AudD lookup failed: {error}").format(error=response.audd_error))
-        note = " ".join(note_parts) if note_parts else None
+            success_note_parts.append(
+                _("AudD lookup failed: {error}").format(error=response.audd_error)
+            )
+        success_note: str | None = " ".join(success_note_parts) if success_note_parts else None
         success += 1
         if log_consumer:
             log_consumer(
@@ -176,7 +178,7 @@ def run_batch_identify(
                     fingerprint=response.fingerprint,
                     matches=selected,
                     status="ok",
-                    note=note,
+                    note=success_note,
                     error=None,
                     metadata=None,
                 )
