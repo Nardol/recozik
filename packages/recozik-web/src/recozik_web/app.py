@@ -248,24 +248,28 @@ async def identify_from_upload(
         )
 
     temp_path = await _persist_upload(file, settings)
-    payload = IdentifyRequestPayload(
-        audio_path=str(temp_path),
-        refresh_cache=refresh_cache,
-        metadata_fallback=metadata_fallback,
-        prefer_audd=prefer_audd,
-        force_audd_enterprise=force_audd_enterprise,
-        enable_audd=enable_audd,
-    )
-    repo = get_job_repository(settings.jobs_database_url_resolved)
-    job = repo.create_job(user_id=context.user.user_id or "anonymous")
-    background_tasks.add_task(
-        _run_identify_job,
-        job.id,
-        temp_path,
-        payload,
-        settings,
-        context,
-    )
+    try:
+        payload = IdentifyRequestPayload(
+            audio_path=str(temp_path),
+            refresh_cache=refresh_cache,
+            metadata_fallback=metadata_fallback,
+            prefer_audd=prefer_audd,
+            force_audd_enterprise=force_audd_enterprise,
+            enable_audd=enable_audd,
+        )
+        repo = get_job_repository(settings.jobs_database_url_resolved)
+        job = repo.create_job(user_id=context.user.user_id or "anonymous")
+        background_tasks.add_task(
+            _run_identify_job,
+            job.id,
+            temp_path,
+            payload,
+            settings,
+            context,
+        )
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
     return JobSummaryModel(job_id=job.id, status=job.status)
 
 
