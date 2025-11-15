@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -287,19 +288,26 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
             detail="Absolute paths or directory traversal components are not allowed.",
         )
 
+    # Get absolute media root path
     media_root = settings.base_media_root.resolve()
-    candidate_path = (media_root / relative_path).resolve()
+    media_root_str = str(media_root)
 
-    # Ensure the candidate path is strictly contained within media_root.
-    try:
-        candidate_path.relative_to(media_root)
-    except ValueError:
+    # Construct and normalize the full path WITHOUT following symlinks
+    # Using os.path.normpath instead of Path.resolve() prevents symlink attacks
+    candidate_str = os.path.normpath(os.path.join(media_root_str, normalized_path))
+
+    # Verify the normalized path is still within media_root
+    if not candidate_str.startswith(media_root_str + os.sep) and candidate_str != media_root_str:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         )
 
+    candidate_path = Path(candidate_str)
+
+    # Verify the path points to an actual file
     if not candidate_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
+
     return candidate_path
 
 
