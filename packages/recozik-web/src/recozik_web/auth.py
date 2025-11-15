@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from recozik_services.security import (
     AccessDeniedError,
     AccessPolicy,
@@ -19,8 +20,12 @@ from recozik_services.security import (
 
 from .auth_store import TokenRecord, ensure_seed_tokens, get_token_repository
 from .config import WebSettings, get_settings
+from .persistent_quota import get_persistent_quota_policy
+from .rate_limit import get_auth_rate_limiter
 
 API_TOKEN_HEADER = "X-API-Token"  # noqa: S105 - header name, not credential
+
+logger = logging.getLogger("recozik.web.auth")
 
 
 @dataclass(frozen=True)
@@ -81,7 +86,7 @@ class InMemoryQuotaPolicy(QuotaPolicy):
 
 
 _ACCESS_POLICY = TokenAccessPolicy()
-_QUOTA_POLICY = InMemoryQuotaPolicy()
+# Note: _QUOTA_POLICY is created lazily in get_request_context to access settings
 
 
 @dataclass
@@ -185,13 +190,47 @@ def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
     return defaults
 
 
-def resolve_user_from_token(token: str, settings: WebSettings) -> ServiceUser:
-    """Return the ServiceUser matching the provided API token."""
+def resolve_user_from_token(
+    token: str, settings: WebSettings, *, request: Request | None = None
+) -> ServiceUser:
+    """Return the ServiceUser matching the provided API token.
+
+    Args:
+        token: API token to validate
+        settings: Application settings
+        request: Optional request object for logging
+
+    Returns:
+        ServiceUser instance if token is valid
+
+    Raises:
+        HTTPException: 401 if token is invalid
+
+    """
     repo = get_token_repository(settings.auth_database_url_resolved)
     ensure_seed_tokens(repo, defaults=_seed_defaults(settings))
     record = repo.get(token)
+
     if not record:
+        # Log failed authentication attempt
+        client_ip = "unknown"
+        if request and request.client:
+            client_ip = request.client.host
+        logger.warning(
+            "Failed authentication attempt with invalid token from IP %s (token: %s...)",
+            client_ip,
+            token[:8] if len(token) >= 8 else "***",
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API token")
+
+    # Log successful authentication
+    if request and request.client:
+        logger.info(
+            "Successful authentication for user '%s' from IP %s",
+            record.user_id,
+            request.client.host,
+        )
+
     attributes = {
         "allowed_features": frozenset(record.allowed_features),
         "quota_limits": record.quota_limits,
@@ -206,9 +245,58 @@ def resolve_user_from_token(token: str, settings: WebSettings) -> ServiceUser:
 
 
 def get_request_context(
+    request: Request,
     api_token: str = Header(..., alias=API_TOKEN_HEADER),
     settings: WebSettings = Depends(get_settings),
 ) -> RequestContext:
-    """FastAPI dependency injecting ServiceUser + policies."""
-    user = resolve_user_from_token(api_token, settings)
-    return RequestContext(user=user, access_policy=_ACCESS_POLICY, quota_policy=_QUOTA_POLICY)
+    """FastAPI dependency injecting ServiceUser + policies.
+
+    Args:
+        request: FastAPI Request object
+        api_token: API token from header
+        settings: Application settings
+
+    Returns:
+        RequestContext with user and policies
+
+    Raises:
+        HTTPException: 429 if rate limit exceeded, 401 if auth fails
+
+    """
+    # Apply rate limiting if enabled
+    if settings.rate_limit_enabled:
+        auth_limiter = get_auth_rate_limiter(
+            max_requests=settings.rate_limit_per_minute, window_seconds=60
+        )
+        try:
+            auth_limiter.check_auth_attempt(request)
+        except HTTPException:
+            client_ip = request.client.host if request.client else "unknown"
+            logger.warning("Rate limit exceeded for IP %s", client_ip)
+            raise
+
+    # Resolve user from token
+    try:
+        user = resolve_user_from_token(api_token, settings, request=request)
+    except HTTPException:
+        # Record failed attempt if rate limiting is enabled
+        if settings.rate_limit_enabled:
+            auth_limiter = get_auth_rate_limiter(
+                max_requests=settings.rate_limit_per_minute, window_seconds=60
+            )
+            auth_limiter.record_failed_auth(request)
+        raise
+
+    # Record successful auth if rate limiting is enabled
+    if settings.rate_limit_enabled:
+        auth_limiter = get_auth_rate_limiter(
+            max_requests=settings.rate_limit_per_minute, window_seconds=60
+        )
+        auth_limiter.record_successful_auth(request)
+
+    # Use persistent quota policy
+    quota_policy = get_persistent_quota_policy(
+        database_url=settings.auth_database_url_resolved, window_hours=24
+    )
+
+    return RequestContext(user=user, access_policy=_ACCESS_POLICY, quota_policy=quota_policy)
