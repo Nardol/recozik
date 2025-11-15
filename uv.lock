@@ -1342,7 +1342,6 @@ dev = [
 test = [
     { name = "pytest" },
     { name = "pytest-mock" },
-    { name = "typer" },
 ]
 
 [package.metadata]
@@ -1366,7 +1365,6 @@ dev = [
 test = [
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-mock", specifier = ">=3.15.1" },
-    { name = "typer", specifier = ">=0.20.0" },
 ]
 
 [[package]]
