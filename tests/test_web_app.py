@@ -155,7 +155,7 @@ def test_identify_rejects_traversal(web_app) -> None:
         headers={"X-API-Token": API_TOKEN},
     )
     assert response.status_code == 400
-    assert "invalid" in response.json()["detail"].lower()
+    assert "traversal" in response.json()["detail"].lower()
 
 
 def test_identify_rejects_absolute_path(web_app) -> None:

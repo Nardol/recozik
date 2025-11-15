@@ -88,7 +88,7 @@ class JobCallbacks(LoggingCallbacks):
         self.repo.append_message(self.job_id, message)
 
 
-def _ensure_admin(context: RequestContext) -> None:
+def _ensure_admin(context: RequestContext = Depends(get_request_context)) -> None:
     if "admin" not in context.user.roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
 
@@ -277,35 +277,32 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     if not path_value.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing audio path")
 
-    raw_value = path_value.replace("\\", "/")
-    if raw_value.startswith("/"):
+    # Disallow absolute paths and path traversal components.
+    relative_path = Path(path_value)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Absolute paths disabled"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Absolute paths or directory traversal components are not allowed.",
         )
 
-    if ".." in Path(raw_value).parts:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path segments in audio_path"
-        )
+    media_root = settings.base_media_root.resolve()
+    resolved_path = (media_root / relative_path).resolve()
 
-    base_root = str(settings.base_media_root.resolve())
-    normalized = os.path.normpath(os.path.join(base_root, raw_value))
-    base_prefix = base_root if base_root.endswith(os.sep) else f"{base_root}{os.sep}"
-    if not normalized.startswith(base_prefix):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
-        )
-
-    resolved = Path(normalized).resolve()
-    resolved_str = str(resolved)
-    if not resolved_str.startswith(base_prefix):
+    # Ensure the resolved path is within the media root directory.
+    try:
+        if not resolved_path.is_relative_to(media_root):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
+            )
+    except ValueError:
+        # This occurs on Windows if the path is on a different drive.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
         )
 
-    if not resolved.is_file():
+    if not resolved_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found")
-    return resolved
+    return resolved_path
 
 
 def _build_identify_request(
@@ -488,9 +485,6 @@ async def _persist_upload(upload: UploadFile, settings: WebSettings) -> Path:
     upload_dir = settings.upload_directory
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    suffix = Path(upload.filename or "").suffix
-    temp_path = upload_dir / f"{uuid4().hex}{suffix}"
-
     max_bytes = max(settings.max_upload_mb, 0) * 1024 * 1024
     if max_bytes == 0:
         raise HTTPException(
@@ -498,27 +492,36 @@ async def _persist_upload(upload: UploadFile, settings: WebSettings) -> Path:
             detail="File uploads are disabled (max_upload_mb=0)",
         )
 
+    # Sanitize the filename to prevent directory traversal or invalid characters.
+    filename = Path(upload.filename or "").name
+    suffix = Path(filename).suffix
+    temp_path = upload_dir / f"{uuid4().hex}{suffix}"
+
     written = 0
     chunk_size = 1024 * 64
-    with temp_path.open("wb") as buffer:
-        while True:
-            chunk = await upload.read(chunk_size)
-            if not chunk:
-                break
-            written += len(chunk)
-            if written > max_bytes:
-                buffer.close()
-                temp_path.unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                    detail="Upload exceeds configured size limit",
-                )
-            buffer.write(chunk)
-    await upload.close()
+    try:
+        with temp_path.open("wb") as buffer:
+            while True:
+                chunk = await upload.read(chunk_size)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > max_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        detail="Upload exceeds configured size limit",
+                    )
+                buffer.write(chunk)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+    finally:
+        await upload.close()
 
     if written == 0:
         temp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload")
+
     return temp_path
 
 
@@ -543,17 +546,17 @@ async def job_updates(websocket: WebSocket, job_id: str) -> None:
     logger.debug("WebSocket connect for %s", job_id)
     token = websocket.headers.get(API_TOKEN_HEADER) or websocket.query_params.get("token")
     settings = get_settings()
+
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     try:
-        if not token:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-            return
         user = resolve_user_from_token(token, settings)
         repo = get_job_repository(settings.jobs_database_url_resolved)
         job = repo.get(job_id)
-        if job is None:
-            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
-            return
-        if not _job_is_accessible(job, user):
+
+        if job is None or not _job_is_accessible(job, user):
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
@@ -566,11 +569,10 @@ async def job_updates(websocket: WebSocket, job_id: str) -> None:
             while True:
                 payload = await queue.get()
                 await websocket.send_json(payload)
-        except WebSocketDisconnect:
+        finally:
             notifier.unsubscribe(job_id, queue)
-        except Exception:
-            notifier.unsubscribe(job_id, queue)
-            raise
+    except WebSocketDisconnect:
+        logger.debug("WebSocket for job %s disconnected.", job_id)
     except Exception:  # pragma: no cover - defensive logging
         logger.exception("WebSocket error for job %s", job_id)
         with contextlib.suppress(Exception):
@@ -579,11 +581,10 @@ async def job_updates(websocket: WebSocket, job_id: str) -> None:
 
 @app.get("/admin/tokens", response_model=list[TokenResponseModel])
 def list_tokens(
-    context: RequestContext = Depends(get_request_context),
     settings: WebSettings = Depends(get_settings),
+    _: None = Depends(_ensure_admin),
 ) -> list[TokenResponseModel]:
     """Return all stored tokens (admin only)."""
-    _ensure_admin(context)
     repo = get_token_repository(settings.auth_database_url_resolved)
     records = repo.list_tokens()
     return [
@@ -602,11 +603,10 @@ def list_tokens(
 @app.post("/admin/tokens", response_model=TokenResponseModel)
 def create_token(
     payload: TokenCreateModel,
-    context: RequestContext = Depends(get_request_context),
     settings: WebSettings = Depends(get_settings),
+    _: None = Depends(_ensure_admin),
 ) -> TokenResponseModel:
     """Create or update API tokens (admin only)."""
-    _ensure_admin(context)
     repo = get_token_repository(settings.auth_database_url_resolved)
     token_value = payload.token or uuid4().hex
     record = TokenRecord(
