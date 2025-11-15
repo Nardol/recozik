@@ -472,6 +472,10 @@ def _run_identify_job(
     except IdentifyServiceError as exc:
         repo.append_message(job_id, f"Error: {exc}")
         repo.set_status(job_id, JobStatus.FAILED, error=str(exc))
+    except Exception as exc:  # pragma: no cover - defensive safety net
+        logger.exception("Unexpected error while processing job %s", job_id)
+        repo.append_message(job_id, f"Unexpected error: {exc}")
+        repo.set_status(job_id, JobStatus.FAILED, error="Unexpected error during processing")
     else:
         serialized = _serialize_response(response).model_dump()
         repo.set_status(job_id, JobStatus.COMPLETED, result=serialized)
