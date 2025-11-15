@@ -295,7 +295,9 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     candidate_path_str = str(candidate_path)
     if not (
         candidate_path_str == media_root_str
-        or candidate_path_str.startswith(media_root_str + str(candidate_path.anchor or candidate_path.root or "/"))
+        or candidate_path_str.startswith(
+            media_root_str + str(candidate_path.anchor or candidate_path.root or "/")
+        )
         or candidate_path_str.startswith(media_root_str + "/")  # For POSIX systems
     ):
         raise HTTPException(
