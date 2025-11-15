@@ -48,7 +48,11 @@ class TokenRepository:
         with Session(self._engine) as session:
             session.merge(record)
             session.commit()
-            return session.get(TokenRecord, record.token)
+            stored = session.get(TokenRecord, record.token)
+            if stored is None:  # pragma: no cover - defensive, merge ensures a row exists
+                msg = "Failed to persist token record"
+                raise RuntimeError(msg)
+            return stored
 
 
 _REPOSITORIES: dict[str, TokenRepository] = {}

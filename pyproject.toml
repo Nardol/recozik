@@ -115,9 +115,12 @@ members = ["packages/*"]
 [tool.mypy]
 python_version = "3.10"
 strict_optional = true
-namespace_packages = true
+namespace_packages = false
+explicit_package_bases = false
 ignore_missing_imports = true
 files = [
     "packages/recozik-core/src/recozik_core",
+    "packages/recozik-services/src/recozik_services",
+    "packages/recozik-web/src/recozik_web",
     "src/recozik",
 ]
