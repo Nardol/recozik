@@ -40,6 +40,7 @@ from recozik_services.security import (
     ServiceFeature,
     ServiceUser,
 )
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
@@ -58,7 +59,68 @@ from .token_utils import (
 logger = logging.getLogger("recozik.web")
 security_logger = logging.getLogger("recozik.web.security")
 
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Apply hardened HTTP response headers."""
+
+    def __init__(
+        self,
+        app,
+        *,
+        strict_transport: str | None,
+        content_security_policy: str | None,
+        referrer_policy: str | None,
+        permissions_policy: str | None,
+    ) -> None:
+        """Store header templates for later injection."""
+        super().__init__(app)
+        self.strict_transport = strict_transport
+        self.content_security_policy = content_security_policy
+        self.referrer_policy = referrer_policy
+        self.permissions_policy = permissions_policy
+
+    async def dispatch(self, request: Request, call_next):
+        """Inject the configured headers into the outgoing response."""
+        response = await call_next(request)
+        if self.strict_transport:
+            response.headers.setdefault("strict-transport-security", self.strict_transport)
+        response.headers.setdefault("x-frame-options", "DENY")
+        response.headers.setdefault("x-content-type-options", "nosniff")
+        if self.referrer_policy:
+            response.headers.setdefault("referrer-policy", self.referrer_policy)
+        if self.content_security_policy:
+            response.headers.setdefault("content-security-policy", self.content_security_policy)
+        if self.permissions_policy:
+            response.headers.setdefault("permissions-policy", self.permissions_policy)
+        return response
+
+
 app = FastAPI(title="Recozik Web API", version="0.1.0")
+
+
+def _configure_security_headers() -> None:
+    settings = get_settings()
+    if not settings.security_headers_enabled:
+        return
+
+    max_age = max(settings.security_hsts_max_age, 0)
+    sts_parts = [f"max-age={max_age}"]
+    if settings.security_hsts_include_subdomains:
+        sts_parts.append("includeSubDomains")
+    if settings.security_hsts_preload:
+        sts_parts.append("preload")
+    strict_transport = "; ".join(sts_parts)
+
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        strict_transport=strict_transport,
+        content_security_policy=settings.security_csp,
+        referrer_policy=settings.security_referrer_policy,
+        permissions_policy=settings.security_permissions_policy,
+    )
+
+
+_configure_security_headers()
 
 
 # Configure application on startup
@@ -78,6 +140,9 @@ def configure_security() -> None:
             expose_headers=["X-API-Token"],
         )
         logger.info("CORS enabled for origins: %s", settings.cors_origins)
+
+    if settings.security_headers_enabled:
+        logger.info("Security headers middleware enabled")
 
 
 @app.middleware("http")

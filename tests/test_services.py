@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from recozik_services.batch import BatchRequest, run_batch_identify
 from recozik_services.cli_support.musicbrainz import MusicBrainzOptions, build_settings
+from recozik_services.cli_support.paths import discover_audio_files
 from recozik_services.identify import (
     AudDConfig,
     IdentifyRequest,
@@ -563,6 +564,27 @@ def test_rename_service_rejects_outside_root(tmp_path):
     assert summary.applied == 0
     assert summary.errors >= 1
     assert not (root / "Artist - Song.flac").exists()
+
+
+def test_discover_audio_files_skips_symlinks(tmp_path):
+    """Symlinked files should be ignored during discovery."""
+    root = tmp_path / "music"
+    root.mkdir()
+    real = root / "track.flac"
+    real.write_bytes(b"data")
+    alias = root / "alias.flac"
+    alias.symlink_to(real)
+
+    files = list(
+        discover_audio_files(
+            root,
+            recursive=False,
+            patterns=[],
+            extensions={".flac"},
+        )
+    )
+
+    assert files == [real.resolve()]
 
 
 def test_rename_service_creates_backup(tmp_path):

@@ -34,10 +34,13 @@ def discover_audio_files(
     extensions: set[str],
 ) -> Iterable[Path]:
     """Yield audio files matching the provided selection criteria."""
+    base_dir = base_dir.resolve()
     seen: set[Path] = set()
 
     def should_keep(path: Path) -> bool:
         try:
+            if path.is_symlink():
+                return False
             if not path.is_file():
                 return False
         except OSError:

@@ -110,6 +110,35 @@ curl -X POST https://api.example.com/admin/tokens \
 - **readonly**: Limited to identification endpoints with quotas
 - **user**: Custom role with configurable permissions
 
+### Auditing Stored Tokens
+
+Run the helper script to verify that all tokens use the hardened PBKDF2 format and to
+list their public hints:
+
+```bash
+uv run python scripts/token_audit.py \
+  --database-url "sqlite:////var/lib/recozik/auth.db"
+```
+
+Use the `--json` flag if you prefer structured output for automation.
+
+### Security Headers
+
+Recozik enables HTTP security headers by default (HSTS, CSP, frame protection, and
+referrer policy). Fine-tune them via the following environment variables:
+
+```bash
+export RECOZIK_WEB_SECURITY_HEADERS_ENABLED=true
+export RECOZIK_WEB_SECURITY_CSP="default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+export RECOZIK_WEB_SECURITY_REFERRER_POLICY="same-origin"
+export RECOZIK_WEB_SECURITY_HSTS_MAX_AGE=63072000
+export RECOZIK_WEB_SECURITY_HSTS_INCLUDE_SUBDOMAINS=true
+export RECOZIK_WEB_SECURITY_HSTS_PRELOAD=false
+```
+
+Set `RECOZIK_WEB_SECURITY_HEADERS_ENABLED=false` only when a downstream proxy injects the
+headers instead.
+
 ---
 
 ## Rate Limiting

@@ -102,6 +102,16 @@ def test_health_endpoint(web_app) -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_security_headers_enabled(web_app) -> None:
+    """Security middleware should add hardened headers."""
+    client, _, _, _ = web_app
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers["x-frame-options"] == "DENY"
+    csp = response.headers.get("content-security-policy", "")
+    assert "default-src" in csp
+
+
 def test_identify_requires_token(web_app) -> None:
     """Missing auth header should cause a 422 error at validation time."""
     client, media_root, _, _ = web_app
