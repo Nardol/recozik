@@ -202,7 +202,11 @@ def config_set_key(
         key = (api_key_opt or api_key_arg or "").strip()
 
         if key:
-            confirmation = typer.prompt(_("Confirm the key"), default=key)
+            confirmation = typer.prompt(
+                _("Confirm the key"),
+                show_default=False,
+                hide_input=True,
+            )
             if confirmation.strip() != key:
                 typer.echo(_("The keys do not match. Operation cancelled."))
                 raise typer.Exit(code=1)
@@ -289,7 +293,11 @@ def config_set_audd_token(
     else:
         token = (token_opt or token_arg or "").strip()
         if token:
-            confirmation = typer.prompt(_("Confirm the token"), default=token, show_default=False)
+            confirmation = typer.prompt(
+                _("Confirm the token"),
+                show_default=False,
+                hide_input=True,
+            )
             if confirmation.strip() != token:
                 typer.echo(_("The tokens do not match. Operation cancelled."))
                 raise typer.Exit(code=1)

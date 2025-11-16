@@ -34,7 +34,13 @@ from recozik_services import (
     identify_track,
 )
 from recozik_services.cli_support.musicbrainz import MusicBrainzOptions, build_settings
-from recozik_services.security import AccessPolicyError, QuotaPolicyError, ServiceUser
+from recozik_services.security import (
+    AccessPolicyError,
+    QuotaPolicyError,
+    ServiceFeature,
+    ServiceUser,
+)
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
@@ -43,11 +49,78 @@ from .auth import API_TOKEN_HEADER, RequestContext, get_request_context, resolve
 from .auth_store import TokenRecord, get_token_repository
 from .config import WebSettings, get_settings
 from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
+from .token_utils import (
+    format_token_hint,
+    hash_token_for_storage,
+    hint_from_raw,
+    token_hint_from_stored,
+)
 
 logger = logging.getLogger("recozik.web")
 security_logger = logging.getLogger("recozik.web.security")
 
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Apply hardened HTTP response headers."""
+
+    def __init__(
+        self,
+        app,
+        *,
+        strict_transport: str | None,
+        content_security_policy: str | None,
+        referrer_policy: str | None,
+        permissions_policy: str | None,
+    ) -> None:
+        """Store header templates for later injection."""
+        super().__init__(app)
+        self.strict_transport = strict_transport
+        self.content_security_policy = content_security_policy
+        self.referrer_policy = referrer_policy
+        self.permissions_policy = permissions_policy
+
+    async def dispatch(self, request: Request, call_next):
+        """Inject the configured headers into the outgoing response."""
+        response = await call_next(request)
+        if self.strict_transport:
+            response.headers.setdefault("strict-transport-security", self.strict_transport)
+        response.headers.setdefault("x-frame-options", "DENY")
+        response.headers.setdefault("x-content-type-options", "nosniff")
+        if self.referrer_policy:
+            response.headers.setdefault("referrer-policy", self.referrer_policy)
+        if self.content_security_policy:
+            response.headers.setdefault("content-security-policy", self.content_security_policy)
+        if self.permissions_policy:
+            response.headers.setdefault("permissions-policy", self.permissions_policy)
+        return response
+
+
 app = FastAPI(title="Recozik Web API", version="0.1.0")
+
+
+def _configure_security_headers() -> None:
+    settings = get_settings()
+    if not settings.security_headers_enabled:
+        return
+
+    max_age = max(settings.security_hsts_max_age, 0)
+    sts_parts = [f"max-age={max_age}"]
+    if settings.security_hsts_include_subdomains:
+        sts_parts.append("includeSubDomains")
+    if settings.security_hsts_preload:
+        sts_parts.append("preload")
+    strict_transport = "; ".join(sts_parts)
+
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        strict_transport=strict_transport,
+        content_security_policy=settings.security_csp,
+        referrer_policy=settings.security_referrer_policy,
+        permissions_policy=settings.security_permissions_policy,
+    )
+
+
+_configure_security_headers()
 
 
 # Configure application on startup
@@ -67,6 +140,9 @@ def configure_security() -> None:
             expose_headers=["X-API-Token"],
         )
         logger.info("CORS enabled for origins: %s", settings.cors_origins)
+
+    if settings.security_headers_enabled:
+        logger.info("Security headers middleware enabled")
 
 
 @app.middleware("http")
@@ -218,7 +294,8 @@ class JobDetailModel(JobSummaryModel):
 class TokenResponseModel(BaseModel):
     """Serialized token metadata returned by admin APIs."""
 
-    token: str
+    token: str | None = None
+    token_hint: str
     user_id: str
     display_name: str
     roles: list[str]
@@ -235,6 +312,26 @@ class TokenCreateModel(BaseModel):
     roles: list[str] = Field(default_factory=list)
     allowed_features: list[str] = Field(default_factory=list)
     quota_limits: dict[str, int | None] = Field(default_factory=dict)
+
+
+def _normalize_allowed_feature_inputs(values: list[str]) -> list[str]:
+    """Validate and normalize feature identifiers provided by admins."""
+    if not values:
+        return []
+    allowed: set[str] = set()
+    valid_values = sorted(feature.value for feature in ServiceFeature)
+    valid_display = ", ".join(valid_values)
+    for value in values:
+        candidate = (value or "").strip()
+        if not candidate:
+            continue
+        if candidate not in valid_values:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown feature '{candidate}'. Valid options: {valid_display}",
+            )
+        allowed.add(candidate)
+    return sorted(allowed)
 
 
 @app.get("/health")
@@ -347,7 +444,8 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
         )
 
     # Get absolute media root path as string
-    media_root_str = str(settings.base_media_root.resolve())
+    media_root_path = settings.base_media_root.resolve()
+    media_root_str = str(media_root_path)
 
     # Construct and normalize the candidate path using os.path operations (works on strings)
     # This prevents CodeQL from tracking the Path object taint flow
@@ -366,7 +464,7 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
 
     # Secondary validation using Path.relative_to
     try:
-        safe_path.relative_to(media_root_str)
+        safe_path.relative_to(media_root_path)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Path outside media root"
@@ -378,7 +476,28 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     if not safe_path.is_file():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Path is not a file")
 
-    return safe_path
+    if safe_path.is_symlink():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Symbolic links are not allowed.",
+        )
+
+    resolved_path = safe_path.resolve()
+    try:
+        resolved_path.relative_to(media_root_path)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Path outside media root",
+        ) from exc
+
+    if resolved_path.is_symlink():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target path must not be a symbolic link.",
+        )
+
+    return resolved_path
 
 
 def _build_identify_request(
@@ -503,12 +622,19 @@ def _ensure_job_access(job: JobRecord, context: RequestContext) -> None:
 @app.get("/whoami")
 def whoami(context: RequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Return details about the token (useful for quick diagnostics)."""
-    allowed = context.user.attributes.get("allowed_features", [])
+    allowed = context.user.attributes.get("allowed_features", frozenset())
+    if isinstance(allowed, (set, frozenset)):
+        allowed_display = sorted(
+            feature.value if isinstance(feature, ServiceFeature) else str(feature)
+            for feature in allowed
+        )
+    else:
+        allowed_display = list(allowed)
     return {
         "user_id": context.user.user_id,
         "display_name": context.user.display_name,
         "roles": list(context.user.roles),
-        "allowed_features": list(allowed),
+        "allowed_features": allowed_display,
     }
 
 
@@ -686,7 +812,8 @@ def list_tokens(
     records = repo.list_tokens()
     return [
         TokenResponseModel(
-            token=record.token,
+            token=None,
+            token_hint=format_token_hint(token_hint_from_stored(record.token)),
             user_id=record.user_id,
             display_name=record.display_name,
             roles=record.roles,
@@ -706,17 +833,20 @@ def create_token(
     """Create or update API tokens (admin only)."""
     repo = get_token_repository(settings.auth_database_url_resolved)
     token_value = payload.token or uuid4().hex
+    stored_token_value = hash_token_for_storage(token_value)
+    normalized_features = _normalize_allowed_feature_inputs(payload.allowed_features)
     record = TokenRecord(
-        token=token_value,
+        token=stored_token_value,
         user_id=payload.user_id,
         display_name=payload.display_name,
         roles=payload.roles,
-        allowed_features=payload.allowed_features,
+        allowed_features=normalized_features,
         quota_limits=payload.quota_limits,
     )
     repo.upsert(record)
     return TokenResponseModel(
-        token=record.token,
+        token=token_value,
+        token_hint=format_token_hint(hint_from_raw(token_value)),
         user_id=record.user_id,
         display_name=record.display_name,
         roles=record.roles,

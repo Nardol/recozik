@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from importlib import import_module, reload
 from pathlib import Path
@@ -9,8 +10,11 @@ from pathlib import Path
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
-from recozik_services.identify import IdentifyResponse
+from recozik_services.identify import IdentifyResponse, IdentifyServiceError
+from recozik_services.security import AccessPolicyError, ServiceFeature
+from recozik_web.auth_store import get_token_repository
 from recozik_web.config import WebSettings
+from recozik_web.token_utils import TOKEN_HASH_PREFIX
 from starlette.websockets import WebSocketDisconnect
 
 from recozik_core.fingerprint import AcoustIDMatch, FingerprintResult, ReleaseInfo
@@ -68,15 +72,22 @@ def web_app_fixture(monkeypatch, tmp_path: Path):
     return _bootstrap_app(monkeypatch, tmp_path, settings)
 
 
-def _create_token(client: TestClient, token_value: str, user_id: str) -> str:
+def _create_token(
+    client: TestClient,
+    token_value: str,
+    user_id: str,
+    *,
+    allowed_features: list[str] | None = None,
+    quota_limits: dict[str, int | None] | None = None,
+) -> str:
     """Create an API token through the admin endpoint for test purposes."""
     payload = {
         "token": token_value,
         "user_id": user_id,
         "display_name": user_id,
         "roles": [],
-        "allowed_features": ["identify"],
-        "quota_limits": {},
+        "allowed_features": allowed_features if allowed_features is not None else ["identify"],
+        "quota_limits": quota_limits or {},
     }
     resp = client.post("/admin/tokens", json=payload, headers={"X-API-Token": API_TOKEN})
     assert resp.status_code == 200, resp.text
@@ -89,6 +100,16 @@ def test_health_endpoint(web_app) -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_security_headers_enabled(web_app) -> None:
+    """Security middleware should add hardened headers."""
+    client, _, _, _ = web_app
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers["x-frame-options"] == "DENY"
+    csp = response.headers.get("content-security-policy", "")
+    assert "default-src" in csp
 
 
 def test_identify_requires_token(web_app) -> None:
@@ -169,6 +190,31 @@ def test_identify_rejects_absolute_path(web_app) -> None:
     )
     assert response.status_code == 400
     assert "absolute paths" in response.json()["detail"].lower()
+
+
+def test_identify_rejects_symlink_escape(web_app, tmp_path) -> None:
+    """Symlinks pointing outside the media root must be rejected."""
+    if not hasattr(os, "symlink"):
+        pytest.skip("symlink handling not supported on this platform")
+
+    client, media_root, _, _ = web_app
+    # Create a secret file outside the media root.
+    secret_target = tmp_path.parent / f"{tmp_path.name}-secret.flac"
+    secret_target.write_bytes(b"secret-data")
+
+    symlink_path = media_root / "leak.flac"
+    try:
+        symlink_path.symlink_to(secret_target)
+    except OSError as exc:  # pragma: no cover - platform dependent
+        pytest.skip(f"symlink creation not permitted: {exc}")
+
+    response = client.post(
+        "/identify/from-path",
+        json={"audio_path": symlink_path.name},
+        headers={"X-API-Token": API_TOKEN},
+    )
+    assert response.status_code == 400
+    assert "symbolic" in response.json()["detail"].lower()
 
 
 def test_whoami_returns_context(web_app) -> None:
@@ -328,7 +374,22 @@ def test_job_detail_rejects_other_user(monkeypatch, web_app) -> None:
         audd_note=None,
         audd_error=None,
     )
-    monkeypatch.setattr(app_module, "identify_track", lambda *_args, **_kwargs: fake_response)
+
+    def _guarded_identify(*_args, **kwargs):
+        access_policy = kwargs.get("access_policy")
+        user = kwargs.get("user")
+        if access_policy and user:
+            try:
+                access_policy.ensure_feature(
+                    user,
+                    ServiceFeature.IDENTIFY,
+                    context=kwargs,
+                )
+            except AccessPolicyError as exc:
+                raise IdentifyServiceError(str(exc)) from exc
+        return fake_response
+
+    monkeypatch.setattr(app_module, "identify_track", _guarded_identify)
 
     resp = client.post(
         "/identify/upload",
@@ -367,7 +428,18 @@ def test_job_websocket_rejects_other_user(monkeypatch, web_app) -> None:
         audd_note=None,
         audd_error=None,
     )
-    monkeypatch.setattr(app_module, "identify_track", lambda *_args, **_kwargs: fake_response)
+
+    def _guarded_identify(*_args, **kwargs):
+        access_policy = kwargs.get("access_policy")
+        user = kwargs.get("user")
+        if access_policy and user:
+            try:
+                access_policy.ensure_feature(user, ServiceFeature.IDENTIFY, context=kwargs)
+            except AccessPolicyError as exc:
+                raise IdentifyServiceError(str(exc)) from exc
+        return fake_response
+
+    monkeypatch.setattr(app_module, "identify_track", _guarded_identify)
 
     resp = client.post(
         "/identify/upload",
@@ -385,6 +457,99 @@ def test_job_websocket_rejects_other_user(monkeypatch, web_app) -> None:
         ) as websocket:
             websocket.receive_json()
     assert excinfo.value.code == status.WS_1008_POLICY_VIOLATION
+
+
+def test_admin_tokens_hide_secret(web_app) -> None:
+    """Admin token listing must never leak stored token hashes."""
+    client, _, _, settings = web_app
+    token_value = "custom-secret-token"  # noqa: S105 - deterministic test fixture
+    resp = client.post(
+        "/admin/tokens",
+        json={
+            "token": token_value,
+            "user_id": "auditor",
+            "display_name": "auditor",
+            "roles": [],
+            "allowed_features": ["identify"],
+            "quota_limits": {},
+        },
+        headers={"X-API-Token": API_TOKEN},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["token"] == token_value
+    assert body["token_hint"].endswith(token_value[-4:])
+
+    listing = client.get("/admin/tokens", headers={"X-API-Token": API_TOKEN})
+    assert listing.status_code == 200
+    entries = listing.json()
+    stored = next(entry for entry in entries if entry["user_id"] == "auditor")
+    assert stored["token"] is None
+    assert stored["token_hint"].endswith(token_value[-4:])
+
+    repo = get_token_repository(settings.auth_database_url_resolved)
+    stored_record = next(record for record in repo.list_tokens() if record.user_id == "auditor")
+    assert stored_record.token.startswith(TOKEN_HASH_PREFIX)
+
+
+def test_restricted_token_denies_missing_feature(monkeypatch, web_app) -> None:
+    """Tokens without the identify feature must not access identify endpoints."""
+    client, media_root, app_module, _ = web_app
+    limited_token = _create_token(
+        client,
+        "rename-only-token",
+        "rename-only",
+        allowed_features=["rename"],
+    )
+
+    target = media_root / "clip.wav"
+    target.write_bytes(b"audio")
+
+    whoami = client.get("/whoami", headers={"X-API-Token": limited_token})
+    assert whoami.status_code == 200
+    assert whoami.json()["allowed_features"] == ["rename"]
+
+    fingerprint = FingerprintResult(fingerprint="abc", duration_seconds=5.0)
+    match = AcoustIDMatch(
+        score=0.9,
+        recording_id="rec",
+        title="Track",
+        artist="Artist",
+        releases=[],
+    )
+    fake_response = IdentifyResponse(
+        fingerprint=fingerprint,
+        matches=[match],
+        match_source="acoustid",
+        metadata=None,
+        audd_note=None,
+        audd_error=None,
+    )
+
+    def _guarded_identify(*_args, **kwargs):
+        access_policy = kwargs.get("access_policy")
+        user = kwargs.get("user")
+        if access_policy and user:
+            try:
+                access_policy.ensure_feature(
+                    user,
+                    ServiceFeature.IDENTIFY,
+                    context=kwargs,
+                )
+            except AccessPolicyError as exc:
+                raise IdentifyServiceError(str(exc)) from exc
+        return fake_response
+
+    monkeypatch.setattr(app_module, "identify_track", _guarded_identify)
+
+    response = client.post(
+        "/identify/from-path",
+        json={"audio_path": target.name},
+        headers={"X-API-Token": limited_token},
+    )
+
+    assert response.status_code == 403
+    assert "identify" in response.json()["detail"].lower()
 
 
 def test_admin_can_manage_tokens(monkeypatch, web_app) -> None:

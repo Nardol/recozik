@@ -22,6 +22,7 @@ from .auth_store import TokenRecord, ensure_seed_tokens, get_token_repository
 from .config import WebSettings, get_settings
 from .persistent_quota import get_persistent_quota_policy
 from .rate_limit import get_auth_rate_limiter
+from .token_utils import TOKEN_HASH_PREFIX, compare_token, hash_token_for_storage
 
 API_TOKEN_HEADER = "X-API-Token"  # noqa: S105 - header name, not credential
 
@@ -38,6 +39,17 @@ class TokenRule:
     roles: tuple[str, ...]
     allowed_features: tuple[ServiceFeature, ...]
     quota_limits: Mapping[QuotaScope, int | None]
+
+
+def _convert_allowed_features(values: list[str]) -> frozenset[ServiceFeature]:
+    """Return a frozenset of ServiceFeature enums, ignoring unknown entries."""
+    converted: set[ServiceFeature] = set()
+    for value in values:
+        try:
+            converted.add(ServiceFeature(value))
+        except ValueError:
+            logger.warning("Ignoring unknown feature on token: %s", value)
+    return frozenset(converted)
 
 
 class TokenAccessPolicy(AccessPolicy):
@@ -157,7 +169,7 @@ def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
 
     defaults.append(
         TokenRecord(
-            token=settings.admin_token,
+            token=hash_token_for_storage(settings.admin_token),
             user_id="admin",
             display_name="Administrator",
             roles=["admin"],
@@ -178,7 +190,7 @@ def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
 
         defaults.append(
             TokenRecord(
-                token=settings.readonly_token,
+                token=hash_token_for_storage(settings.readonly_token),
                 user_id="readonly",
                 display_name="Readonly",
                 roles=["readonly"],
@@ -193,26 +205,12 @@ def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
 def resolve_user_from_token(
     token: str, settings: WebSettings, *, request: Request | None = None
 ) -> ServiceUser:
-    """Return the ServiceUser matching the provided API token.
-
-    Args:
-        token: API token to validate
-        settings: Application settings
-        request: Optional request object for logging
-
-    Returns:
-        ServiceUser instance if token is valid
-
-    Raises:
-        HTTPException: 401 if token is invalid
-
-    """
+    """Return the ServiceUser matching the provided API token."""
     repo = get_token_repository(settings.auth_database_url_resolved)
     ensure_seed_tokens(repo, defaults=_seed_defaults(settings))
-    record = repo.get(token)
+    record = repo.find_by_token_value(token)
 
-    if not record:
-        # Log failed authentication attempt (without token for security)
+    if record is None or not compare_token(token, record.token):
         client_ip = "unknown"
         if request and request.client:
             client_ip = request.client.host
@@ -223,7 +221,6 @@ def resolve_user_from_token(
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API token")
 
-    # Log successful authentication
     if request and request.client:
         logger.info(
             "Successful authentication for user '%s' from IP %s",
@@ -231,19 +228,22 @@ def resolve_user_from_token(
             request.client.host,
         )
 
-    # Convert quota_limits from string keys to QuotaScope enum keys
+    if not record.token.startswith(TOKEN_HASH_PREFIX):
+        updated = repo.replace_token_value(record.token, hash_token_for_storage(token))
+        if updated:
+            record = updated
+
     raw_limits = record.quota_limits or {}
     quota_limits: dict[QuotaScope, int | None] = {}
     for scope_key, value in raw_limits.items():
         try:
             quota_limits[QuotaScope(scope_key)] = value
         except ValueError:
-            # Skip invalid quota scope keys
             logger.warning("Invalid quota scope key in token: %s", scope_key)
             continue
 
     attributes = {
-        "allowed_features": frozenset(record.allowed_features),
+        "allowed_features": _convert_allowed_features(record.allowed_features),
         "quota_limits": quota_limits,
     }
     return ServiceUser(

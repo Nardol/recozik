@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlmodel import JSON, Column, Field, Session, SQLModel, create_engine, select
 
+from .token_utils import compare_token
+
 
 class TokenRecord(SQLModel, table=True):
     """Stored representation of an API token."""
@@ -53,6 +55,37 @@ class TokenRepository:
                 msg = "Failed to persist token record"
                 raise RuntimeError(msg)
             return stored
+
+    def replace_token_value(self, old_token: str, new_token: str) -> TokenRecord | None:
+        """Replace a legacy plaintext token with a hashed value."""
+        with Session(self._engine) as session:
+            record = session.get(TokenRecord, old_token)
+            if record is None:
+                return None
+            session.delete(record)
+            session.commit()
+
+            updated = TokenRecord(
+                token=new_token,
+                user_id=record.user_id,
+                display_name=record.display_name,
+                roles=list(record.roles),
+                allowed_features=list(record.allowed_features),
+                quota_limits=dict(record.quota_limits or {}),
+            )
+            session.add(updated)
+            session.commit()
+            session.refresh(updated)
+            return updated
+
+    def find_by_token_value(self, token_value: str) -> TokenRecord | None:
+        """Return the first record matching the provided token value."""
+        with Session(self._engine) as session:
+            statement = select(TokenRecord)
+            for record in session.exec(statement):
+                if compare_token(token_value, record.token):
+                    return record
+        return None
 
 
 _REPOSITORIES: dict[str, TokenRepository] = {}

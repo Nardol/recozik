@@ -56,6 +56,13 @@ class WebSettings(BaseSettings):
         ".opus",
         ".wma",
     ]
+    security_headers_enabled: bool = True
+    security_csp: str | None = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    security_referrer_policy: str = "same-origin"
+    security_permissions_policy: str | None = None
+    security_hsts_max_age: int = 63072000
+    security_hsts_include_subdomains: bool = True
+    security_hsts_preload: bool = False
 
     @field_validator("cors_origins", mode="before")
     @classmethod

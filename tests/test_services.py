@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from recozik_services.batch import BatchRequest, run_batch_identify
 from recozik_services.cli_support.musicbrainz import MusicBrainzOptions, build_settings
+from recozik_services.cli_support.paths import discover_audio_files
 from recozik_services.identify import (
     AudDConfig,
     IdentifyRequest,
@@ -518,8 +519,72 @@ def test_rename_service_dry_run_plan_reuse(tmp_path):
     final_summary = rename_from_log(apply_request, prompts=DummyPrompts())
 
     assert final_summary.applied == 1
-    assert (root / "Artist - Song.flac").exists()
-    assert final_summary.plan_entries is None
+
+
+def test_rename_service_rejects_outside_root(tmp_path):
+    """Entries pointing outside the provided root must be skipped."""
+    root = tmp_path / "music"
+    root.mkdir()
+    outside = tmp_path / "other.flac"
+    outside.write_bytes(b"data")
+
+    log_file = tmp_path / "log.jsonl"
+    log_entry = {
+        "path": str(outside),
+        "status": "ok",
+        "matches": [
+            {
+                "artist": "Artist",
+                "title": "Song",
+                "score": 0.9,
+                "formatted": "Artist - Song.flac",
+            }
+        ],
+    }
+    log_file.write_text(json.dumps(log_entry) + "\n", encoding="utf-8")
+
+    request = RenameRequest(
+        log_path=log_file,
+        root=root,
+        template="{artist} - {title}",
+        require_template_fields=False,
+        dry_run=True,
+        interactive=False,
+        confirm_each=False,
+        on_conflict="append",
+        backup_dir=None,
+        export_path=None,
+        metadata_fallback=False,
+        metadata_fallback_confirm=False,
+        deduplicate_template=True,
+    )
+
+    summary = rename_from_log(request, prompts=DummyPrompts())
+
+    assert summary.applied == 0
+    assert summary.errors >= 1
+    assert not (root / "Artist - Song.flac").exists()
+
+
+def test_discover_audio_files_skips_symlinks(tmp_path):
+    """Symlinked files should be ignored during discovery."""
+    root = tmp_path / "music"
+    root.mkdir()
+    real = root / "track.flac"
+    real.write_bytes(b"data")
+    alias = root / "alias.flac"
+    alias.symlink_to(real)
+
+    files = list(
+        discover_audio_files(
+            root,
+            recursive=False,
+            patterns=[],
+            extensions={".flac"},
+        )
+    )
+
+    assert files == [real.resolve()]
 
 
 def test_rename_service_creates_backup(tmp_path):

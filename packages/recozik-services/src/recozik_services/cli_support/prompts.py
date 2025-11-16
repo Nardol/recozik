@@ -35,10 +35,10 @@ def prompt_yes_no(message: str, *, default: bool = True, require_answer: bool = 
 
 def prompt_api_key() -> str | None:
     """Prompt the user for an AcoustID API key."""
-    key = typer.prompt(_("AcoustID API key"), show_default=False).strip()
+    key = typer.prompt(_("AcoustID API key"), show_default=False, hide_input=True).strip()
     if not key:
         return None
-    confirmation = typer.prompt(_("Confirm the key"), default=key, show_default=False).strip()
+    confirmation = typer.prompt(_("Confirm the key"), show_default=False, hide_input=True).strip()
     if confirmation != key:
         typer.echo(_("The keys do not match."))
         return None
@@ -47,11 +47,11 @@ def prompt_api_key() -> str | None:
 
 def prompt_service_token(label: str, *, confirm_label: str | None = None) -> str | None:
     """Prompt the user for a generic service token with confirmation."""
-    token = typer.prompt(label, show_default=False).strip()
+    token = typer.prompt(label, show_default=False, hide_input=True).strip()
     if not token:
         return None
     confirmation_label = confirm_label or _("Confirm the token")
-    confirmation = typer.prompt(confirmation_label, default=token, show_default=False).strip()
+    confirmation = typer.prompt(confirmation_label, show_default=False, hide_input=True).strip()
     if confirmation != token:
         typer.echo(_("The tokens do not match."))
         return None
