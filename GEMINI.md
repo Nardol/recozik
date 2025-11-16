@@ -41,6 +41,11 @@ uv sync --all-groups
 # Frontend workspace
 cd packages/recozik-webui
 npm install
+
+# Optional: Docker Compose (backend + frontend + Nginx)
+cd docker
+cp .env.example .env
+docker compose up --build
 ```
 
 - **Run a CLI command:**

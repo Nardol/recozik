@@ -30,4 +30,4 @@ npm run build
 npm run start -- --hostname 0.0.0.0 --port 3000
 ```
 
-Set `NEXT_PUBLIC_RECOZIK_API_BASE` in `.env.local` to the backend base URL before building. See `docs/deploy-frontend.md` for deployment instructions (bare-metal + optional container notes).
+Set `NEXT_PUBLIC_RECOZIK_API_BASE` in `.env.local` to the backend base URL before building (the Docker stack defaults to `/api`). See `docs/deploy-frontend.md` for deployment instructions (bare-metal + container recipe).

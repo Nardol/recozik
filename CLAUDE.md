@@ -22,6 +22,11 @@ uv sync --all-groups
 # Frontend (Next.js dashboard)
 cd packages/recozik-webui
 npm install
+
+# Docker (optional full stack)
+cd docker
+cp .env.example .env  # edit tokens/keys
+docker compose up --build
 ```
 
 ### Running the CLI
@@ -91,6 +96,10 @@ uv run python scripts/compile_translations.py
 ```bash
 # Build wheel and sdist for release validation
 uv build
+
+# Build dashboard assets (Next.js)
+cd packages/recozik-webui
+npm run build
 ```
 
 ## Architecture

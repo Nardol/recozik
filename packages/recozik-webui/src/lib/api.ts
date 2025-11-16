@@ -1,6 +1,5 @@
 const API_BASE =
-  process.env.NEXT_PUBLIC_RECOZIK_API_BASE?.replace(/\/$/, "") ??
-  "http://localhost:8000";
+  process.env.NEXT_PUBLIC_RECOZIK_API_BASE?.replace(/\/$/, "") ?? "/api";
 
 async function apiFetch<T>(
   path: string,

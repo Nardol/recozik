@@ -37,6 +37,16 @@ Recozik now ships with a shared FastAPI backend plus an accessible Next.js dashb
 - See [docs/deploy-backend.md](docs/deploy-backend.md) to run the HTTP API (token management, upload jobs, WebSocket streaming).
 - See [docs/deploy-frontend.md](docs/deploy-frontend.md) to build and deploy the screen-reader friendly dashboard under `packages/recozik-webui`.
 
+Quick start with Docker Compose:
+
+```bash
+cd docker
+cp .env.example .env  # edit tokens/keys
+docker compose up --build
+```
+
+Browse <http://localhost:8080> for the dashboard; the backend API lives under `/api`.
+
 The dashboard talks to the backend via API tokens, so existing CLI users can reuse their credentials while administrators manage fine-grained permissions (including AudD access) from a browser.
 
 ## Prerequisites

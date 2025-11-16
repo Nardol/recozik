@@ -89,10 +89,22 @@ sudo systemctl enable --now recozik-web.service
 - `GET /whoami` confirms token metadata.
 - `GET /jobs/{id}` and `WS /ws/jobs/{id}` validate job persistence and streaming.
 
-## 6. Future containerization
+## 6. Containerized deployment (Docker Compose)
 
-The backend works bare-metal, but you can containerize it later by:
+The repository ships with ready-to-use Docker definitions under `docker/`:
 
-1. Copying `pyproject.toml`, `uv.lock`, and `packages/recozik-*` into an image.
-2. Running `uv sync --locked` at build time.
-3. Exposing port 8000 and mounting the media root as a volume.
+```bash
+cd docker
+cp .env.example .env  # edit tokens/keys inside
+docker compose up --build
+```
+
+This stack launches three containers:
+
+1. **backend** – Python image built from `docker/backend.Dockerfile`, storing uploads/SQLite data under the `recozik-data` volume (mounted at `/data`).
+2. **frontend** – Next.js dashboard served via `npm run start` (see `docker/frontend.Dockerfile`).
+3. **nginx** – Fronts both services on port `8080`, exposing:
+   - `http://localhost:8080` → dashboard
+   - `http://localhost:8080/api` → FastAPI REST endpoints
+
+Update `.env` with your production tokens/keys before deploying. The Compose setup is also handy for local development if you don't want to maintain a bare-metal Nginx installation.

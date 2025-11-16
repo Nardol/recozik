@@ -23,6 +23,7 @@
 - `uv run mypy` – Run static type checks (entire `src/recozik` + `recozik_core` must stay clean).
 - `uv run pytest` – Run the full automated test suite.
 - `cd packages/recozik-webui && npm install && npm run lint` – Install frontend dependencies and run Next.js lint/type checks (required before touching the dashboard).
+- `cd docker && docker compose up --build` – Optional full-stack environment (backend + frontend + Nginx). Update `docker/.env` with real tokens/keys before sharing instructions.
 
 > **Permission reminder:** Always request elevated permissions before running any `uv` command (`uv run …`, `uv sync …`, etc.).
 

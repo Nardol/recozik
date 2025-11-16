@@ -1,0 +1,7 @@
+.git
+.venv
+node_modules
+packages/recozik-webui/node_modules
+packages/recozik-webui/.next
+dist
+build

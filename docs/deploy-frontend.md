@@ -59,27 +59,17 @@ Ensure both origins share the same top-level domain so that browsers treat them 
 - Navigate via keyboard only (Tab/Shift+Tab) and ensure focus outlines are visible.
 - Run `npm run lint` to execute ESLint + Next.js type checks.
 
-## 6. Future Docker image (optional)
+## 6. Containerized deployment (Docker Compose)
 
-1. Create a `Dockerfile` similar to:
+To spin up the backend, dashboard, and Nginx with a single command:
 
-   ```Dockerfile
-   FROM node:20-alpine AS builder
-   WORKDIR /app
-   COPY package*.json ./
-   RUN npm install
-   COPY . .
-   RUN npm run build
+```bash
+cd docker
+cp .env.example .env  # customise tokens + API keys
+docker compose up --build
+```
 
-   FROM node:20-alpine
-   WORKDIR /app
-   ENV NODE_ENV=production
-   COPY --from=builder /app .
-   EXPOSE 3000
-   CMD ["npm", "run", "start", "--", "--hostname", "0.0.0.0", "--port", "3000"]
-   ```
+- Dashboard: <http://localhost:8080>
+- Backend API: <http://localhost:8080/api>
 
-2. Pass `NEXT_PUBLIC_RECOZIK_API_BASE` via `docker run -e` or Docker Compose.
-3. Mount a persistent volume if you want to customise `public/` assets at runtime.
-
-This optional containerization path keeps the main deployment story simple while documenting how future contributors can rely on Docker.
+The frontend container defaults to `NEXT_PUBLIC_RECOZIK_API_BASE=/api`, so browsers automatically target the same origin served by Nginx. Override the variable in `.env` if you expose the stack under a different hostname or path.
