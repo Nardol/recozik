@@ -9,7 +9,6 @@ import secrets
 from typing import Final
 
 TOKEN_HASH_PREFIX: Final = "pbkdf2-sha256$"  # noqa: S105 - identifier prefix
-LEGACY_SHA256_PREFIX: Final = "sha256$"
 PBKDF2_ITERATIONS: Final = 200_000
 PBKDF2_SALT_BYTES: Final = 16
 
@@ -53,10 +52,6 @@ def compare_token(candidate: str, stored: str) -> bool:
         expected_digest = _decode_bytes(digest_b64)
         candidate_pbkdf2 = _pbkdf2_digest(candidate, salt, iterations_value)
         return hmac.compare_digest(expected_digest, candidate_pbkdf2)
-    if stored.startswith(LEGACY_SHA256_PREFIX):
-        digest = stored[len(LEGACY_SHA256_PREFIX) :].split(":", 1)[0]
-        legacy_candidate_digest = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
-        return hmac.compare_digest(digest, legacy_candidate_digest)
     # Legacy plaintext token, fall back to direct comparison.
     return hmac.compare_digest(candidate, stored)
 
