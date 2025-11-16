@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlmodel import JSON, Column, Field, Session, SQLModel, create_engine, select
 
+from .token_utils import compare_token
+
 
 class TokenRecord(SQLModel, table=True):
     """Stored representation of an API token."""
@@ -75,6 +77,15 @@ class TokenRepository:
             session.commit()
             session.refresh(updated)
             return updated
+
+    def find_by_token_value(self, token_value: str) -> TokenRecord | None:
+        """Return the first record matching the provided token value."""
+        with Session(self._engine) as session:
+            statement = select(TokenRecord)
+            for record in session.exec(statement):
+                if compare_token(token_value, record.token):
+                    return record
+        return None
 
 
 _REPOSITORIES: dict[str, TokenRepository] = {}

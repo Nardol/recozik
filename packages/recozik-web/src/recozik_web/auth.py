@@ -22,7 +22,7 @@ from .auth_store import TokenRecord, ensure_seed_tokens, get_token_repository
 from .config import WebSettings, get_settings
 from .persistent_quota import get_persistent_quota_policy
 from .rate_limit import get_auth_rate_limiter
-from .token_utils import compare_token, hash_token_for_storage
+from .token_utils import TOKEN_HASH_PREFIX, compare_token, hash_token_for_storage
 
 API_TOKEN_HEADER = "X-API-Token"  # noqa: S105 - header name, not credential
 
@@ -208,16 +208,7 @@ def resolve_user_from_token(
     """Return the ServiceUser matching the provided API token."""
     repo = get_token_repository(settings.auth_database_url_resolved)
     ensure_seed_tokens(repo, defaults=_seed_defaults(settings))
-
-    hashed_token_value = hash_token_for_storage(token)
-    record = repo.get(hashed_token_value)
-
-    if record is None:
-        # Legacy plaintext token - attempt to migrate on the fly.
-        legacy_record = repo.get(token)
-        if legacy_record is not None:
-            migrated = repo.replace_token_value(token, hashed_token_value)
-            record = migrated or legacy_record
+    record = repo.find_by_token_value(token)
 
     if record is None or not compare_token(token, record.token):
         client_ip = "unknown"
@@ -236,6 +227,11 @@ def resolve_user_from_token(
             record.user_id,
             request.client.host,
         )
+
+    if not record.token.startswith(TOKEN_HASH_PREFIX):
+        updated = repo.replace_token_value(record.token, hash_token_for_storage(token))
+        if updated:
+            record = updated
 
     raw_limits = record.quota_limits or {}
     quota_limits: dict[QuotaScope, int | None] = {}
