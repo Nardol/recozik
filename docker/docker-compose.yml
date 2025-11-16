@@ -2,6 +2,7 @@ version: "3.9"
 
 services:
   backend:
+    hostname: backend
     build:
       context: ..
       dockerfile: docker/backend.Dockerfile
@@ -15,6 +16,7 @@ services:
       - recozik-data:/data
 
   frontend:
+    hostname: frontend
     build:
       context: ..
       dockerfile: docker/frontend.Dockerfile
@@ -24,6 +26,7 @@ services:
       - backend
 
   nginx:
+    hostname: nginx
     image: docker.io/library/nginx:1.27
     depends_on:
       - backend
