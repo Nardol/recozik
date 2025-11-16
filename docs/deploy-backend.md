@@ -97,6 +97,8 @@ The repository ships with ready-to-use Docker definitions under `docker/`:
 cd docker
 cp .env.example .env  # edit tokens/keys inside
 docker compose up --build
+# or, with Podman (older releases ship the podman-compose shim):
+# podman-compose up --build
 ```
 
 This stack launches three containers:

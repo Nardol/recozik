@@ -24,7 +24,7 @@ services:
       - backend
 
   nginx:
-    image: nginx:1.27
+    image: docker.io/library/nginx:1.27
     depends_on:
       - backend
       - frontend

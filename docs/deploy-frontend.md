@@ -67,6 +67,8 @@ To spin up the backend, dashboard, and Nginx with a single command:
 cd docker
 cp .env.example .env  # customise tokens + API keys
 docker compose up --build
+# Podman users can rely on the shim:
+# podman-compose up --build
 ```
 
 - Dashboard: <http://localhost:8080>
