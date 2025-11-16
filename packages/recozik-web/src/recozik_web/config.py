@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import secrets
+import sys
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +18,7 @@ class WebSettings(BaseSettings):
 
     admin_token: str = "dev-admin"  # noqa: S105 - default token for local dev
     readonly_token: str | None = None
+    production_mode: bool = False
     acoustid_api_key: str = "demo-key"
     audd_token: str | None = None
     audd_endpoint_standard: str = "https://api.audd.io"
@@ -37,6 +40,39 @@ class WebSettings(BaseSettings):
     jobs_database_url: str | None = None
     auth_database_url: str | None = None
 
+    # Security settings
+    cors_enabled: bool = False
+    cors_origins: list[str] = []
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute: int = 60
+    rate_limit_trusted_proxies: int = 0
+    allowed_upload_extensions: list[str] = [
+        ".mp3",
+        ".flac",
+        ".wav",
+        ".ogg",
+        ".m4a",
+        ".aac",
+        ".opus",
+        ".wma",
+    ]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value) -> list[str]:
+        """Parse CORS origins from comma-separated string or list."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value or []
+
+    @field_validator("allowed_upload_extensions", mode="before")
+    @classmethod
+    def normalize_extensions(cls, value) -> list[str]:
+        """Normalize file extensions to lowercase."""
+        if isinstance(value, list):
+            return [ext.lower() if isinstance(ext, str) else ext for ext in value]
+        return value or []
+
     @model_validator(mode="after")
     def _resolve_media_root(self) -> WebSettings:
         """Normalize the media + upload paths."""
@@ -46,6 +82,19 @@ class WebSettings(BaseSettings):
             msg = "upload_subdir must be a relative, safe path"
             raise ValueError(msg)
         self.upload_subdir = subdir.as_posix()
+        return self
+
+    @model_validator(mode="after")
+    def _validate_production_security(self) -> WebSettings:
+        """Ensure admin token is secure in production mode."""
+        if self.production_mode and self.admin_token == "dev-admin":  # noqa: S105
+            msg = (
+                "SECURITY ERROR: Default admin token detected in production mode!\n"
+                "Set RECOZIK_WEB_ADMIN_TOKEN to a secure random value.\n"
+                f"Example: RECOZIK_WEB_ADMIN_TOKEN={secrets.token_urlsafe(32)}"
+            )
+            print(msg, file=sys.stderr)
+            raise ValueError(msg)
         return self
 
     @property

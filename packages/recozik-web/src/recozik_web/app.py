@@ -17,10 +17,13 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Request,
+    Response,
     UploadFile,
     WebSocket,
     status,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocketDisconnect
 from pydantic import BaseModel, Field
 from recozik_services import (
@@ -42,7 +45,62 @@ from .config import WebSettings, get_settings
 from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
 
 logger = logging.getLogger("recozik.web")
+security_logger = logging.getLogger("recozik.web.security")
+
 app = FastAPI(title="Recozik Web API", version="0.1.0")
+
+
+# Configure application on startup
+@app.on_event("startup")
+def configure_security() -> None:
+    """Configure security middleware and CORS on startup."""
+    settings = get_settings()
+
+    # Configure CORS if enabled
+    if settings.cors_enabled and settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=["*"],
+            expose_headers=["X-API-Token"],
+        )
+        logger.info("CORS enabled for origins: %s", settings.cors_origins)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    """Add security headers to all HTTP responses."""
+    response = await call_next(request)
+
+    # Security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    # Only add HSTS in production with HTTPS
+    settings = get_settings()
+    if settings.production_mode:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    return response
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next) -> Response:
+    """Log all incoming requests for security monitoring."""
+    client_ip = request.client.host if request.client else "unknown"
+    security_logger.info(
+        "%s %s from %s - User-Agent: %s",
+        request.method,
+        request.url.path,
+        client_ip,
+        request.headers.get("user-agent", "unknown"),
+    )
+    response = await call_next(request)
+    return response
 
 
 class LoggingCallbacks:
@@ -512,7 +570,21 @@ async def _persist_upload(upload: UploadFile, settings: WebSettings) -> Path:
 
     # Sanitize the filename to prevent directory traversal or invalid characters.
     filename = Path(upload.filename or "").name
-    suffix = Path(filename).suffix
+    suffix = Path(filename).suffix.lower()
+
+    # Validate file extension
+    if suffix not in settings.allowed_upload_extensions:
+        security_logger.warning(
+            "Upload rejected: invalid extension '%s' (allowed: %s)",
+            suffix,
+            settings.allowed_upload_extensions,
+        )
+        allowed_exts = ", ".join(settings.allowed_upload_extensions)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File extension '{suffix}' not allowed. Allowed: {allowed_exts}",
+        )
+
     temp_path = upload_dir / f"{uuid4().hex}{suffix}"
 
     written = 0
@@ -560,12 +632,19 @@ def get_job_detail(
 
 @app.websocket("/ws/jobs/{job_id}")
 async def job_updates(websocket: WebSocket, job_id: str) -> None:
-    """Stream job updates over WebSocket."""
+    """Stream job updates over WebSocket.
+
+    Security: Token must be provided via X-API-Token header only.
+    Query parameters are not accepted to prevent token leakage in logs.
+    """
     logger.debug("WebSocket connect for %s", job_id)
-    token = websocket.headers.get(API_TOKEN_HEADER) or websocket.query_params.get("token")
+    token = websocket.headers.get(API_TOKEN_HEADER)
     settings = get_settings()
 
     if not token:
+        security_logger.warning(
+            "WebSocket connection rejected: missing token in header for job %s", job_id
+        )
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
