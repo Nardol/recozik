@@ -18,6 +18,10 @@ pip install uv
 
 # Create virtual environment and install all dependencies
 uv sync --all-groups
+
+# Frontend (Next.js dashboard)
+cd packages/recozik-webui
+npm install
 ```
 
 ### Running the CLI
@@ -107,6 +111,7 @@ The codebase is structured for **fast import times** and **maintainability**:
 - **`src/recozik/cli_support/`**: Re-export shims for shared helpers hosted in `recozik-services` (locale, metadata, filesystem, logging, prompts, lazy dependency loaders).
 - **`packages/recozik-services/src/recozik_services/`**: Service layer consumed by the CLI and future GUIs. Exposes identify/batch/rename runners, callback/prompt protocols, and helper utilities. Includes `security.py` where auth/quota policies live (defaulting to allow-all) so every frontend wires consistent access control.
 - **`packages/recozik-web/src/recozik_web/`**: FastAPI backend that consumes `recozik-services`, wires the new auth/quota policies to API tokens, and exposes endpoints such as `/identify/from-path` plus the async `/identify/upload` + job polling/WebSocket endpoints for GUI/automation clients.
+- **`packages/recozik-webui/`**: Next.js/React dashboard that talks to the FastAPI backend. Handles token login, upload workflows, job monitoring (polling + live regions for screen readers), and admin token management.
 
 ### Core Modules
 
@@ -224,3 +229,7 @@ Override with `RECOZIK_CONFIG_FILE` environment variable.
 - Keys are `fingerprint:rounded_duration`
 - TTL enforcement happens at read time (stale entries are ignored)
 - Call `cache.save()` explicitly to persist (not automatic)
+
+# Frontend lint/tests
+
+npm run lint

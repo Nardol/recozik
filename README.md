@@ -30,6 +30,15 @@ Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.or
 
 Recozik is currently in a public alpha phase. Interfaces and outputs may change without notice until the 1.0 release. Track changes in [CHANGELOG.md](CHANGELOG.md) and in the GitHub Releases page.
 
+## Web backend & dashboard
+
+Recozik now ships with a shared FastAPI backend plus an accessible Next.js dashboard:
+
+- See [docs/deploy-backend.md](docs/deploy-backend.md) to run the HTTP API (token management, upload jobs, WebSocket streaming).
+- See [docs/deploy-frontend.md](docs/deploy-frontend.md) to build and deploy the screen-reader friendly dashboard under `packages/recozik-webui`.
+
+The dashboard talks to the backend via API tokens, so existing CLI users can reuse their credentials while administrators manage fine-grained permissions (including AudD access) from a browser.
+
 ## Prerequisites
 
 - Python 3.10 through 3.13 (librosa 0.11+ supports 3.13; Recozik bundles the `standard-*`/`audioop-lts` backfill packages automatically).
