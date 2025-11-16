@@ -47,6 +47,8 @@ docker compose up --build
 
 Browse <http://localhost:8080> for the dashboard; the backend API lives under `/api`.
 
+The default admin API token is `dev-admin` (set via `RECOZIK_WEB_ADMIN_TOKEN` or `RECOZIK_ADMIN_TOKEN` in `docker/.env`). Make sure to override it for production deployments.
+
 The dashboard talks to the backend via API tokens, so existing CLI users can reuse their credentials while administrators manage fine-grained permissions (including AudD access) from a browser.
 
 ## Prerequisites

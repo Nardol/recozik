@@ -7,6 +7,7 @@ import { JobUploader } from "../components/JobUploader";
 import { JobList } from "../components/JobList";
 import { AdminTokenManager } from "../components/AdminTokenManager";
 import { ProfileCard } from "../components/ProfileCard";
+import { NavigationBar } from "../components/NavigationBar";
 import { JobDetail } from "../lib/api";
 
 export default function Home() {
@@ -40,7 +41,7 @@ export default function Home() {
 
   if (!token) {
     return (
-      <main className="container">
+      <main className="container" id="main-content">
         <header>
           <h1>Recozik Web Console</h1>
           <p>
@@ -53,20 +54,29 @@ export default function Home() {
   }
 
   return (
-    <main className="container">
-      <header>
-        <h1>Recozik Web Console</h1>
-        <p className="muted">
-          Monitor identify jobs, trigger uploads, and manage API tokens.
-          Designed for screen readers with clear landmarks and ARIA updates.
-        </p>
-      </header>
-      <ProfileCard />
-      <div className="grid">
-        <JobUploader onJobUpdate={handleJobUpdate} />
-        <JobList jobs={sortedJobs} onUpdate={handleJobUpdate} />
-      </div>
-      <AdminTokenManager />
-    </main>
+    <>
+      <NavigationBar />
+      <main className="container" id="main-content">
+        <header>
+          <h1>Recozik Web Console</h1>
+          <p className="muted">
+            Monitor identify jobs, trigger uploads, and manage API tokens.
+          </p>
+        </header>
+        <ProfileCard />
+        <div className="grid">
+          <JobUploader
+            sectionId="upload-section"
+            onJobUpdate={handleJobUpdate}
+          />
+          <JobList
+            sectionId="jobs-section"
+            jobs={sortedJobs}
+            onUpdate={handleJobUpdate}
+          />
+        </div>
+        <AdminTokenManager sectionId="admin-section" />
+      </main>
+    </>
   );
 }

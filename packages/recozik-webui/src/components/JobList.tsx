@@ -7,9 +7,10 @@ import { useToken } from "./TokenProvider";
 interface Props {
   jobs: JobDetail[];
   onUpdate: (job: JobDetail) => void;
+  sectionId?: string;
 }
 
-export function JobList({ jobs, onUpdate }: Props) {
+export function JobList({ jobs, onUpdate, sectionId }: Props) {
   const { token } = useToken();
 
   useEffect(() => {
@@ -35,7 +36,11 @@ export function JobList({ jobs, onUpdate }: Props) {
 
   if (jobs.length === 0) {
     return (
-      <section aria-labelledby="jobs-title" className="panel">
+      <section
+        id={sectionId}
+        aria-labelledby="jobs-title"
+        className="panel"
+      >
         <h2 id="jobs-title">Jobs</h2>
         <p>No identify jobs yet. Submit an upload to see live results.</p>
       </section>
@@ -43,7 +48,11 @@ export function JobList({ jobs, onUpdate }: Props) {
   }
 
   return (
-    <section aria-labelledby="jobs-title" className="panel">
+    <section
+      id={sectionId}
+      aria-labelledby="jobs-title"
+      className="panel"
+    >
       <h2 id="jobs-title">Jobs</h2>
       <div className="table-wrapper" role="region" aria-live="polite">
         <table>

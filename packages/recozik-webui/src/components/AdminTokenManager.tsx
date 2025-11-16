@@ -17,7 +17,17 @@ const FEATURE_OPTIONS = [
   { key: "musicbrainz_enrich", label: "MusicBrainz" },
 ];
 
-export function AdminTokenManager() {
+const ROLE_OPTIONS = [
+  { key: "admin", label: "Admin" },
+  { key: "operator", label: "Operator" },
+  { key: "readonly", label: "Readonly" },
+];
+
+interface Props {
+  sectionId?: string;
+}
+
+export function AdminTokenManager({ sectionId }: Props) {
   const { token, profile } = useToken();
   const isAdmin = profile?.roles.includes("admin");
   const [records, setRecords] = useState<TokenResponse[]>([]);
@@ -55,17 +65,15 @@ export function AdminTokenManager() {
     const allowed = FEATURE_OPTIONS.filter((feature) =>
       formData.getAll("feature").includes(feature.key),
     ).map((feature) => feature.key);
+    const roles = ROLE_OPTIONS.filter((role) =>
+      formData.getAll("role").includes(role.key),
+    ).map((role) => role.key);
+
     const payload: TokenCreatePayload = {
       token: formData.get("token")?.toString() || undefined,
       user_id: formData.get("user_id")?.toString() ?? "",
       display_name: formData.get("display_name")?.toString() ?? "",
-      roles:
-        formData
-          .get("roles")
-          ?.toString()
-          ?.split(",")
-          .map((role) => role.trim())
-          .filter(Boolean) ?? [],
+      roles,
       allowed_features: allowed,
       quota_limits: {
         acoustid_lookup: parseNullableNumber(formData.get("quota_acoustid")),
@@ -90,7 +98,11 @@ export function AdminTokenManager() {
   };
 
   return (
-    <section aria-labelledby="admin-title" className="panel">
+    <section
+      id={sectionId}
+      aria-labelledby="admin-title"
+      className="panel"
+    >
       <h2 id="admin-title">Admin · Token management</h2>
       <p className="muted">
         Create or update tokens, toggle AudD access, and tune quota policies.
@@ -142,30 +154,33 @@ export function AdminTokenManager() {
         </table>
       </div>
 
-      <form
-        className="stack"
-        onSubmit={handleSubmit}
-        aria-describedby="admin-help"
-      >
+      <form className="stack" onSubmit={handleSubmit}>
         <h3>Create or update a token</h3>
         <div className="grid-2">
           <label>
-            Token (leave empty to auto-generate)
-            <input name="token" type="text" autoComplete="off" />
-          </label>
-          <label>
             User ID
+            <span className="field-hint">
+              Used in logs and quota entries. Keep it short.
+            </span>
             <input name="user_id" type="text" required />
           </label>
           <label>
             Display name
             <input name="display_name" type="text" required />
           </label>
-          <label>
-            Roles (comma-separated)
-            <input name="roles" type="text" placeholder="admin,operator" />
-          </label>
         </div>
+        <fieldset>
+          <legend>Roles</legend>
+          <p className="field-hint">
+            Assign capabilities such as admin access or read-only usage.
+          </p>
+          {ROLE_OPTIONS.map((role) => (
+            <label key={role.key} className="option">
+              <input type="checkbox" name="role" value={role.key} />
+              {role.label}
+            </label>
+          ))}
+        </fieldset>
         <fieldset>
           <legend>Allowed features</legend>
           {FEATURE_OPTIONS.map((feature) => (
@@ -204,13 +219,16 @@ export function AdminTokenManager() {
             <input name="quota_audd" type="number" min="0" placeholder="∞" />
           </label>
         </div>
+        <details className="advanced">
+          <summary>Advanced options</summary>
+          <label>
+            Token (optional, leave blank to auto-generate)
+            <input name="token" type="text" autoComplete="off" />
+          </label>
+        </details>
         <button type="submit" className="primary" disabled={loading}>
           {loading ? "Saving…" : "Save token"}
         </button>
-        <p id="admin-help" className="muted">
-          Tokens are stored in the backend SQLite database defined by{" "}
-          <code>RECOZIK_WEB_AUTH_DB</code>.
-        </p>
       </form>
       <div aria-live="polite" className="status">
         {message}

@@ -6,9 +6,10 @@ import { useToken } from "./TokenProvider";
 
 interface Props {
   onJobUpdate: (job: JobDetail) => void;
+  sectionId?: string;
 }
 
-export function JobUploader({ onJobUpdate }: Props) {
+export function JobUploader({ onJobUpdate, sectionId }: Props) {
   const { token } = useToken();
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,11 @@ export function JobUploader({ onJobUpdate }: Props) {
   };
 
   return (
-    <section aria-labelledby="upload-title" className="panel">
+    <section
+      id={sectionId}
+      aria-labelledby="upload-title"
+      className="panel"
+    >
       <h2 id="upload-title">Upload &amp; identify audio</h2>
       <p className="muted">
         Upload an audio clip to trigger the identify workflow. Jobs are

@@ -26,11 +26,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <a className="visually-hidden" href="#main">
+        <a className="visually-hidden" href="#main-content">
           Skip to content
         </a>
         <TokenProvider>
-          <div id="main">{children}</div>
+          <div id="main-content">{children}</div>
         </TokenProvider>
       </body>
     </html>
