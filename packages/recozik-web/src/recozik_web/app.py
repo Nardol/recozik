@@ -254,7 +254,8 @@ def _normalize_allowed_feature_inputs(values: list[str]) -> list[str]:
     if not values:
         return []
     allowed: set[str] = set()
-    valid_values = {feature.value for feature in ServiceFeature}
+    valid_values = sorted(feature.value for feature in ServiceFeature)
+    valid_display = ", ".join(valid_values)
     for value in values:
         candidate = (value or "").strip()
         if not candidate:
@@ -262,7 +263,7 @@ def _normalize_allowed_feature_inputs(values: list[str]) -> list[str]:
         if candidate not in valid_values:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unknown feature '{candidate}'.",
+                detail=f"Unknown feature '{candidate}'. Valid options: {valid_display}",
             )
         allowed.add(candidate)
     return sorted(allowed)
@@ -428,7 +429,7 @@ def _resolve_audio_path(path_value: str, settings: WebSettings) -> Path:
     if resolved_path.is_symlink():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Symbolic links are not allowed.",
+            detail="Target path must not be a symbolic link.",
         )
 
     return resolved_path
@@ -557,8 +558,11 @@ def _ensure_job_access(job: JobRecord, context: RequestContext) -> None:
 def whoami(context: RequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Return details about the token (useful for quick diagnostics)."""
     allowed = context.user.attributes.get("allowed_features", frozenset())
-    if isinstance(allowed, frozenset):
-        allowed_display = sorted(feature.value for feature in allowed)
+    if isinstance(allowed, (set, frozenset)):
+        allowed_display = sorted(
+            feature.value if isinstance(feature, ServiceFeature) else str(feature)
+            for feature in allowed
+        )
     else:
         allowed_display = list(allowed)
     return {

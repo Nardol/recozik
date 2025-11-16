@@ -100,6 +100,10 @@ curl -X POST https://api.example.com/admin/tokens \
   }'
 ```
 
+> ℹ️ The creation response is the only time the server returns the full token.
+> Subsequent calls to `/admin/tokens` expose only `token_hint`, so copy the value
+> above immediately after creation.
+
 ### Token Roles
 
 - **admin**: Full access to all endpoints including `/admin/*`
