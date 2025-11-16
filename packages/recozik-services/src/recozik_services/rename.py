@@ -251,8 +251,19 @@ def rename_from_log(
                 continue
 
             source_path = Path(raw_path)
-            if not source_path.is_absolute():
+            if source_path.is_absolute():
+                source_path = source_path.resolve()
+            else:
                 source_path = (root_path / source_path).resolve()
+
+            try:
+                source_path.relative_to(root_path)
+            except ValueError:
+                errors += 1
+                callbacks.warning(
+                    _("Entry outside root directory, skipped: {path}").format(path=source_path)
+                )
+                continue
 
             if not source_path.exists():
                 errors += 1

@@ -54,6 +54,28 @@ class TokenRepository:
                 raise RuntimeError(msg)
             return stored
 
+    def replace_token_value(self, old_token: str, new_token: str) -> TokenRecord | None:
+        """Replace a legacy plaintext token with a hashed value."""
+        with Session(self._engine) as session:
+            record = session.get(TokenRecord, old_token)
+            if record is None:
+                return None
+            session.delete(record)
+            session.commit()
+
+            updated = TokenRecord(
+                token=new_token,
+                user_id=record.user_id,
+                display_name=record.display_name,
+                roles=list(record.roles),
+                allowed_features=list(record.allowed_features),
+                quota_limits=dict(record.quota_limits or {}),
+            )
+            session.add(updated)
+            session.commit()
+            session.refresh(updated)
+            return updated
+
 
 _REPOSITORIES: dict[str, TokenRepository] = {}
 
