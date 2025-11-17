@@ -99,6 +99,8 @@ cp .env.example .env  # edit tokens/keys inside
 docker compose up --build
 # or, with Podman (older releases ship the podman-compose shim):
 # podman-compose up --build
+# start the reverse proxy only when needed
+# docker compose --profile reverse-proxy up --build
 ```
 
 This stack launches three containers:

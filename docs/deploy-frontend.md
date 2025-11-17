@@ -69,6 +69,8 @@ cp .env.example .env  # customise tokens + API keys
 docker compose up --build
 # Podman users can rely on the shim:
 # podman-compose up --build
+# Add --profile reverse-proxy if you need Nginx to front the UI/API
+# docker compose --profile reverse-proxy up --build
 ```
 
 - Dashboard: <http://localhost:8080>
