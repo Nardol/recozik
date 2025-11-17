@@ -3,10 +3,11 @@
 import { useI18n } from "../i18n/I18nProvider";
 import { FEATURE_LABELS, ROLE_LABELS } from "../i18n/labels";
 import { useToken } from "./TokenProvider";
+import { logoutAction } from "../app/actions";
 
 export function ProfileCard() {
-  const { profile, clearToken, status } = useToken();
-  const { t } = useI18n();
+  const { profile } = useToken();
+  const { t, locale } = useI18n();
 
   if (!profile) {
     return null;
@@ -42,14 +43,12 @@ export function ProfileCard() {
             {t("profile.features")}: {translatedFeatures || "—"}
           </p>
         </div>
-        <button
-          type="button"
-          className="secondary"
-          onClick={clearToken}
-          disabled={status === "loading"}
-        >
-          {t("profile.forget")}
-        </button>
+        <form action={logoutAction}>
+          <input type="hidden" name="locale" value={locale} />
+          <button type="submit" className="secondary">
+            {t("profile.forget")}
+          </button>
+        </form>
       </div>
     </section>
   );

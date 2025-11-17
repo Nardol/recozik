@@ -36,6 +36,7 @@ Recozik now ships with a shared FastAPI backend plus an accessible Next.js dashb
 
 - See [docs/deploy-backend.md](docs/deploy-backend.md) to run the HTTP API (token management, upload jobs, WebSocket streaming).
 - See [docs/deploy-frontend.md](docs/deploy-frontend.md) to build and deploy the screen-reader-friendly dashboard under `packages/recozik-webui`.
+- The Docker Compose stack stores uploads + SQLite data under `/data` (mount `recozik-data`). Override the location via `RECOZIK_WEB_BASE_MEDIA_ROOT` or change the upload subdirectory with `RECOZIK_WEB_UPLOAD_SUBDIR` in `docker/.env`.
 
 Quick start with Docker Compose:
 

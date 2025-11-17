@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS runtime
+FROM ghcr.io/astral-sh/uv:0.4.4-python3.11-bookworm-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -6,11 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libsndfile1 curl \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        libsndfile1 \
+        ffmpeg \
+        libchromaprint1 \
+        libchromaprint-tools \
     && rm -rf /var/lib/apt/lists/*
-
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && mv /root/.local/bin/uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src

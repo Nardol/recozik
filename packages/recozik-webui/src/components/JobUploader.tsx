@@ -1,63 +1,61 @@
 "use client";
 
-import { FormEvent, useId, useRef, useState } from "react";
-import { JobDetail, uploadJob, fetchJobDetail } from "../lib/api";
+import { useEffect, useId } from "react";
+import { useFormState, useFormStatus } from "react-dom";
+import { JobDetail } from "../lib/api";
 import { useI18n } from "../i18n/I18nProvider";
-import { useToken } from "./TokenProvider";
+import { DEFAULT_UPLOAD_STATE, uploadAction } from "../app/actions";
 
 interface Props {
   onJobUpdate: (job: JobDetail) => void;
   sectionId?: string;
 }
 
+function SubmitButton({
+  submitting,
+  idle,
+}: {
+  submitting: string;
+  idle: string;
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="primary" disabled={pending}>
+      {pending ? submitting : idle}
+    </button>
+  );
+}
+
 export function JobUploader({ onJobUpdate, sectionId }: Props) {
-  const { token } = useToken();
-  const { t } = useI18n();
-  const [statusMessage, setStatusMessage] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  const { t, locale } = useI18n();
   const fieldsetId = useId();
+  const [state, formAction] = useFormState(uploadAction, DEFAULT_UPLOAD_STATE);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!token) {
-      setError(t("uploader.error.noToken"));
-      return;
+  useEffect(() => {
+    if (state.status === "success" && state.job) {
+      onJobUpdate(state.job);
     }
+  }, [state, onJobUpdate]);
 
-    const formData = new FormData(event.currentTarget);
-    const file = formData.get("file");
-    if (!(file instanceof File) || file.size === 0) {
-      setError(t("uploader.error.noFile"));
-      return;
+  let statusText = "";
+  if (state.status === "success" && state.code === "queued") {
+    statusText = t("uploader.status.queued");
+  } else if (state.status === "error") {
+    if (state.code === "missing_token") {
+      statusText = t("uploader.error.noToken");
+    } else if (state.code === "missing_file") {
+      statusText = t("uploader.error.noFile");
+    } else {
+      statusText = state.message ?? t("uploader.error.generic");
     }
-
-    setBusy(true);
-    setError(null);
-    setStatusMessage(t("uploader.status.uploading"));
-
-    try {
-      const { job_id } = await uploadJob(token, formData);
-      setStatusMessage(t("uploader.status.queued"));
-      if (formRef.current) {
-        formRef.current.reset();
-      }
-      const detail = await fetchJobDetail(token, job_id);
-      onJobUpdate(detail);
-    } catch (err) {
-      setError((err as Error).message);
-      setStatusMessage("");
-    } finally {
-      setBusy(false);
-    }
-  };
+  }
 
   return (
     <section id={sectionId} aria-labelledby="upload-title" className="panel">
       <h2 id="upload-title">{t("uploader.title")}</h2>
       <p className="muted">{t("uploader.description")}</p>
-      <form ref={formRef} className="stack" onSubmit={handleSubmit}>
+      <form className="stack" action={formAction}>
+        <input type="hidden" name="locale" value={locale} />
         <label htmlFor="file-input">{t("uploader.audio")}</label>
         <input
           id="file-input"
@@ -65,14 +63,9 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
           type="file"
           accept="audio/*"
           required
-          disabled={busy}
         />
 
-        <fieldset
-          id={fieldsetId}
-          aria-describedby="options-help"
-          disabled={busy}
-        >
+        <fieldset id={fieldsetId} aria-describedby="options-help">
           <legend>{t("uploader.options")}</legend>
           <label className="option">
             <input type="checkbox" name="metadata_fallback" defaultChecked />{" "}
@@ -90,15 +83,18 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
         <p id="options-help" className="muted">
           {t("uploader.optionsHelp")}
         </p>
-        <button type="submit" className="primary" disabled={busy}>
-          {busy ? t("uploader.submitting") : t("uploader.submit")}
-        </button>
+        <SubmitButton
+          submitting={t("uploader.submitting")}
+          idle={t("uploader.submit")}
+        />
       </form>
       <div aria-live="polite" aria-atomic="true" className="status">
-        {statusMessage}
-        {error ? (
-          <p role="alert" className="error">
-            {error}
+        {statusText ? (
+          <p
+            role={state.status === "error" ? "alert" : "status"}
+            className={state.status === "error" ? "error" : ""}
+          >
+            {statusText}
           </p>
         ) : null}
       </div>

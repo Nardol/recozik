@@ -3,10 +3,11 @@
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useI18n } from "../i18n/I18nProvider";
 import { useToken } from "./TokenProvider";
+import { logoutAction } from "../app/actions";
 
 export function NavigationBar() {
-  const { token, clearToken } = useToken();
-  const { t } = useI18n();
+  const { token } = useToken();
+  const { t, locale } = useI18n();
 
   if (!token) {
     return null;
@@ -27,9 +28,12 @@ export function NavigationBar() {
       </ul>
       <div className="nav-actions">
         <LanguageSwitcher />
-        <button type="button" className="secondary small" onClick={clearToken}>
-          {t("nav.disconnect")}
-        </button>
+        <form action={logoutAction}>
+          <input type="hidden" name="locale" value={locale} />
+          <button type="submit" className="secondary small">
+            {t("nav.disconnect")}
+          </button>
+        </form>
       </div>
     </nav>
   );
