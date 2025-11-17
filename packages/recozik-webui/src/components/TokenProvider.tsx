@@ -23,20 +23,20 @@ const TokenContext = createContext<TokenContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "recozik-webui-token";
 
-export function TokenProvider({ children }: { children: React.ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(null);
-  const [profile, setProfile] = useState<WhoAmI | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+interface Props {
+  children: React.ReactNode;
+  initialToken?: string | null;
+  initialProfile?: WhoAmI | null;
+}
 
-  useEffect(() => {
-    const saved =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(STORAGE_KEY)
-        : null;
-    if (saved) {
-      setTokenState(saved);
-    }
-  }, []);
+export function TokenProvider({
+  children,
+  initialToken = null,
+  initialProfile = null,
+}: Props) {
+  const [token, setTokenState] = useState<string | null>(initialToken);
+  const [profile, setProfile] = useState<WhoAmI | null>(initialProfile);
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
 
   const persistToken = useCallback((value: string | null) => {
     if (typeof window === "undefined") return;
@@ -46,6 +46,20 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
       window.localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    if (initialToken) {
+      persistToken(initialToken);
+      return;
+    }
+    const saved =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(STORAGE_KEY)
+        : null;
+    if (saved) {
+      setTokenState(saved);
+    }
+  }, [initialToken, persistToken]);
 
   const setToken = useCallback(
     (value: string) => {

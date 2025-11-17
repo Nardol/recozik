@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Providers } from "../components/Providers";
-import { SkipLink } from "../components/SkipLink";
-import { LangUpdater } from "../components/LangUpdater";
+import { cookies } from "next/headers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,21 +18,17 @@ export const metadata: Metadata = {
   description: "Accessible dashboard for Recozik identify services",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const localeCookie = cookieStore.get("recozik_locale")?.value ?? "en";
   return (
-    <html lang="en">
+    <html lang={localeCookie}>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <Providers>
-          <LangUpdater />
-          <SkipLink />
-          <div id="main-content" tabIndex={-1}>
-            {children}
-          </div>
-        </Providers>
+        {children}
       </body>
     </html>
   );
