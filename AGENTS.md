@@ -8,6 +8,7 @@
 - `packages/recozik-services/src/recozik_services/` – Service layer consumed by the CLI and future GUIs (identify, batch identify, rename runners plus callback/ prompt protocols). Implement new behaviour here first so every frontend stays in sync.
 - `packages/recozik-services/src/recozik_services/security.py` – Auth/authorization/quota protocols + default policies every frontend must wire up.
 - `packages/recozik-web/src/recozik_web/` – FastAPI backend exposing the shared services over HTTP (token auth, quota policy wiring, filesystem-based identify endpoint, async upload/jobs API + polling/WebSocket hooks).
+- `packages/recozik-webui/` – Next.js dashboard that consumes the HTTP API (token login, upload panel, job monitoring, admin token management). Keep accessibility (screen readers, keyboard navigation) in mind when adding components.
 - `packages/recozik-core/src/recozik_core/` – Core libraries (`fingerprint.py`, `cache.py`, `config.py`, `audd.py`, `i18n.py`, locales) consumed by the CLI and future GUIs.
 - `tests/` – Pytest suites mirroring CLI features and performance guards (includes `test_cli_import_time.py`).
 - `README.md` – User-facing quick start; AGENTS should cross-check when updating commands.
@@ -21,6 +22,8 @@
 - `uv run ruff format` – Apply Ruff formatter to keep code style consistent.
 - `uv run mypy` – Run static type checks (entire `src/recozik` + `recozik_core` must stay clean).
 - `uv run pytest` – Run the full automated test suite.
+- `cd packages/recozik-webui && npm install && npm run lint` – Install frontend dependencies and run Next.js lint/type checks (required before touching the dashboard).
+- `cd docker && docker compose up --build` – Optional full-stack environment (backend + frontend + Nginx). Update `docker/.env` with real tokens/keys before sharing instructions.
 
 > **Permission reminder:** Always request elevated permissions before running any `uv` command (`uv run …`, `uv sync …`, etc.).
 
@@ -61,5 +64,6 @@
 - If GPG signing blocks commits, rerun with elevated permissions (`with_escalated_permissions: true`).
 - Request the user's approval before running any `uv …` command and rerun with `with_escalated_permissions: true` once granted (it unlocks workspace access, not sudo).
 - See `TRANSLATION.md` for the translation workflow (extraction, `.mo` compilation, multi-locale testing).
+- When updating the web backend or dashboard, keep `docs/deploy-backend.md` and `docs/deploy-frontend.md` current so operators can redeploy without guesswork.
 - When adding new commands, create a dedicated module under `src/recozik/commands/`, surface any required backward-compatible aliases via `cli.py`, and extend `AGENTS.md`/README as needed.
 - Always sanity-check execution costs: keep lazy imports intact, avoid unnecessary `Path.resolve()` churn in hot paths, and document any trade-offs if a feature must slow things down.

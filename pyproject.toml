@@ -113,7 +113,11 @@ recozik-services = { workspace = true }
 recozik-web = { workspace = true }
 
 [tool.uv.workspace]
-members = ["packages/*"]
+members = [
+    "packages/recozik-core",
+    "packages/recozik-services",
+    "packages/recozik-web",
+]
 
 [tool.mypy]
 python_version = "3.10"

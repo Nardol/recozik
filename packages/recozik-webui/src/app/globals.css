@@ -1,0 +1,293 @@
+:root {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --panel: #1e293b;
+  --panel-border: #334155;
+  --muted: #cbd5f5;
+  --accent: #38bdf8;
+  --danger: #f87171;
+  --success: #4ade80;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings:
+    "liga" on,
+    "calt" on;
+  line-height: 1.5;
+}
+
+.visually-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.visually-hidden:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #0f172a;
+  border-radius: 0.25rem;
+}
+
+.top-nav {
+  background-color: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid var(--panel-border);
+  padding: 0.75rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.top-nav .nav-links {
+  list-style: none;
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.top-nav a {
+  color: var(--foreground);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.top-nav a:focus-visible,
+.top-nav a:hover {
+  color: var(--accent);
+}
+
+.nav-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+main.container {
+  min-height: 100vh;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+header {
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 1rem;
+}
+
+.panel {
+  background-color: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.grid-2 {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.grid-3 {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+label {
+  font-weight: 600;
+}
+
+input,
+select,
+button,
+fieldset {
+  font: inherit;
+}
+
+input,
+select,
+button,
+textarea {
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--panel-border);
+  background-color: #0b1220;
+  color: inherit;
+}
+
+textarea {
+  min-height: 120px;
+}
+
+button.primary {
+  background: linear-gradient(120deg, #0ea5e9, #2563eb);
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.secondary.small {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.field-hint {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.option {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.status {
+  margin-top: 0.75rem;
+  min-height: 1.5rem;
+}
+
+.advanced {
+  margin-top: 1rem;
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--panel-border);
+  padding: 0.5rem;
+  vertical-align: top;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+
+.badge-completed {
+  background-color: rgba(74, 222, 128, 0.15);
+  border-color: var(--success);
+}
+
+.badge-running {
+  background-color: rgba(56, 189, 248, 0.15);
+  border-color: var(--accent);
+}
+
+.badge-failed {
+  background-color: rgba(248, 113, 113, 0.15);
+  border-color: var(--danger);
+}
+
+pre {
+  background-color: #020617;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.profile {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.table-wrapper ul {
+  padding-left: 1.25rem;
+}
+
+code {
+  font-family: "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+}

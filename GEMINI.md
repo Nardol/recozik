@@ -24,6 +24,7 @@ The CLI is built using the Typer framework, but most business logic is exposed v
 - `src/recozik/cli_support/`: Re-export shims for shared helpers (locale, prompts, filesystem utilities) hosted in `recozik-services`.
 - `packages/recozik-services/src/recozik_services/`: Service layer consumed by the CLI, tests, and future GUIs (identify/batch/rename runners, callback protocols, shared utilities). The new `security.py` module defines auth/quota policies (with allow-all defaults) so every frontend enforces consistent access limits.
 - `packages/recozik-web/src/recozik_web/`: FastAPI backend module that reuses `recozik-services` and exposes HTTP endpoints with token-based auth/quota enforcement (including async upload → job queue + polling/WebSocket APIs) for future GUIs.
+- `packages/recozik-webui/`: Next.js/React dashboard that consumes the FastAPI endpoints (token login, upload panel, job monitoring, admin token management with accessible UI patterns).
 - `packages/recozik-core/src/recozik_core/`: Core primitives (fingerprinting, AudD integration, caching, config, gettext locales).
 - `tests/`: Contains the pytest test suite (`tests/test_services.py` exercises the service APIs directly).
 - `scripts/`: Utility scripts, such as for compiling translations or measuring import time.
@@ -34,9 +35,18 @@ The project uses `uv` to manage dependencies and virtual environments.
 
 - **Install all dependencies (runtime and dev):**
 
-  ```bash
-  uv sync --all-groups
-  ```
+```bash
+uv sync --all-groups
+
+# Frontend workspace
+cd packages/recozik-webui
+npm install
+
+# Optional: Docker Compose (backend + frontend + Nginx)
+cd docker
+cp .env.example .env
+docker compose up --build
+```
 
 - **Run a CLI command:**
 
@@ -51,8 +61,16 @@ The project uses `uv` to manage dependencies and virtual environments.
   ```
 
 - **Build the project (wheel and sdist):**
+
   ```bash
   uv build
+  ```
+
+- **Build the dashboard:**
+  ```bash
+  cd packages/recozik-webui
+  npm run build
+  npm run start
   ```
 
 ## Development Conventions
