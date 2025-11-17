@@ -472,7 +472,7 @@ def test_list_jobs_returns_only_current_user(web_app) -> None:
         repo.create_job(user_id="worker"),
     ]
     for job in worker_jobs:
-        repo.set_status(job.id, JobStatus.COMPLETED, result={"job_id": job.id})
+        repo.set_status(job.id, JobStatus.COMPLETED)
     repo.create_job(user_id="other-user")
 
     resp = client.get("/jobs", headers={"X-API-Token": worker_token})
