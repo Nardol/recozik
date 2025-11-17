@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SUPPORTED_LOCALES, isSupportedLocale } from "./lib/constants";
+import { isSupportedLocale } from "./lib/constants";
 
 function detectLocale(header: string | null): string {
   if (!header) return "en";
   for (const token of header.split(",")) {
     const [lang] = token.trim().split(";");
     const base = lang?.split("-")[0];
-    if (base && SUPPORTED_LOCALES.includes(base)) {
+    if (base && isSupportedLocale(base)) {
       return base;
     }
   }

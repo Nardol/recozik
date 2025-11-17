@@ -3,17 +3,14 @@ import { notFound } from "next/navigation";
 import { DashboardClient } from "../../components/DashboardClient";
 import { Providers } from "../../components/Providers";
 import { serverFetchWhoami } from "../../lib/server/whoami";
-import { SUPPORTED_LOCALES } from "../../lib/constants";
+import { isSupportedLocale } from "../../lib/constants";
 
 interface Props {
   params: { locale: string };
 }
 
 export default async function LocaleDashboard({ params }: Props) {
-  const locale = SUPPORTED_LOCALES.includes(params.locale)
-    ? params.locale
-    : null;
-  if (!locale) {
+  if (!isSupportedLocale(params.locale)) {
     notFound();
   }
   const cookieStore = await cookies();
@@ -28,7 +25,11 @@ export default async function LocaleDashboard({ params }: Props) {
     }
   }
   return (
-    <Providers locale={locale} initialToken={token} initialProfile={profile}>
+    <Providers
+      locale={params.locale}
+      initialToken={token}
+      initialProfile={profile}
+    >
       <DashboardClient />
     </Providers>
   );
