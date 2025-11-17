@@ -225,11 +225,7 @@ export function AdminTokenManager({ sectionId }: Props) {
             <input name="token" type="text" autoComplete="off" />
           </label>
         </details>
-        <button
-          type="submit"
-          className="primary"
-          disabled={loading || saving}
-        >
+        <button type="submit" className="primary" disabled={loading || saving}>
           {saving ? "Saving…" : "Save token"}
         </button>
       </form>

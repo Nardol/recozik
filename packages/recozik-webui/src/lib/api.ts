@@ -17,7 +17,10 @@ async function apiFetch<T>(
 
   const { timeoutMs, ...requestInit } = init ?? {};
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const timeout = setTimeout(
+    () => controller.abort(),
+    timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
 
   let response: Response;
   try {
