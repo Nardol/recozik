@@ -1,23 +1,45 @@
 "use client";
 
+import { useI18n } from "../i18n/I18nProvider";
+import { FEATURE_LABELS, ROLE_LABELS } from "../i18n/labels";
 import { useToken } from "./TokenProvider";
 
 export function ProfileCard() {
   const { profile, clearToken, status } = useToken();
+  const { t } = useI18n();
 
   if (!profile) {
     return null;
   }
 
+  const translatedRoles =
+    profile.roles.length === 0
+      ? "—"
+      : profile.roles
+          .map((role) => {
+            const key = ROLE_LABELS[role];
+            return key ? t(key) : role;
+          })
+          .join(", ");
+
+  const translatedFeatures = profile.allowed_features
+    .map((feature) => {
+      const key = FEATURE_LABELS[feature];
+      return key ? t(key) : feature;
+    })
+    .join(", ");
+
   return (
     <section className="panel" aria-live="polite">
       <div className="profile">
         <div>
-          <p className="muted">Signed in as</p>
+          <p className="muted">{t("profile.signedInAs")}</p>
           <strong>{profile.display_name ?? profile.user_id}</strong>
-          <p className="muted">Roles: {profile.roles.join(", ") || "—"}</p>
           <p className="muted">
-            Features: {profile.allowed_features.join(", ")}
+            {t("profile.roles")}: {translatedRoles}
+          </p>
+          <p className="muted">
+            {t("profile.features")}: {translatedFeatures || "—"}
           </p>
         </div>
         <button
@@ -26,7 +48,7 @@ export function ProfileCard() {
           onClick={clearToken}
           disabled={status === "loading"}
         >
-          Forget token
+          {t("profile.forget")}
         </button>
       </div>
     </section>

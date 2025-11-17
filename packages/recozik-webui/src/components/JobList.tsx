@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { JobDetail, fetchJobDetail } from "../lib/api";
+import { MessageKey, useI18n } from "../i18n/I18nProvider";
 import { useToken } from "./TokenProvider";
 
 interface Props {
@@ -10,8 +11,16 @@ interface Props {
   sectionId?: string;
 }
 
+const STATUS_KEYS: Record<string, MessageKey> = {
+  queued: "jobs.status.queued",
+  running: "jobs.status.running",
+  completed: "jobs.status.completed",
+  failed: "jobs.status.failed",
+};
+
 export function JobList({ jobs, onUpdate, sectionId }: Props) {
   const { token } = useToken();
+  const { t } = useI18n();
   const headingId = sectionId ? `${sectionId}-jobs-title` : "jobs-title";
 
   useEffect(() => {
@@ -37,27 +46,32 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
     return () => clearInterval(interval);
   }, [jobs, token, onUpdate]);
 
+  const statusLabel = (status: string) => {
+    const key = STATUS_KEYS[status];
+    return key ? t(key) : status;
+  };
+
   if (jobs.length === 0) {
     return (
       <section id={sectionId} aria-labelledby={headingId} className="panel">
-        <h2 id={headingId}>Jobs</h2>
-        <p>No identify jobs yet. Submit an upload to see live results.</p>
+        <h2 id={headingId}>{t("jobs.title")}</h2>
+        <p>{t("jobs.empty")}</p>
       </section>
     );
   }
 
   return (
     <section id={sectionId} aria-labelledby={headingId} className="panel">
-      <h2 id={headingId}>Jobs</h2>
+      <h2 id={headingId}>{t("jobs.title")}</h2>
       <div className="table-wrapper" role="region" aria-live="polite">
         <table>
           <thead>
             <tr>
-              <th scope="col">Job ID</th>
-              <th scope="col">Status</th>
-              <th scope="col">Updated</th>
-              <th scope="col">Messages</th>
-              <th scope="col">Result summary</th>
+              <th scope="col">{t("jobs.th.id")}</th>
+              <th scope="col">{t("jobs.th.status")}</th>
+              <th scope="col">{t("jobs.th.updated")}</th>
+              <th scope="col">{t("jobs.th.messages")}</th>
+              <th scope="col">{t("jobs.th.result")}</th>
             </tr>
           </thead>
           <tbody>
@@ -68,7 +82,7 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
                 </td>
                 <td>
                   <span className={`badge badge-${job.status.toLowerCase()}`}>
-                    {job.status}
+                    {statusLabel(job.status)}
                   </span>
                   {job.error ? <p className="error">{job.error}</p> : null}
                 </td>
@@ -83,11 +97,11 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
                 <td>
                   {job.result ? (
                     <details>
-                      <summary>View JSON</summary>
+                      <summary>{t("jobs.viewJson")}</summary>
                       <pre>{JSON.stringify(job.result, null, 2)}</pre>
                     </details>
                   ) : (
-                    <span className="muted">Pending</span>
+                    <span className="muted">{t("jobs.pending")}</span>
                   )}
                 </td>
               </tr>
