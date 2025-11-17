@@ -14,14 +14,10 @@ interface TokenContextValue {
   token: string | null;
   profile: WhoAmI | null;
   status: "idle" | "loading" | "error";
-  setToken: (value: string) => void;
-  clearToken: () => void;
   refreshProfile: () => Promise<void>;
 }
 
 const TokenContext = createContext<TokenContextValue | undefined>(undefined);
-
-const STORAGE_KEY = "recozik-webui-token";
 
 interface Props {
   children: React.ReactNode;
@@ -38,43 +34,11 @@ export function TokenProvider({
   const [profile, setProfile] = useState<WhoAmI | null>(initialProfile);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
 
-  const persistToken = useCallback((value: string | null) => {
-    if (typeof window === "undefined") return;
-    if (value) {
-      window.localStorage.setItem(STORAGE_KEY, value);
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
-
   useEffect(() => {
-    if (initialToken) {
-      persistToken(initialToken);
-      return;
-    }
-    const saved =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(STORAGE_KEY)
-        : null;
-    if (saved) {
-      setTokenState(saved);
-    }
-  }, [initialToken, persistToken]);
-
-  const setToken = useCallback(
-    (value: string) => {
-      setTokenState(value);
-      persistToken(value);
-    },
-    [persistToken],
-  );
-
-  const clearToken = useCallback(() => {
-    setTokenState(null);
-    setProfile(null);
+    setTokenState(initialToken ?? null);
+    setProfile(initialProfile ?? null);
     setStatus("idle");
-    persistToken(null);
-  }, [persistToken]);
+  }, [initialToken, initialProfile]);
 
   const refreshProfile = useCallback(async () => {
     if (!token) return;
@@ -100,8 +64,8 @@ export function TokenProvider({
   }, [token, refreshProfile]);
 
   const value = useMemo(
-    () => ({ token, profile, status, setToken, clearToken, refreshProfile }),
-    [token, profile, status, setToken, clearToken, refreshProfile],
+    () => ({ token, profile, status, refreshProfile }),
+    [token, profile, status, refreshProfile],
   );
 
   return (
