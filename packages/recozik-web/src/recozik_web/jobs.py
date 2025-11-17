@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from sqlmodel import JSON, Column, Field, Session, SQLModel, create_engine
+from sqlmodel import JSON, Column, Field, Session, SQLModel, create_engine, select
 
 
 class JobStatus(str, Enum):
@@ -156,6 +156,23 @@ class JobRepository:
                 },
             )
             return job
+
+    def list_jobs(
+        self,
+        *,
+        user_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[JobRecord]:
+        """Return recent jobs optionally filtered by owner."""
+        statement = select(JobRecord).order_by(
+            JobRecord.__table__.c.created_at.desc()  # type: ignore[attr-defined]
+        )
+        if user_id is not None:
+            statement = statement.where(JobRecord.user_id == user_id)
+        statement = statement.offset(offset).limit(limit)
+        with Session(self._engine) as session:
+            return list(session.exec(statement))
 
 
 class JobNotifier:

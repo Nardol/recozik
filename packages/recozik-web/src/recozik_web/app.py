@@ -17,6 +17,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -754,6 +755,24 @@ def get_job_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     _ensure_job_access(job, context)
     return _job_to_model(job)
+
+
+@app.get("/jobs", response_model=list[JobDetailModel])
+def list_jobs(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user_id: str | None = Query(default=None),
+    context: RequestContext = Depends(get_request_context),
+    settings: WebSettings = Depends(get_settings),
+) -> list[JobDetailModel]:
+    """Return recent jobs for the current user (admins may filter by user)."""
+    repo = get_job_repository(settings.jobs_database_url_resolved)
+    is_admin = context.user.has_role("admin")
+    target_user = user_id if is_admin else context.user.user_id
+    if not is_admin:
+        target_user = context.user.user_id
+    records = repo.list_jobs(user_id=target_user, limit=limit, offset=offset)
+    return [_job_to_model(job) for job in records]
 
 
 @app.websocket("/ws/jobs/{job_id}")
