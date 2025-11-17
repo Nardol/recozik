@@ -7,20 +7,22 @@ import {
   createToken,
   fetchAdminTokens,
 } from "../lib/api";
+import { MessageKey, useI18n } from "../i18n/I18nProvider";
+import { FEATURE_LABELS, ROLE_LABELS, QUOTA_LABELS } from "../i18n/labels";
 import { useToken } from "./TokenProvider";
 
-const FEATURE_OPTIONS = [
-  { key: "identify", label: "Identify" },
-  { key: "identify_batch", label: "Batch Identify" },
-  { key: "rename", label: "Rename" },
-  { key: "audd", label: "AudD" },
-  { key: "musicbrainz_enrich", label: "MusicBrainz" },
+const FEATURE_OPTIONS: { key: string; labelKey: MessageKey }[] = [
+  { key: "identify", labelKey: "feature.identify" },
+  { key: "identify_batch", labelKey: "feature.identify_batch" },
+  { key: "rename", labelKey: "feature.rename" },
+  { key: "audd", labelKey: "feature.audd" },
+  { key: "musicbrainz_enrich", labelKey: "feature.musicbrainz_enrich" },
 ];
 
-const ROLE_OPTIONS = [
-  { key: "admin", label: "Admin" },
-  { key: "operator", label: "Operator" },
-  { key: "readonly", label: "Readonly" },
+const ROLE_OPTIONS: { key: string; labelKey: MessageKey }[] = [
+  { key: "admin", labelKey: "role.admin" },
+  { key: "operator", labelKey: "role.operator" },
+  { key: "readonly", labelKey: "role.readonly" },
 ];
 
 interface Props {
@@ -29,6 +31,7 @@ interface Props {
 
 export function AdminTokenManager({ sectionId }: Props) {
   const { token, profile } = useToken();
+  const { t } = useI18n();
   const isAdmin = profile?.roles.includes("admin");
   const [records, setRecords] = useState<TokenResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -86,10 +89,10 @@ export function AdminTokenManager({ sectionId }: Props) {
 
     try {
       setSaving(true);
-      setMessage("Saving token…");
+      setMessage(t("admin.status.saving"));
       setError(null);
       await createToken(token, payload);
-      setMessage("Token saved.");
+      setMessage(t("admin.status.saved"));
       event.currentTarget.reset();
       await loadTokens();
     } catch (err) {
@@ -100,20 +103,33 @@ export function AdminTokenManager({ sectionId }: Props) {
     }
   };
 
+  const translateFeature = (value: string) => {
+    const key = FEATURE_LABELS[value];
+    return key ? t(key) : value;
+  };
+
+  const translateRole = (value: string) => {
+    const key = ROLE_LABELS[value];
+    return key ? t(key) : value;
+  };
+
+  const translateQuota = (value: string) => {
+    const key = QUOTA_LABELS[value];
+    return key ? t(key) : value;
+  };
+
   return (
     <section id={sectionId} aria-labelledby="admin-title" className="panel">
-      <h2 id="admin-title">Admin · Token management</h2>
-      <p className="muted">
-        Create or update tokens, toggle AudD access, and tune quota policies.
-      </p>
+      <h2 id="admin-title">{t("admin.title")}</h2>
+      <p className="muted">{t("admin.lead")}</p>
       <div className="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th scope="col">User</th>
-              <th scope="col">Token</th>
-              <th scope="col">Features</th>
-              <th scope="col">Quotas</th>
+              <th scope="col">{t("admin.table.user")}</th>
+              <th scope="col">{t("admin.table.token")}</th>
+              <th scope="col">{t("admin.table.features")}</th>
+              <th scope="col">{t("admin.table.quotas")}</th>
             </tr>
           </thead>
           <tbody>
@@ -123,7 +139,10 @@ export function AdminTokenManager({ sectionId }: Props) {
                   <strong>{record.display_name}</strong>
                   <div className="muted">{record.user_id}</div>
                   <div className="muted">
-                    Roles: {record.roles.join(", ") || "—"}
+                    {t("admin.table.rolesPrefix")}:{" "}
+                    {record.roles.length
+                      ? record.roles.map(translateRole).join(", ")
+                      : "—"}
                   </div>
                 </td>
                 <td>
@@ -132,7 +151,7 @@ export function AdminTokenManager({ sectionId }: Props) {
                 <td>
                   <ul>
                     {record.allowed_features.map((feature) => (
-                      <li key={feature}>{feature}</li>
+                      <li key={feature}>{translateFeature(feature)}</li>
                     ))}
                   </ul>
                 </td>
@@ -141,7 +160,7 @@ export function AdminTokenManager({ sectionId }: Props) {
                     {Object.entries(record.quota_limits).map(
                       ([scope, value]) => (
                         <li key={scope}>
-                          {scope}: {value ?? "∞"}
+                          {translateQuota(scope)}: {value ?? "∞"}
                         </li>
                       ),
                     )}
@@ -154,34 +173,30 @@ export function AdminTokenManager({ sectionId }: Props) {
       </div>
 
       <form className="stack" onSubmit={handleSubmit}>
-        <h3>Create or update a token</h3>
+        <h3>{t("admin.form.title")}</h3>
         <div className="grid-2">
           <label>
-            User ID
-            <span className="field-hint">
-              Used in logs and quota entries. Keep it short.
-            </span>
+            {t("admin.form.userId")}
+            <span className="field-hint">{t("admin.form.userHint")}</span>
             <input name="user_id" type="text" required />
           </label>
           <label>
-            Display name
+            {t("admin.form.displayName")}
             <input name="display_name" type="text" required />
           </label>
         </div>
         <fieldset>
-          <legend>Roles</legend>
-          <p className="field-hint">
-            Assign capabilities such as admin access or read-only usage.
-          </p>
+          <legend>{t("admin.form.rolesLegend")}</legend>
+          <p className="field-hint">{t("admin.form.rolesHint")}</p>
           {ROLE_OPTIONS.map((role) => (
             <label key={role.key} className="option">
               <input type="checkbox" name="role" value={role.key} />
-              {role.label}
+              {t(role.labelKey)}
             </label>
           ))}
         </fieldset>
         <fieldset>
-          <legend>Allowed features</legend>
+          <legend>{t("admin.form.featuresLegend")}</legend>
           {FEATURE_OPTIONS.map((feature) => (
             <label key={feature.key} className="option">
               <input
@@ -190,13 +205,13 @@ export function AdminTokenManager({ sectionId }: Props) {
                 value={feature.key}
                 defaultChecked={feature.key === "identify"}
               />
-              {feature.label}
+              {t(feature.labelKey)}
             </label>
           ))}
         </fieldset>
         <div className="grid-3">
           <label>
-            AcoustID quota
+            {t("admin.form.acoustid")}
             <input
               name="quota_acoustid"
               type="number"
@@ -205,7 +220,7 @@ export function AdminTokenManager({ sectionId }: Props) {
             />
           </label>
           <label>
-            MusicBrainz quota
+            {t("admin.form.musicbrainz")}
             <input
               name="quota_musicbrainz"
               type="number"
@@ -214,19 +229,19 @@ export function AdminTokenManager({ sectionId }: Props) {
             />
           </label>
           <label>
-            AudD quota
+            {t("admin.form.audd")}
             <input name="quota_audd" type="number" min="0" placeholder="∞" />
           </label>
         </div>
         <details className="advanced">
-          <summary>Advanced options</summary>
+          <summary>{t("admin.form.advanced")}</summary>
           <label>
-            Token (optional, leave blank to auto-generate)
+            {t("admin.form.tokenOptional")}
             <input name="token" type="text" autoComplete="off" />
           </label>
         </details>
         <button type="submit" className="primary" disabled={loading || saving}>
-          {saving ? "Saving…" : "Save token"}
+          {saving ? t("admin.form.saving") : t("admin.form.save")}
         </button>
       </form>
       <div aria-live="polite" className="status">

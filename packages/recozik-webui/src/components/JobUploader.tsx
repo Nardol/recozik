@@ -2,6 +2,7 @@
 
 import { FormEvent, useId, useRef, useState } from "react";
 import { JobDetail, uploadJob, fetchJobDetail } from "../lib/api";
+import { useI18n } from "../i18n/I18nProvider";
 import { useToken } from "./TokenProvider";
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 export function JobUploader({ onJobUpdate, sectionId }: Props) {
   const { token } = useToken();
+  const { t } = useI18n();
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -20,24 +22,24 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) {
-      setError("Please provide a token before uploading files.");
+      setError(t("uploader.error.noToken"));
       return;
     }
 
     const formData = new FormData(event.currentTarget);
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) {
-      setError("Select an audio file before submitting.");
+      setError(t("uploader.error.noFile"));
       return;
     }
 
     setBusy(true);
     setError(null);
-    setStatusMessage("Uploading…");
+    setStatusMessage(t("uploader.status.uploading"));
 
     try {
       const { job_id } = await uploadJob(token, formData);
-      setStatusMessage("Job queued. Polling for updates…");
+      setStatusMessage(t("uploader.status.queued"));
       if (formRef.current) {
         formRef.current.reset();
       }
@@ -53,13 +55,10 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
 
   return (
     <section id={sectionId} aria-labelledby="upload-title" className="panel">
-      <h2 id="upload-title">Upload &amp; identify audio</h2>
-      <p className="muted">
-        Upload an audio clip to trigger the identify workflow. Jobs are
-        processed asynchronously with live updates.
-      </p>
+      <h2 id="upload-title">{t("uploader.title")}</h2>
+      <p className="muted">{t("uploader.description")}</p>
       <form ref={formRef} className="stack" onSubmit={handleSubmit}>
-        <label htmlFor="file-input">Audio file</label>
+        <label htmlFor="file-input">{t("uploader.audio")}</label>
         <input
           id="file-input"
           name="file"
@@ -74,25 +73,25 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
           aria-describedby="options-help"
           disabled={busy}
         >
-          <legend>Options</legend>
+          <legend>{t("uploader.options")}</legend>
           <label className="option">
             <input type="checkbox" name="metadata_fallback" defaultChecked />{" "}
-            Use metadata fallback
+            {t("uploader.option.metadata")}
           </label>
           <label className="option">
-            <input type="checkbox" name="prefer_audd" /> Prefer AudD
+            <input type="checkbox" name="prefer_audd" />{" "}
+            {t("uploader.option.preferAudd")}
           </label>
           <label className="option">
-            <input type="checkbox" name="force_audd_enterprise" /> Force AudD
-            enterprise mode
+            <input type="checkbox" name="force_audd_enterprise" />{" "}
+            {t("uploader.option.forceAudd")}
           </label>
         </fieldset>
         <p id="options-help" className="muted">
-          Advanced flags help control cache usage and AudD behavior. Leave them
-          unchecked for default heuristics.
+          {t("uploader.optionsHelp")}
         </p>
         <button type="submit" className="primary" disabled={busy}>
-          {busy ? "Submitting…" : "Submit job"}
+          {busy ? t("uploader.submitting") : t("uploader.submit")}
         </button>
       </form>
       <div aria-live="polite" aria-atomic="true" className="status">

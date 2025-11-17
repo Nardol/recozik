@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { TokenProvider } from "../components/TokenProvider";
+import { Providers } from "../components/Providers";
+import { SkipLink } from "../components/SkipLink";
+import { LangUpdater } from "../components/LangUpdater";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,14 +28,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <a className="visually-hidden" href="#main-content">
-          Skip to content
-        </a>
-        <TokenProvider>
+        <Providers>
+          <LangUpdater />
+          <SkipLink />
           <div id="main-content" tabIndex={-1}>
             {children}
           </div>
-        </TokenProvider>
+        </Providers>
       </body>
     </html>
   );

@@ -9,9 +9,11 @@ import { AdminTokenManager } from "../components/AdminTokenManager";
 import { ProfileCard } from "../components/ProfileCard";
 import { NavigationBar } from "../components/NavigationBar";
 import { JobDetail } from "../lib/api";
+import { useI18n } from "../i18n/I18nProvider";
 
 export default function Home() {
   const { token } = useToken();
+  const { t } = useI18n();
   const [jobs, setJobs] = useState<JobDetail[]>([]);
 
   useEffect(() => {
@@ -43,10 +45,8 @@ export default function Home() {
     return (
       <main className="container" id="main-content">
         <header>
-          <h1>Recozik Web Console</h1>
-          <p>
-            Authenticate with an API token to access jobs and admin features.
-          </p>
+          <h1>{t("app.title")}</h1>
+          <p>{t("app.lead")}</p>
         </header>
         <TokenForm />
       </main>
@@ -58,10 +58,8 @@ export default function Home() {
       <NavigationBar />
       <main className="container" id="main-content">
         <header>
-          <h1>Recozik Web Console</h1>
-          <p className="muted">
-            Monitor identify jobs, trigger uploads, and manage API tokens.
-          </p>
+          <h1>{t("app.title")}</h1>
+          <p className="muted">{t("app.leadAuthed")}</p>
         </header>
         <ProfileCard />
         <div className="grid">

@@ -3,6 +3,7 @@
 Application en ligne de commande conçue pour calculer des empreintes [Chromaprint](https://acoustid.org/chromaprint), interroger l'API AcoustID et automatiser l'identification / le renommage de bibliothèques audio. La sortie texte reste adaptée aux lecteurs d'écran et l'interface est désormais localisée.
 
 - [Présentation](#présentation)
+- [Backend web et tableau de bord](#backend-web-et-tableau-de-bord)
 - [Prérequis](#prérequis)
 - [Installation](#installation)
 - [Configuration d'AcoustID](#configuration-dacoustid)
@@ -25,6 +26,15 @@ Application en ligne de commande conçue pour calculer des empreintes [Chromapri
 | `recozik rename-from-log` | Applique les propositions issues du log pour organiser la bibliothèque.                   |
 | `recozik completion …`    | Gère les scripts de complétion shell (Bash, Zsh, Fish, PowerShell).                       |
 | `recozik config …`        | Persiste et consulte la configuration locale (clé API, cache, modèles, etc.).             |
+
+## Backend web et tableau de bord
+
+Recozik fournit désormais un backend FastAPI mutualisé et un tableau de bord Next.js accessible :
+
+- Consultez [docs/deploy-backend.md](docs/deploy-backend.md) (EN) ou [docs/deploy-backend.fr.md](docs/deploy-backend.fr.md) (FR) pour exposer l'API HTTP (téléversements, WebSockets, gestion des jetons).
+- Consultez [docs/deploy-frontend.md](docs/deploy-frontend.md) (EN) ou [docs/deploy-frontend.fr.md](docs/deploy-frontend.fr.md) (FR) pour construire et déployer l'interface web.
+
+Les définitions Docker Compose décrites dans la documentation permettent également de lancer le backend, le frontend et Nginx en une seule commande (utile pour les tests locaux ou une mise en production minimale).
 
 ## Prérequis
 
