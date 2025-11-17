@@ -39,7 +39,7 @@ Place your reverse proxy in front of the Next.js server, handle TLS there, and f
 
 ## 4. Reverse proxy example (Caddy)
 
-```
+```caddy
 recozik-ui.example.com {
   reverse_proxy 127.0.0.1:3000
   encode zstd gzip

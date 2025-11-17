@@ -19,7 +19,7 @@ export function TokenForm() {
       setValue("");
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      setError(err instanceof Error ? err.message : "Unable to save token.");
     }
   };
 
@@ -41,13 +41,18 @@ export function TokenForm() {
           value={value}
           onChange={(event) => setValue(event.target.value)}
           aria-describedby="token-help"
+          disabled={status === "loading"}
           required
         />
         <p id="token-help" className="muted">
           Your token is stored locally in the browser and never shared with
           Recozik.
         </p>
-        <button type="submit" className="primary">
+        <button
+          type="submit"
+          className="primary"
+          disabled={status === "loading"}
+        >
           {status === "loading" ? "Validating…" : "Save token"}
         </button>
         {error ? (

@@ -6,6 +6,20 @@ services:
     build:
       context: ..
       dockerfile: docker/backend.Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     environment:
       RECOZIK_WEB_BASE_MEDIA_ROOT: /data
       RECOZIK_WEB_UPLOAD_SUBDIR: uploads
@@ -20,11 +34,21 @@ services:
     build:
       context: ..
       dockerfile: docker/frontend.Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     environment:
       NEXT_PUBLIC_RECOZIK_API_BASE: /api
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
+  # Start nginx via `docker compose --profile reverse-proxy up`
   nginx:
     hostname: nginx
     image: docker.io/library/nginx:1.27

@@ -35,7 +35,7 @@ Recozik is currently in a public alpha phase. Interfaces and outputs may change 
 Recozik now ships with a shared FastAPI backend plus an accessible Next.js dashboard:
 
 - See [docs/deploy-backend.md](docs/deploy-backend.md) to run the HTTP API (token management, upload jobs, WebSocket streaming).
-- See [docs/deploy-frontend.md](docs/deploy-frontend.md) to build and deploy the screen-reader friendly dashboard under `packages/recozik-webui`.
+- See [docs/deploy-frontend.md](docs/deploy-frontend.md) to build and deploy the screen-reader-friendly dashboard under `packages/recozik-webui`.
 
 Quick start with Docker Compose:
 

@@ -12,6 +12,7 @@ interface Props {
 
 export function JobList({ jobs, onUpdate, sectionId }: Props) {
   const { token } = useToken();
+  const headingId = sectionId ? `${sectionId}-jobs-title` : "jobs-title";
 
   useEffect(() => {
     if (!token) return;
@@ -21,14 +22,16 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
     if (incomplete.length === 0) return;
 
     const interval = setInterval(async () => {
-      for (const job of incomplete) {
-        try {
-          const detail = await fetchJobDetail(token, job.job_id);
-          onUpdate(detail);
-        } catch (error) {
-          console.warn("Unable to refresh job", job.job_id, error);
-        }
-      }
+      await Promise.all(
+        incomplete.map(async (job) => {
+          try {
+            const detail = await fetchJobDetail(token, job.job_id);
+            onUpdate(detail);
+          } catch (error) {
+            console.warn("Unable to refresh job", job.job_id, error);
+          }
+        }),
+      );
     }, 4000);
 
     return () => clearInterval(interval);
@@ -36,16 +39,16 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
 
   if (jobs.length === 0) {
     return (
-      <section id={sectionId} aria-labelledby="jobs-title" className="panel">
-        <h2 id="jobs-title">Jobs</h2>
+      <section id={sectionId} aria-labelledby={headingId} className="panel">
+        <h2 id={headingId}>Jobs</h2>
         <p>No identify jobs yet. Submit an upload to see live results.</p>
       </section>
     );
   }
 
   return (
-    <section id={sectionId} aria-labelledby="jobs-title" className="panel">
-      <h2 id="jobs-title">Jobs</h2>
+    <section id={sectionId} aria-labelledby={headingId} className="panel">
+      <h2 id={headingId}>Jobs</h2>
       <div className="table-wrapper" role="region" aria-live="polite">
         <table>
           <thead>

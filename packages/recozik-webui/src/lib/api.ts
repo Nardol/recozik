@@ -1,10 +1,13 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_RECOZIK_API_BASE?.replace(/\/$/, "") ?? "/api";
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+type ApiRequestInit = RequestInit & { timeoutMs?: number };
 
 async function apiFetch<T>(
   path: string,
   token: string,
-  init?: RequestInit,
+  init?: ApiRequestInit,
 ): Promise<T> {
   const headers = new Headers(init?.headers as HeadersInit | undefined);
   headers.set("X-API-Token", token);
@@ -12,10 +15,20 @@ async function apiFetch<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-  });
+  const { timeoutMs, ...requestInit } = init ?? {};
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs ?? DEFAULT_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...requestInit,
+      headers,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const detail = await response.text().catch(() => response.statusText);
@@ -71,6 +84,7 @@ export async function uploadJob(token: string, formData: FormData) {
   return apiFetch<{ job_id: string }>("/identify/upload", token, {
     method: "POST",
     body: formData,
+    timeoutMs: 120_000,
   });
 }
 

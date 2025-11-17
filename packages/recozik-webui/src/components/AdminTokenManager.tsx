@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   TokenCreatePayload,
   TokenResponse,
@@ -32,10 +32,11 @@ export function AdminTokenManager({ sectionId }: Props) {
   const isAdmin = profile?.roles.includes("admin");
   const [records, setRecords] = useState<TokenResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  const loadTokens = async () => {
+  const loadTokens = useCallback(async () => {
     if (!token || !isAdmin) return;
     try {
       setLoading(true);
@@ -47,12 +48,11 @@ export function AdminTokenManager({ sectionId }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, isAdmin]);
 
   useEffect(() => {
     loadTokens();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, isAdmin]);
+  }, [loadTokens]);
 
   if (!isAdmin) {
     return null;
@@ -85,6 +85,7 @@ export function AdminTokenManager({ sectionId }: Props) {
     };
 
     try {
+      setSaving(true);
       setMessage("Saving token…");
       setError(null);
       await createToken(token, payload);
@@ -94,6 +95,8 @@ export function AdminTokenManager({ sectionId }: Props) {
     } catch (err) {
       setMessage("");
       setError((err as Error).message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -222,8 +225,12 @@ export function AdminTokenManager({ sectionId }: Props) {
             <input name="token" type="text" autoComplete="off" />
           </label>
         </details>
-        <button type="submit" className="primary" disabled={loading}>
-          {loading ? "Saving…" : "Save token"}
+        <button
+          type="submit"
+          className="primary"
+          disabled={loading || saving}
+        >
+          {saving ? "Saving…" : "Save token"}
         </button>
       </form>
       <div aria-live="polite" className="status">

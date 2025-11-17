@@ -10,7 +10,7 @@ export function NavigationBar() {
   }
 
   return (
-    <nav className="top-nav" aria-label="Primary">
+    <nav className="top-nav" aria-label="Main navigation">
       <ul className="nav-links">
         <li>
           <a href="#upload-section">Upload</a>

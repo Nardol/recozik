@@ -58,6 +58,7 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
   const clearToken = useCallback(() => {
     setTokenState(null);
     setProfile(null);
+    setStatus("idle");
     persistToken(null);
   }, [persistToken]);
 
@@ -80,6 +81,7 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
       refreshProfile();
     } else {
       setProfile(null);
+      setStatus("idle");
     }
   }, [token, refreshProfile]);
 

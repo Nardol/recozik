@@ -3,7 +3,7 @@
 Accessible dashboard for the Recozik identify services. Users authenticate with the same API tokens used by the CLI and can:
 
 - Upload audio clips and monitor identify jobs (live updates + polling fallback).
-- Inspect job history with screen-reader friendly tables.
+- Inspect job history with screen-reader-friendly tables.
 - Administrators: list/create tokens, toggle AudD access, and tune quota limits.
 
 The UI is built with Next.js (App Router) and consumes the FastAPI backend documented in `docs/deploy-backend.md`.
@@ -11,7 +11,7 @@ The UI is built with Next.js (App Router) and consumes the FastAPI backend docum
 ## Prerequisites
 
 - Node.js 20+
-- Running backend (default `http://localhost:8000`) or the `NEXT_PUBLIC_RECOZIK_API_BASE` env variable pointing to your server
+- Running backend at `http://localhost:8000` for local development, or configure `NEXT_PUBLIC_RECOZIK_API_BASE` to point at your server
 
 ## Commands
 
@@ -30,4 +30,4 @@ npm run build
 npm run start -- --hostname 0.0.0.0 --port 3000
 ```
 
-Set `NEXT_PUBLIC_RECOZIK_API_BASE` in `.env.local` to the backend base URL before building (the Docker stack defaults to `/api`). See `docs/deploy-frontend.md` for deployment instructions (bare-metal + container recipe).
+Set `NEXT_PUBLIC_RECOZIK_API_BASE` in `.env.local` before building: use `http://localhost:8000` when running the backend directly, or `/api` when routing through the Docker/Nginx stack. See `docs/deploy-frontend.md` for deployment instructions (bare-metal + container recipe).

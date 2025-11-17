@@ -31,11 +31,13 @@ All settings live under the `RECOZIK_WEB_` prefix. The most important ones:
 | `RECOZIK_WEB_JOBS_DATABASE_URL` | SQLModel URL for the jobs database. Default: SQLite file next to the media root.                       |
 | `RECOZIK_WEB_AUTH_DATABASE_URL` | SQLModel URL for the auth/token database. Default: SQLite file next to the media root.                 |
 
+> **Security:** Generate a strong random value for `RECOZIK_WEB_ADMIN_TOKEN` (for example `openssl rand -hex 32`). Never reuse the placeholder token in production.
+
 Example `.env` snippet:
 
 ```bash
 RECOZIK_WEB_BASE_MEDIA_ROOT=/var/lib/recozik
-RECOZIK_WEB_ADMIN_TOKEN=change-me
+RECOZIK_WEB_ADMIN_TOKEN=your-secure-random-token-here
 RECOZIK_WEB_ACOUSTID_API_KEY=xxx
 RECOZIK_WEB_AUDD_TOKEN=
 RECOZIK_WEB_UPLOAD_SUBDIR=uploads
@@ -58,7 +60,7 @@ Enable CORS or TLS termination at the reverse proxy layer if you plan to access 
 
 ## 4. Optional: systemd service
 
-```
+```ini
 [Unit]
 Description=Recozik Web API
 After=network.target
@@ -71,6 +73,12 @@ ExecStart=/path/to/recozik/.venv/bin/uvicorn recozik_web.app:app --host 0.0.0.0 
 Restart=on-failure
 User=recozik
 Group=recozik
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/recozik
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 [Install]
 WantedBy=multi-user.target
