@@ -14,6 +14,7 @@ from recozik_services.identify import IdentifyResponse, IdentifyServiceError
 from recozik_services.security import AccessPolicyError, ServiceFeature
 from recozik_web.auth_store import get_token_repository
 from recozik_web.config import WebSettings
+from recozik_web.jobs import JobStatus
 from recozik_web.token_utils import TOKEN_HASH_PREFIX
 from starlette.websockets import WebSocketDisconnect
 
@@ -457,6 +458,45 @@ def test_job_websocket_rejects_other_user(monkeypatch, web_app) -> None:
         ) as websocket:
             websocket.receive_json()
     assert excinfo.value.code == status.WS_1008_POLICY_VIOLATION
+
+
+def test_list_jobs_returns_only_current_user(web_app) -> None:
+    """GET /jobs should scope results to the current token."""
+    client, _, app_module, settings = web_app
+    worker_token = _create_token(client, "worker-token", "worker")
+    repo = app_module.get_job_repository(settings.jobs_database_url_resolved)
+
+    worker_jobs = [
+        repo.create_job(user_id="worker"),
+        repo.create_job(user_id="worker"),
+        repo.create_job(user_id="worker"),
+    ]
+    for job in worker_jobs:
+        repo.set_status(job.id, JobStatus.COMPLETED, result={"job_id": job.id})
+    repo.create_job(user_id="other-user")
+
+    resp = client.get("/jobs", headers={"X-API-Token": worker_token})
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert [entry["job_id"] for entry in payload] == [job.id for job in reversed(worker_jobs)]
+
+
+def test_admin_can_list_jobs_for_any_user(web_app) -> None:
+    """Admins may filter jobs by user_id."""
+    client, _, app_module, settings = web_app
+    repo = app_module.get_job_repository(settings.jobs_database_url_resolved)
+    job = repo.create_job(user_id="inspect-user")
+    repo.set_status(job.id, JobStatus.RUNNING)
+
+    resp = client.get(
+        "/jobs",
+        params={"user_id": "inspect-user"},
+        headers={"X-API-Token": API_TOKEN},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["job_id"] == job.id
 
 
 def test_admin_tokens_hide_secret(web_app) -> None:
