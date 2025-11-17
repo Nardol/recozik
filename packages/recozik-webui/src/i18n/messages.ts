@@ -42,6 +42,7 @@ const en = {
   "uploader.status.queued": "Job queued. Polling for updates…",
   "uploader.error.noToken": "Provide an API token before uploading files.",
   "uploader.error.noFile": "Select an audio file before submitting.",
+  "uploader.error.generic": "Upload failed. Try again later.",
   "jobs.title": "Jobs",
   "jobs.empty": "No identify jobs yet. Submit an upload to see live results.",
   "jobs.th.id": "Job ID",
@@ -140,6 +141,7 @@ const fr: Record<MessageKey, string> = {
   "uploader.error.noToken":
     "Fournissez un jeton API avant de téléverser des fichiers.",
   "uploader.error.noFile": "Sélectionnez un fichier audio avant de valider.",
+  "uploader.error.generic": "Échec du téléversement. Réessayez plus tard.",
   "jobs.title": "Tâches",
   "jobs.empty":
     "Aucune tâche d'identification pour l'instant. Téléversez un fichier pour voir les résultats en direct.",

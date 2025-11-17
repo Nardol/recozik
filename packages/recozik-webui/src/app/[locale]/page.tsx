@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 import { DashboardClient } from "../../components/DashboardClient";
 import { Providers } from "../../components/Providers";
 import { serverFetchWhoami } from "../../lib/server/whoami";
-
-const SUPPORTED_LOCALES = ["en", "fr"];
+import { SUPPORTED_LOCALES } from "../../lib/constants";
 
 interface Props {
   params: { locale: string };
@@ -23,7 +22,8 @@ export default async function LocaleDashboard({ params }: Props) {
   if (token) {
     try {
       profile = await serverFetchWhoami(token);
-    } catch {
+    } catch (error) {
+      console.error("Failed to fetch user profile:", error);
       profile = null;
     }
   }

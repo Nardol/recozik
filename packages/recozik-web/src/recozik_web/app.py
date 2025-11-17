@@ -769,8 +769,6 @@ def list_jobs(
     repo = get_job_repository(settings.jobs_database_url_resolved)
     is_admin = context.user.has_role("admin")
     target_user = user_id if is_admin else context.user.user_id
-    if not is_admin:
-        target_user = context.user.user_id
     records = repo.list_jobs(user_id=target_user, limit=limit, offset=offset)
     return [_job_to_model(job) for job in records]
 

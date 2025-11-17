@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { cookies } from "next/headers";
+import { isSupportedLocale } from "../lib/constants";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,7 +25,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const localeCookie = cookieStore.get("recozik_locale")?.value ?? "en";
+  const rawLocale = cookieStore.get("recozik_locale")?.value ?? "en";
+  const localeCookie = isSupportedLocale(rawLocale) ? rawLocale : "en";
   return (
     <html lang={localeCookie}>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>

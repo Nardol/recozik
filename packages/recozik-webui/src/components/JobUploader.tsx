@@ -46,7 +46,7 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
     } else if (state.code === "missing_file") {
       statusText = t("uploader.error.noFile");
     } else {
-      statusText = state.message ?? t("uploader.status.uploading");
+      statusText = state.message ?? t("uploader.error.generic");
     }
   }
 

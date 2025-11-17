@@ -79,7 +79,7 @@ export async function uploadAction(
     return { status: "error", code: "missing_token" };
   }
   const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+  if (!(file instanceof Blob) || file.size === 0) {
     return { status: "error", code: "missing_file" };
   }
   try {

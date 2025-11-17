@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-
-const SUPPORTED = ["en", "fr"];
+import { SUPPORTED_LOCALES } from "../lib/constants";
 
 function detectLocale(header: string | null): string {
   if (!header) return "en";
@@ -9,7 +8,7 @@ function detectLocale(header: string | null): string {
   for (const candidate of candidates) {
     const [lang] = candidate.split(";");
     const base = lang?.split("-")[0];
-    if (base && SUPPORTED.includes(base)) {
+    if (base && SUPPORTED_LOCALES.includes(base)) {
       return base;
     }
   }

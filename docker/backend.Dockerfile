@@ -7,6 +7,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        curl \
         libsndfile1 \
         ffmpeg \
         libchromaprint1 \
