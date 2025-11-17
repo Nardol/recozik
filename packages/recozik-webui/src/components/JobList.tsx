@@ -36,11 +36,7 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
 
   if (jobs.length === 0) {
     return (
-      <section
-        id={sectionId}
-        aria-labelledby="jobs-title"
-        className="panel"
-      >
+      <section id={sectionId} aria-labelledby="jobs-title" className="panel">
         <h2 id="jobs-title">Jobs</h2>
         <p>No identify jobs yet. Submit an upload to see live results.</p>
       </section>
@@ -48,11 +44,7 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
   }
 
   return (
-    <section
-      id={sectionId}
-      aria-labelledby="jobs-title"
-      className="panel"
-    >
+    <section id={sectionId} aria-labelledby="jobs-title" className="panel">
       <h2 id="jobs-title">Jobs</h2>
       <div className="table-wrapper" role="region" aria-live="polite">
         <table>

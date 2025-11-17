@@ -98,11 +98,7 @@ export function AdminTokenManager({ sectionId }: Props) {
   };
 
   return (
-    <section
-      id={sectionId}
-      aria-labelledby="admin-title"
-      className="panel"
-    >
+    <section id={sectionId} aria-labelledby="admin-title" className="panel">
       <h2 id="admin-title">Admin · Token management</h2>
       <p className="muted">
         Create or update tokens, toggle AudD access, and tune quota policies.

@@ -23,11 +23,7 @@ export function NavigationBar() {
         </li>
       </ul>
       <div className="nav-actions">
-        <button
-          type="button"
-          className="secondary small"
-          onClick={clearToken}
-        >
+        <button type="button" className="secondary small" onClick={clearToken}>
           Disconnect
         </button>
       </div>

@@ -52,11 +52,7 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
   };
 
   return (
-    <section
-      id={sectionId}
-      aria-labelledby="upload-title"
-      className="panel"
-    >
+    <section id={sectionId} aria-labelledby="upload-title" className="panel">
       <h2 id="upload-title">Upload &amp; identify audio</h2>
       <p className="muted">
         Upload an audio clip to trigger the identify workflow. Jobs are
