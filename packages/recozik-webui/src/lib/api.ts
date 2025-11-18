@@ -98,6 +98,30 @@ export async function fetchJobDetail(
   return apiFetch(`/jobs/${jobId}`, token, { cache: "no-store" });
 }
 
+interface JobsQuery {
+  limit?: number;
+  offset?: number;
+  userId?: string;
+}
+
+export async function fetchJobs(
+  token: string,
+  query?: JobsQuery,
+): Promise<JobDetail[]> {
+  const params = new URLSearchParams();
+  if (query?.limit) {
+    params.set("limit", String(query.limit));
+  }
+  if (typeof query?.offset === "number") {
+    params.set("offset", String(query.offset));
+  }
+  if (query?.userId) {
+    params.set("user_id", query.userId);
+  }
+  const search = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch(`/jobs${search}`, token, { cache: "no-store" });
+}
+
 export async function fetchAdminTokens(
   token: string,
 ): Promise<TokenResponse[]> {
