@@ -28,9 +28,10 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
   const socketsRef = useRef<Map<string, WebSocket>>(new Map());
 
   useEffect(() => {
+    const sockets = socketsRef.current;
     return () => {
-      socketsRef.current.forEach((socket) => socket.close());
-      socketsRef.current.clear();
+      sockets.forEach((socket) => socket.close());
+      sockets.clear();
     };
   }, []);
 
