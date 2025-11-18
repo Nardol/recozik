@@ -196,7 +196,7 @@ function ResultSummary({ job, t }: ResultSummaryProps) {
     return <span className="muted">{t("jobs.summary.noResult")}</span>;
   }
 
-  const match = job.result.matches[0];
+  const match = job.result.matches?.[0];
   const metadataLine = formatMetadata(job.result.metadata);
   const note = job.result.audd_note;
   const auddError = job.result.audd_error;

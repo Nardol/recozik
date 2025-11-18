@@ -64,7 +64,7 @@ export interface MatchSummary {
   artist?: string | null;
   release_group_id?: string | null;
   release_group_title?: string | null;
-  releases: ReleaseSummary[];
+  releases?: ReleaseSummary[] | null;
 }
 
 export interface IdentifyResult {
