@@ -4,7 +4,8 @@ import { useEffect, useId } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { JobDetail } from "../lib/api";
 import { useI18n } from "../i18n/I18nProvider";
-import { DEFAULT_UPLOAD_STATE, uploadAction } from "../app/actions";
+import { uploadAction } from "../app/actions";
+import { DEFAULT_UPLOAD_STATE } from "../app/action-defaults";
 
 interface Props {
   onJobUpdate: (job: JobDetail) => void;

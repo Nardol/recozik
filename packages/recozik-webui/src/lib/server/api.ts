@@ -1,11 +1,22 @@
 import "server-only";
 
-const RAW_BASE =
-  process.env.RECOZIK_WEB_API_BASE ||
-  process.env.NEXT_PUBLIC_RECOZIK_API_BASE ||
-  "http://localhost:8000";
+const DEFAULT_INTERNAL_BASE = stripTrailingSlash(
+  process.env.RECOZIK_INTERNAL_API_BASE || "http://backend:8000",
+);
 
-const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
+function stripTrailingSlash(value: string): string {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+function resolveApiBase(): string {
+  const preferred = process.env.RECOZIK_WEB_API_BASE?.trim();
+  if (preferred && /^https?:\/\//i.test(preferred)) {
+    return stripTrailingSlash(preferred);
+  }
+  return DEFAULT_INTERNAL_BASE;
+}
+
+const API_BASE = resolveApiBase();
 
 function resolve(path: string): string {
   return path.startsWith("http") ? path : `${API_BASE}${path}`;

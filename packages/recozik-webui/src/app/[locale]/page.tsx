@@ -6,11 +6,12 @@ import { serverFetchWhoami } from "../../lib/server/whoami";
 import { isSupportedLocale } from "../../lib/constants";
 
 interface Props {
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }
 
 export default async function LocaleDashboard({ params }: Props) {
-  if (!isSupportedLocale(params.locale)) {
+  const resolved = await params;
+  if (!isSupportedLocale(resolved.locale)) {
     notFound();
   }
   const cookieStore = await cookies();
@@ -26,7 +27,7 @@ export default async function LocaleDashboard({ params }: Props) {
   }
   return (
     <Providers
-      locale={params.locale}
+      locale={resolved.locale}
       initialToken={token}
       initialProfile={profile}
     >

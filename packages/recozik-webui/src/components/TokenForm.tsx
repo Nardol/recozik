@@ -2,7 +2,8 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { useI18n } from "../i18n/I18nProvider";
-import { DEFAULT_STATE, loginAction } from "../app/actions";
+import { loginAction } from "../app/actions";
+import { DEFAULT_LOGIN_STATE } from "../app/action-defaults";
 
 function SubmitButton({
   savingLabel,
@@ -21,7 +22,7 @@ function SubmitButton({
 
 export function TokenForm() {
   const { t, locale } = useI18n();
-  const [state, formAction] = useFormState(loginAction, DEFAULT_STATE);
+  const [state, formAction] = useFormState(loginAction, DEFAULT_LOGIN_STATE);
 
   return (
     <section aria-labelledby="token-form-title" className="panel">

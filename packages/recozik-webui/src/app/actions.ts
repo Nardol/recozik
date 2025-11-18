@@ -4,17 +4,10 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { serverFetchWhoami } from "../lib/server/whoami";
 import { serverCreateJob } from "../lib/server/jobs";
-import type { JobDetail } from "../lib/api";
+import type { LoginState, UploadState } from "./action-types";
 
 const TOKEN_COOKIE = "recozik_token";
 const SECURE = process.env.NODE_ENV === "production";
-
-export type LoginState = {
-  status: "idle" | "error" | "success";
-  message: string;
-};
-
-const DEFAULT_STATE: LoginState = { status: "idle", message: "" };
 
 export async function loginAction(
   _prevState: LoginState,
@@ -51,22 +44,6 @@ export async function logoutAction(formData: FormData) {
   cookieStore.delete(TOKEN_COOKIE);
   revalidatePath(`/${locale}`);
 }
-
-export { DEFAULT_STATE };
-
-type UploadState = {
-  status: "idle" | "error" | "success";
-  code?: "queued" | "missing_token" | "missing_file" | "backend";
-  message?: string;
-  job?: JobDetail | null;
-};
-
-export const DEFAULT_UPLOAD_STATE: UploadState = {
-  status: "idle",
-  code: undefined,
-  message: "",
-  job: null,
-};
 
 export async function uploadAction(
   _prevState: UploadState,
