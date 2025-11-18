@@ -53,7 +53,6 @@ export async function uploadAction(
 ): Promise<UploadState> {
   const cookieStore = await cookies();
   const token = cookieStore.get(TOKEN_COOKIE)?.value;
-  const locale = (formData.get("locale") || "en").toString();
   if (!token) {
     return { status: "error", code: "missing_token" };
   }
@@ -63,7 +62,6 @@ export async function uploadAction(
   }
   try {
     const job = await serverCreateJob(token, formData);
-    revalidatePath(`/${locale}`);
     return { status: "success", code: "queued", job };
   } catch (error) {
     return {
