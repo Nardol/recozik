@@ -1,6 +1,8 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG RECOZIK_WEBUI_UPLOAD_LIMIT
+ENV RECOZIK_WEBUI_UPLOAD_LIMIT=${RECOZIK_WEBUI_UPLOAD_LIMIT}
 COPY packages/recozik-webui/package*.json ./
 RUN npm ci
 COPY packages/recozik-webui/src ./src
@@ -13,6 +15,8 @@ FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
+ARG RECOZIK_WEBUI_UPLOAD_LIMIT
+ENV RECOZIK_WEBUI_UPLOAD_LIMIT=${RECOZIK_WEBUI_UPLOAD_LIMIT}
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
     chown -R nextjs:nodejs /app

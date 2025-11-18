@@ -34,6 +34,8 @@ services:
     build:
       context: ..
       dockerfile: docker/frontend.Dockerfile
+      args:
+        RECOZIK_WEBUI_UPLOAD_LIMIT: ${RECOZIK_WEBUI_UPLOAD_LIMIT:-100mb}
     deploy:
       resources:
         limits:
@@ -44,6 +46,7 @@ services:
           memory: 128M
     environment:
       NEXT_PUBLIC_RECOZIK_API_BASE: /api
+      RECOZIK_WEBUI_UPLOAD_LIMIT: ${RECOZIK_WEBUI_UPLOAD_LIMIT:-100mb}
     depends_on:
       backend:
         condition: service_healthy
