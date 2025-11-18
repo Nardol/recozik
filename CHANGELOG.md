@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Added optional MusicBrainz enrichment for `identify` and `identify-batch`, including new `--with-musicbrainz/--without-musicbrainz` toggles and missing-only controls.
 - Normalized AudD responses now capture MusicBrainz identifiers when returned by the API, letting cached results retain MBIDs and improving downstream metadata merges.
 - Internal: introduced the `recozik-services` workspace package, rewired CLI commands to call its identify/batch/rename runners, and added docs/tests for the shared service layer that future GUIs will consume.
+- Migrated the Next.js web interface from `middleware.ts` to the new `proxy.ts` entry point so locale routing keeps working on Next 16.
 
 ## [0.10.0] - 2025-10-31
 
