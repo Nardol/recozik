@@ -50,6 +50,33 @@ export interface WhoAmI {
   allowed_features: string[];
 }
 
+export interface ReleaseSummary {
+  title?: string | null;
+  release_id?: string | null;
+  date?: string | null;
+  country?: string | null;
+}
+
+export interface MatchSummary {
+  score: number;
+  recording_id?: string | null;
+  title?: string | null;
+  artist?: string | null;
+  release_group_id?: string | null;
+  release_group_title?: string | null;
+  releases?: ReleaseSummary[] | null;
+}
+
+export interface IdentifyResult {
+  matches: MatchSummary[];
+  match_source: string | null;
+  metadata: Record<string, string> | null;
+  audd_note: string | null;
+  audd_error: string | null;
+  fingerprint: string;
+  duration_seconds: number;
+}
+
 export interface JobDetail {
   job_id: string;
   status: string;
@@ -57,7 +84,7 @@ export interface JobDetail {
   updated_at: string;
   finished_at?: string | null;
   messages: string[];
-  result: Record<string, unknown> | null;
+  result: IdentifyResult | null;
   error: string | null;
 }
 

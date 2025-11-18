@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { JobDetail, fetchJobDetail } from "../lib/api";
 import { MessageKey, useI18n } from "../i18n/I18nProvider";
 import { useToken } from "./TokenProvider";
@@ -157,14 +158,13 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
                   </ul>
                 </td>
                 <td>
+                  <ResultSummary job={job} t={t} />
                   {job.result ? (
                     <details>
                       <summary>{t("jobs.viewJson")}</summary>
                       <pre>{JSON.stringify(job.result, null, 2)}</pre>
                     </details>
-                  ) : (
-                    <span className="muted">{t("jobs.pending")}</span>
-                  )}
+                  ) : null}
                 </td>
               </tr>
             ))}
@@ -173,4 +173,151 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
       </div>
     </section>
   );
+}
+
+interface ResultSummaryProps {
+  job: JobDetail;
+  t: (key: MessageKey, values?: Record<string, string | number>) => string;
+}
+
+function ResultSummary({ job, t }: ResultSummaryProps) {
+  if (job.error) {
+    return (
+      <p className="error">{t("jobs.summary.error", { message: job.error })}</p>
+    );
+  }
+
+  if (job.status !== "completed") {
+    const statusKey = `jobs.status.${job.status}` as MessageKey;
+    return <span className="muted">{t(statusKey)}</span>;
+  }
+
+  if (!job.result) {
+    return <span className="muted">{t("jobs.summary.noResult")}</span>;
+  }
+
+  const match = job.result.matches?.[0];
+  const metadataLine = formatMetadata(job.result.metadata);
+  const note = job.result.audd_note;
+  const auddError = job.result.audd_error;
+  const sourceLine = job.result.match_source
+    ? t("jobs.summary.source", { source: job.result.match_source })
+    : null;
+
+  const lines: ReactNode[] = [];
+
+  if (match) {
+    const artist = match.artist || t("jobs.summary.unknownArtist");
+    const title = match.title || t("jobs.summary.unknownTitle");
+    const release =
+      match.release_group_title || match.releases?.[0]?.title || undefined;
+    const score = formatScore(match.score);
+
+    lines.push(
+      <p key="headline">
+        <strong>{artist ? `${artist} — ${title}` : title}</strong>
+      </p>,
+    );
+
+    if (release) {
+      lines.push(
+        <p key="release" className="muted">
+          {release}
+        </p>,
+      );
+    }
+
+    const facts: string[] = [];
+    if (score !== null) {
+      facts.push(t("jobs.summary.score", { score }));
+    }
+    if (sourceLine) {
+      facts.push(sourceLine);
+    }
+    if (facts.length) {
+      lines.push(
+        <p key="facts" className="muted">
+          {facts.join(" · ")}
+        </p>,
+      );
+    }
+  } else {
+    lines.push(
+      <p key="no-match" className="muted">
+        {t("jobs.summary.noMatches")}
+      </p>,
+    );
+    if (sourceLine) {
+      lines.push(
+        <p key="source" className="muted">
+          {sourceLine}
+        </p>,
+      );
+    }
+  }
+
+  if (metadataLine) {
+    lines.push(
+      <p key="metadata" className="muted">
+        {t("jobs.summary.metadata", { metadata: metadataLine })}
+      </p>,
+    );
+  }
+
+  if (note) {
+    lines.push(
+      <p key="note" className="muted">
+        {t("jobs.summary.note", { note })}
+      </p>,
+    );
+  }
+
+  if (auddError) {
+    lines.push(
+      <p key="audd-error" className="error">
+        {t("jobs.summary.auddError", { message: auddError })}
+      </p>,
+    );
+  }
+
+  return <div className="result-summary">{lines}</div>;
+}
+
+function formatScore(value: number | undefined): number | null {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+  const scaled = value <= 1 ? value * 100 : value;
+  return Math.round(Math.min(Math.max(scaled, 0), 100));
+}
+
+function formatMetadata(
+  metadata: Record<string, string> | null,
+): string | null {
+  if (!metadata) {
+    return null;
+  }
+  const preferred = ["title", "artist", "album", "track", "composer"];
+  const values: string[] = [];
+  const seen = new Set<string>();
+
+  for (const key of preferred) {
+    const value = metadata[key];
+    if (value && !seen.has(value)) {
+      values.push(value);
+      seen.add(value);
+    }
+  }
+
+  Object.values(metadata).forEach((value) => {
+    if (value && !seen.has(value)) {
+      values.push(value);
+      seen.add(value);
+    }
+  });
+
+  if (values.length === 0) {
+    return null;
+  }
+  return values.slice(0, 3).join(" · ");
 }
