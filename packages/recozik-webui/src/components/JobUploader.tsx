@@ -55,7 +55,12 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
     <section id={sectionId} aria-labelledby="upload-title" className="panel">
       <h2 id="upload-title">{t("uploader.title")}</h2>
       <p className="muted">{t("uploader.description")}</p>
-      <form className="stack" action={formAction}>
+      <form
+        className="stack"
+        action={formAction}
+        method="POST"
+        encType="multipart/form-data"
+      >
         <input type="hidden" name="locale" value={locale} />
         <label htmlFor="file-input">{t("uploader.audio")}</label>
         <input

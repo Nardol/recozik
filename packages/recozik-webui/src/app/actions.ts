@@ -15,6 +15,7 @@ export async function loginAction(
 ): Promise<LoginState> {
   const rawToken = formData.get("token");
   const locale = (formData.get("locale") || "en").toString();
+  const shouldPersist = formData.get("remember") === "on";
   const token = (rawToken ?? "").toString().trim();
   if (!token) {
     return { status: "error", message: "Token is required" };
@@ -33,6 +34,7 @@ export async function loginAction(
     sameSite: "lax",
     secure: SECURE,
     path: "/",
+    maxAge: shouldPersist ? 60 * 60 * 24 * 30 : undefined,
   });
   revalidatePath(`/${locale}`);
   return { status: "success", message: "Token saved" };

@@ -44,6 +44,10 @@ export function TokenForm() {
         <p id="token-help" className="muted">
           {t("tokenForm.help")}
         </p>
+        <label className="option" htmlFor="remember-token">
+          <input id="remember-token" name="remember" type="checkbox" />
+          {t("tokenForm.remember")}
+        </label>
         <SubmitButton
           savingLabel={t("tokenForm.saving")}
           idleLabel={t("tokenForm.save")}
