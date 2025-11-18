@@ -16,13 +16,13 @@ export function NavigationBar() {
   return (
     <nav className="top-nav" aria-label="Main navigation">
       <ul className="nav-links" role="list">
-        <li role="none">
+        <li>
           <a href="#upload-section">{t("nav.upload")}</a>
         </li>
-        <li role="none">
+        <li>
           <a href="#jobs-section">{t("nav.jobs")}</a>
         </li>
-        <li role="none">
+        <li>
           <a href="#admin-section">{t("nav.admin")}</a>
         </li>
       </ul>
