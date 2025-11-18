@@ -8,7 +8,7 @@ import { JobList } from "./JobList";
 import { AdminTokenManager } from "./AdminTokenManager";
 import { ProfileCard } from "./ProfileCard";
 import { NavigationBar } from "./NavigationBar";
-import { JobDetail } from "../lib/api";
+import { JobDetail, fetchJobs } from "../lib/api";
 import { useI18n } from "../i18n/I18nProvider";
 
 export function DashboardClient() {
@@ -18,6 +18,26 @@ export function DashboardClient() {
 
   useEffect(() => {
     setJobs([]);
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const initial = await fetchJobs(token);
+        if (!cancelled) {
+          setJobs(initial);
+        }
+      } catch (error) {
+        console.error("Unable to load recent jobs", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const sortedJobs = useMemo(

@@ -4,17 +4,10 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { serverFetchWhoami } from "../lib/server/whoami";
 import { serverCreateJob } from "../lib/server/jobs";
-import type { JobDetail } from "../lib/api";
+import type { LoginState, UploadState } from "./action-types";
 
 const TOKEN_COOKIE = "recozik_token";
 const SECURE = process.env.NODE_ENV === "production";
-
-export type LoginState = {
-  status: "idle" | "error" | "success";
-  message: string;
-};
-
-const DEFAULT_STATE: LoginState = { status: "idle", message: "" };
 
 export async function loginAction(
   _prevState: LoginState,
@@ -22,6 +15,7 @@ export async function loginAction(
 ): Promise<LoginState> {
   const rawToken = formData.get("token");
   const locale = (formData.get("locale") || "en").toString();
+  const shouldPersist = formData.get("remember") === "on";
   const token = (rawToken ?? "").toString().trim();
   if (!token) {
     return { status: "error", message: "Token is required" };
@@ -40,6 +34,7 @@ export async function loginAction(
     sameSite: "lax",
     secure: SECURE,
     path: "/",
+    maxAge: shouldPersist ? 60 * 60 * 24 * 30 : undefined,
   });
   revalidatePath(`/${locale}`);
   return { status: "success", message: "Token saved" };
@@ -52,29 +47,12 @@ export async function logoutAction(formData: FormData) {
   revalidatePath(`/${locale}`);
 }
 
-export { DEFAULT_STATE };
-
-type UploadState = {
-  status: "idle" | "error" | "success";
-  code?: "queued" | "missing_token" | "missing_file" | "backend";
-  message?: string;
-  job?: JobDetail | null;
-};
-
-export const DEFAULT_UPLOAD_STATE: UploadState = {
-  status: "idle",
-  code: undefined,
-  message: "",
-  job: null,
-};
-
 export async function uploadAction(
   _prevState: UploadState,
   formData: FormData,
 ): Promise<UploadState> {
   const cookieStore = await cookies();
   const token = cookieStore.get(TOKEN_COOKIE)?.value;
-  const locale = (formData.get("locale") || "en").toString();
   if (!token) {
     return { status: "error", code: "missing_token" };
   }
@@ -84,7 +62,6 @@ export async function uploadAction(
   }
   try {
     const job = await serverCreateJob(token, formData);
-    revalidatePath(`/${locale}`);
     return { status: "success", code: "queued", job };
   } catch (error) {
     return {

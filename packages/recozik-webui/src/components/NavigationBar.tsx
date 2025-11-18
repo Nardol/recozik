@@ -15,7 +15,7 @@ export function NavigationBar() {
 
   return (
     <nav className="top-nav" aria-label="Main navigation">
-      <ul className="nav-links">
+      <ul className="nav-links" role="list">
         <li>
           <a href="#upload-section">{t("nav.upload")}</a>
         </li>

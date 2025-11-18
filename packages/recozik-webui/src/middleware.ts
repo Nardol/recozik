@@ -25,7 +25,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   if (!isSupportedLocale(first)) {
-    return NextResponse.redirect(new URL(`/en${pathname}`, request.url));
+    const remainder = segments.slice(1).join("/");
+    const nextPath = remainder ? `/en/${remainder}` : "/en";
+    return NextResponse.redirect(new URL(nextPath, request.url));
   }
   const response = NextResponse.next();
   response.cookies.set("recozik_locale", first, {
@@ -36,5 +38,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/:path*"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

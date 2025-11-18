@@ -18,6 +18,7 @@ const en = {
   "tokenForm.label": "Token",
   "tokenForm.help":
     "Your token is stored locally in the browser and never shared with Recozik.",
+  "tokenForm.remember": "Keep me signed in on this browser",
   "tokenForm.save": "Save token",
   "tokenForm.saving": "Validating…",
   "tokenForm.errorRequired": "Please provide an API token.",
@@ -116,6 +117,7 @@ const fr: Record<MessageKey, string> = {
   "tokenForm.label": "Jeton",
   "tokenForm.help":
     "Votre jeton est stocké localement dans le navigateur et n'est jamais partagé avec Recozik.",
+  "tokenForm.remember": "Connexion permanente sur ce navigateur",
   "tokenForm.save": "Enregistrer le jeton",
   "tokenForm.saving": "Validation…",
   "tokenForm.errorRequired": "Veuillez fournir un jeton API.",

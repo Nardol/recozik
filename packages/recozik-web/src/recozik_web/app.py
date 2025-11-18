@@ -6,6 +6,7 @@ import contextlib
 import logging
 import os
 from datetime import datetime
+from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -59,6 +60,23 @@ from .token_utils import (
 
 logger = logging.getLogger("recozik.web")
 security_logger = logging.getLogger("recozik.web.security")
+
+
+def _token_from_websocket(websocket: WebSocket) -> str | None:
+    token = websocket.headers.get(API_TOKEN_HEADER)
+    if token:
+        return token
+    cookie_header = websocket.headers.get("cookie")
+    if not cookie_header:
+        return None
+    try:
+        jar = SimpleCookie()
+        jar.load(cookie_header)
+        cookie = jar.get("recozik_token")
+        return cookie.value if cookie and cookie.value else None
+    except Exception:  # pragma: no cover - defensive fallback
+        logger.warning("Failed to parse cookies during WebSocket auth", exc_info=True)
+        return None
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -781,7 +799,7 @@ async def job_updates(websocket: WebSocket, job_id: str) -> None:
     Query parameters are not accepted to prevent token leakage in logs.
     """
     logger.debug("WebSocket connect for %s", job_id)
-    token = websocket.headers.get(API_TOKEN_HEADER)
+    token = _token_from_websocket(websocket)
     settings = get_settings()
 
     if not token:

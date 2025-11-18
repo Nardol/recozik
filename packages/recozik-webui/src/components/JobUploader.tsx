@@ -4,7 +4,8 @@ import { useEffect, useId } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { JobDetail } from "../lib/api";
 import { useI18n } from "../i18n/I18nProvider";
-import { DEFAULT_UPLOAD_STATE, uploadAction } from "../app/actions";
+import { uploadAction } from "../app/actions";
+import { DEFAULT_UPLOAD_STATE } from "../app/action-defaults";
 
 interface Props {
   onJobUpdate: (job: JobDetail) => void;
@@ -54,7 +55,12 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
     <section id={sectionId} aria-labelledby="upload-title" className="panel">
       <h2 id="upload-title">{t("uploader.title")}</h2>
       <p className="muted">{t("uploader.description")}</p>
-      <form className="stack" action={formAction}>
+      <form
+        className="stack"
+        action={formAction}
+        method="POST"
+        encType="multipart/form-data"
+      >
         <input type="hidden" name="locale" value={locale} />
         <label htmlFor="file-input">{t("uploader.audio")}</label>
         <input
