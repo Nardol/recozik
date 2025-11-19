@@ -28,6 +28,10 @@ npm run lint
 # run component tests
 npm test
 
+# end-to-end tests (Playwright)
+npx playwright install --with-deps chromium
+npm run test:e2e
+
 # production build
 npm run build
 npm run start -- --hostname 0.0.0.0 --port 3000
