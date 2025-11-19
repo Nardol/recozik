@@ -30,10 +30,11 @@ describe("LanguageSwitcher", () => {
       </I18nProvider>,
     );
 
-    const select = screen.getByRole("combobox", {
-      name: "Interface language",
-    });
+    const select = screen.getByRole("combobox", { name: "Interface language" });
     expect(select).toHaveValue("en");
+
+    const options = screen.getAllByRole("option");
+    expect(options.map((o) => o.getAttribute("value"))).toEqual(["en", "fr"]);
 
     fireEvent.change(select, { target: { value: "fr" } });
     expect(push).toHaveBeenCalledWith("/fr/dashboard/jobs");
