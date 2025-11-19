@@ -14,7 +14,7 @@ function detectLocale(header: string | null): string {
   return "en";
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const segments = pathname.split("/").filter(Boolean);
   const first = segments[0];
