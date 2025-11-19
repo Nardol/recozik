@@ -22,7 +22,10 @@
 - `uv run ruff format` – Apply Ruff formatter to keep code style consistent.
 - `uv run mypy` – Run static type checks (entire `src/recozik` + `recozik_core` must stay clean).
 - `uv run pytest` – Run the full automated test suite.
-- `cd packages/recozik-webui && npm install && npm run lint` – Install frontend dependencies and run Next.js lint/type checks before touching the dashboard.
+- Frontend (web UI):
+  - `cd packages/recozik-webui && npm install && npm run lint` – Install deps and lint/type-check the dashboard.
+  - `cd packages/recozik-webui && npm test -- --run` – Run Vitest component/unit tests (jsdom + Testing Library).
+  - `cd packages/recozik-webui && npm run build` – Production build; CI runs lint → tests → build in that order.
 - `cd docker && docker compose up --build` – Launch the full stack (backend + frontend + Nginx). Populate `docker/.env` with real tokens/keys before sharing instructions.
 - `uv build` – Produce wheel + sdist for validation before releases.
 
