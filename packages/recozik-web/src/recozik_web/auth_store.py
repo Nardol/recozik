@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -100,9 +101,60 @@ def get_token_repository(database_url: str) -> TokenRepository:
     return repo
 
 
-def ensure_seed_tokens(repo: TokenRepository, *, defaults: list[TokenRecord]) -> None:
-    """Insert default tokens if the DB is empty."""
-    if repo.list_tokens():
+@dataclass(frozen=True)
+class SeedToken:
+    """Default token definition paired with its raw value."""
+
+    raw_value: str
+    record: TokenRecord
+
+
+def ensure_seed_tokens(repo: TokenRepository, *, defaults: list[SeedToken]) -> None:
+    """Ensure default tokens exist and contain the expected capabilities."""
+    existing = repo.list_tokens()
+    if not existing:
+        for seed in defaults:
+            repo.upsert(seed.record)
         return
-    for record in defaults:
-        repo.upsert(record)
+
+    for seed in defaults:
+        match: TokenRecord | None = None
+        for record in existing:
+            if compare_token(seed.raw_value, record.token):
+                match = record
+                break
+
+        if match is None:
+            repo.upsert(seed.record)
+            existing.append(seed.record)
+            continue
+
+        merged_features = list(match.allowed_features or [])
+        merged_limits = dict(match.quota_limits or {})
+        changed = False
+
+        for feature in seed.record.allowed_features:
+            if feature not in merged_features:
+                merged_features.append(feature)
+                changed = True
+
+        for scope, limit in seed.record.quota_limits.items():
+            if scope not in merged_limits:
+                merged_limits[scope] = limit
+                changed = True
+
+        if not changed:
+            continue
+
+        repo.upsert(
+            TokenRecord(
+                token=match.token,
+                user_id=match.user_id,
+                display_name=match.display_name,
+                roles=list(match.roles),
+                allowed_features=merged_features,
+                quota_limits=merged_limits,
+            )
+        )
+        match.allowed_features = merged_features
+        match.quota_limits = merged_limits
