@@ -18,7 +18,7 @@ from recozik_services.security import (
     ServiceUser,
 )
 
-from .auth_store import TokenRecord, ensure_seed_tokens, get_token_repository
+from .auth_store import SeedToken, TokenRecord, ensure_seed_tokens, get_token_repository
 from .config import WebSettings, get_settings
 from .persistent_quota import get_persistent_quota_policy
 from .rate_limit import get_auth_rate_limiter
@@ -156,25 +156,34 @@ def _build_token_rules(settings: WebSettings) -> dict[str, TokenRule]:
     return rules
 
 
-def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
-    defaults: list[TokenRecord] = []
+def _features_for(settings: WebSettings, readonly: bool) -> list[str]:
+    feats = [ServiceFeature.IDENTIFY.value]
+    if settings.musicbrainz_enabled:
+        feats.append(ServiceFeature.MUSICBRAINZ_ENRICH.value)
+    audd_allowed = bool(settings.audd_token) and (
+        not readonly or settings.readonly_quota_audd_standard is not None
+    )
+    if audd_allowed:
+        feats.append(ServiceFeature.AUDD.value)
+    if not readonly:
+        feats.extend([ServiceFeature.RENAME.value, ServiceFeature.IDENTIFY_BATCH.value])
+    return feats
 
-    def _features_for(settings: WebSettings, readonly: bool) -> list[str]:
-        feats = [ServiceFeature.IDENTIFY.value]
-        if settings.musicbrainz_enabled:
-            feats.append(ServiceFeature.MUSICBRAINZ_ENRICH.value)
-        if not readonly:
-            feats.extend([ServiceFeature.RENAME.value, ServiceFeature.IDENTIFY_BATCH.value])
-        return feats
+
+def _seed_defaults(settings: WebSettings) -> list[SeedToken]:
+    defaults: list[SeedToken] = []
 
     defaults.append(
-        TokenRecord(
-            token=hash_token_for_storage(settings.admin_token),
-            user_id="admin",
-            display_name="Administrator",
-            roles=["admin"],
-            allowed_features=_features_for(settings, readonly=False),
-            quota_limits={},
+        SeedToken(
+            raw_value=settings.admin_token,
+            record=TokenRecord(
+                token=hash_token_for_storage(settings.admin_token),
+                user_id="admin",
+                display_name="Administrator",
+                roles=["admin"],
+                allowed_features=_features_for(settings, readonly=False),
+                quota_limits={},
+            ),
         )
     )
     if settings.readonly_token:
@@ -189,13 +198,16 @@ def _seed_defaults(settings: WebSettings) -> list[TokenRecord]:
             )
 
         defaults.append(
-            TokenRecord(
-                token=hash_token_for_storage(settings.readonly_token),
-                user_id="readonly",
-                display_name="Readonly",
-                roles=["readonly"],
-                allowed_features=_features_for(settings, readonly=True),
-                quota_limits=quota_limits,
+            SeedToken(
+                raw_value=settings.readonly_token,
+                record=TokenRecord(
+                    token=hash_token_for_storage(settings.readonly_token),
+                    user_id="readonly",
+                    display_name="Readonly",
+                    roles=["readonly"],
+                    allowed_features=_features_for(settings, readonly=True),
+                    quota_limits=quota_limits,
+                ),
             )
         )
 

@@ -12,10 +12,10 @@ from fastapi import status
 from fastapi.testclient import TestClient
 from recozik_services.identify import IdentifyResponse, IdentifyServiceError
 from recozik_services.security import AccessPolicyError, ServiceFeature
-from recozik_web.auth_store import get_token_repository
+from recozik_web.auth_store import TokenRecord, get_token_repository
 from recozik_web.config import WebSettings
 from recozik_web.jobs import JobStatus
-from recozik_web.token_utils import TOKEN_HASH_PREFIX
+from recozik_web.token_utils import TOKEN_HASH_PREFIX, hash_token_for_storage
 from starlette.websockets import WebSocketDisconnect
 
 from recozik_core.fingerprint import AcoustIDMatch, FingerprintResult, ReleaseInfo
@@ -530,6 +530,31 @@ def test_admin_tokens_hide_secret(web_app) -> None:
     repo = get_token_repository(settings.auth_database_url_resolved)
     stored_record = next(record for record in repo.list_tokens() if record.user_id == "auditor")
     assert stored_record.token.startswith(TOKEN_HASH_PREFIX)
+
+
+def test_admin_seed_token_gains_audd_feature(monkeypatch, tmp_path: Path) -> None:
+    """Existing admin tokens should pick up AudD access when enabled."""
+    settings = _override_settings(tmp_path)
+    settings.audd_token = "audd-admin-token"  # noqa: S105 - test fixture secret
+
+    repo = get_token_repository(settings.auth_database_url_resolved)
+    repo.upsert(
+        TokenRecord(
+            token=hash_token_for_storage(settings.admin_token),
+            user_id="admin",
+            display_name="Administrator",
+            roles=["admin"],
+            allowed_features=[ServiceFeature.IDENTIFY.value],
+            quota_limits={},
+        )
+    )
+
+    client, _, _, _ = _bootstrap_app(monkeypatch, tmp_path, settings)
+    resp = client.get("/whoami", headers={"X-API-Token": API_TOKEN})
+    assert resp.status_code == 200, resp.text
+
+    stored_record = next(record for record in repo.list_tokens() if record.user_id == "admin")
+    assert ServiceFeature.AUDD.value in stored_record.allowed_features
 
 
 def test_restricted_token_denies_missing_feature(monkeypatch, web_app) -> None:
