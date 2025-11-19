@@ -25,6 +25,9 @@ npm run dev
 # lint & type-check
 npm run lint
 
+# run component tests
+npm test
+
 # production build
 npm run build
 npm run start -- --hostname 0.0.0.0 --port 3000

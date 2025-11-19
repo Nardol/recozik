@@ -80,6 +80,10 @@ jobs:
         run: |
           cd packages/recozik-webui
           npm run lint
+      - name: Test frontend
+        run: |
+          cd packages/recozik-webui
+          npm test -- --run
       - name: Build frontend
         run: |
           cd packages/recozik-webui
