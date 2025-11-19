@@ -18,7 +18,7 @@ COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
 COPY packages ./packages
 
-RUN uv pip install --system ./packages/recozik-web uvicorn
+RUN uv pip install --system ./packages/recozik-web
 
 ENV PYTHONPATH=/app/src:/app/packages/recozik-web/src \
     RECOZIK_WEB_BASE_MEDIA_ROOT=/data \
