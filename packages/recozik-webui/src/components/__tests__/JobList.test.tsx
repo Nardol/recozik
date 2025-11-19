@@ -49,7 +49,13 @@ describe("JobList", () => {
       },
     };
 
-    renderWithProviders(<JobList jobs={[completedJob]} onUpdate={vi.fn()} />);
+    renderWithProviders(
+      <JobList
+        jobs={[completedJob]}
+        onUpdate={vi.fn()}
+        sectionId="jobs-section"
+      />,
+    );
 
     expect(
       screen.getByText("Daft Punk — Harder, Better, Faster, Stronger"),
