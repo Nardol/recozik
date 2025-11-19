@@ -30,7 +30,7 @@
 
 ## Coding Style & Naming Conventions
 
-- Supported Python versions mirror `pyproject.toml` (currently 3.10–3.13). Python 3.14 stays experimental until upstream (librosa/numba) ships stable wheels. The recommended runtime for automation agents is Python 3.11, matching `docker/backend.Dockerfile`; other versions within the `pyproject.toml` range remain valid for local development.
+- Supported Python versions mirror `pyproject.toml` (see the `requires-python` constraint). Treat the version baked into `docker/backend.Dockerfile` as the recommended runtime for automation agents, while any interpreter allowed by `pyproject.toml` stays valid for local development. Python versions beyond that declared range are considered experimental until upstream dependencies (librosa/numba) publish official wheels.
 - CLI options use kebab-case (e.g., `--log-format`); internal functions use snake_case.
 - Keep Typer command logic inside the relevant module under `src/recozik/commands/`; `cli.py` should only register commands and surface compatibility wrappers.
 - When adding or modifying core behaviour (identify/batch/rename workflows), write it under `packages/recozik-services` first, then add the thin CLI glue that builds requests and forwards callbacks/prompts.
