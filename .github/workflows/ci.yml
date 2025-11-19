@@ -110,6 +110,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run E2E tests
         env:
+          PORT: 9999
           NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:9999
         run: |
           cd packages/recozik-webui
