@@ -30,7 +30,7 @@
 
 ## Coding Style & Naming Conventions
 
-- Supported Python versions mirror `pyproject.toml` (currently 3.10–3.13). Python 3.14 stays experimental until upstream (librosa/numba) ships stable wheels.
+- Supported Python versions mirror `pyproject.toml` (see the `requires-python` constraint). Treat the version baked into `docker/backend.Dockerfile` as the recommended runtime for automation agents, while any interpreter allowed by `pyproject.toml` stays valid for local development. Python versions beyond that declared range are considered experimental until upstream dependencies (librosa/numba) publish official wheels.
 - CLI options use kebab-case (e.g., `--log-format`); internal functions use snake_case.
 - Keep Typer command logic inside the relevant module under `src/recozik/commands/`; `cli.py` should only register commands and surface compatibility wrappers.
 - When adding or modifying core behaviour (identify/batch/rename workflows), write it under `packages/recozik-services` first, then add the thin CLI glue that builds requests and forwards callbacks/prompts.
@@ -40,6 +40,14 @@
 - Store AcoustID/AudD secrets via `recozik_core.secrets` (system keyring); never write them in plaintext config files.
 - Honor locale precedence in this order: CLI option `--locale` > environment variable `RECOZIK_LOCALE` > config `[general].locale` > system locale.
 - Favor readability-first helpers (`cli_support.options.resolve_option`, `cli_support.audd_helpers.get_audd_support`, etc.) so new code avoids redundant logic.
+
+## Documentation & Localization Policy
+
+- Every behavioural or structural change must be reflected in the relevant docs: `.github/copilot-instructions.md`, `README.md`, `README.fr.md`, `docs/deploy-*.md` (EN + FR), `TRANSLATION.md`, and any feature-specific guides.
+- Frontend changes that affect UX, routes, or strings must update both English and French documentation plus the Next.js copy in `packages/recozik-webui/src/i18n`. Use the existing message keys and add translations for each locale file before committing UI changes.
+- When adding or modifying translatable strings (CLI/services/frontend), run `python scripts/compile_translations.py` to regenerate `.mo` files and review `packages/recozik-core/src/recozik_core/locales/**/LC_MESSAGES/recozik.po` for parity.
+- Keep `AGENTS.md` (and its symlinked copies `CLAUDE.md`, `GEMINI.md`) in sync with this file; edit `.github/copilot-instructions.md` and let the symlinks inherit the content unless something breaks.
+- Before merging, confirm that new instructions needed by automation agents (Codex, Copilot, Jules, etc.) are captured in `.github/copilot-instructions.md` so all AI helpers share the same expectations.
 
 ## Testing Guidelines
 
@@ -60,12 +68,14 @@
 ## Agent-Specific Tips
 
 - Always run `git status` before exiting to ensure a clean tree.
+- If pre-commit blocks commits, rerun with elevated permissions (`with_escalated_permissions: true`).
 - If GPG signing blocks commits, rerun with elevated permissions (`with_escalated_permissions: true`).
 - Request the user's approval before running any `uv …` command and rerun with `with_escalated_permissions: true` once granted (it unlocks workspace access, not sudo).
 - See `TRANSLATION.md` for the translation workflow (extraction, `.mo` compilation, multi-locale testing).
 - When updating the web backend or dashboard, keep `docs/deploy-backend.md` and `docs/deploy-frontend.md` current so operators can redeploy without guesswork.
 - When adding new commands, create a dedicated module under `src/recozik/commands/`, surface any required backward-compatible aliases via `cli.py`, and extend this doc/README as needed.
 - Always sanity-check execution costs: keep lazy imports intact, avoid unnecessary `Path.resolve()` churn in hot paths, and document trade-offs if a feature must slow things down.
+- Keep frontend localisation healthy: UI copy lives under `packages/recozik-webui/src/i18n`, so every new label/helptext needs translations for all supported locales plus any accessibility notes (aria labels, live regions). Run `npm run lint` after changing text or locale files.
 
 ---
 
@@ -126,6 +136,7 @@ See `packages/recozik-web/src/recozik_web/config.py` for the exhaustive list.
 - **Admin tooling**: `AdminTokenManager` uses `/admin/tokens` to list/create tokens (roles, features, quota scopes). Only shows up when `whoami.roles` contains `admin`.
 - **API client**: `src/lib/api.ts` centralizes calls (`fetchWhoami`, `uploadJob`, `fetchJobs`, `createToken`) and enforces the `X-API-Token` header. `NEXT_PUBLIC_RECOZIK_API_BASE` must point to the backend (default `/api`).
 - **Accessibility**: Keep `SkipLink`, `aria-live` regions, focus management, and translation keys intact when modifying layouts.
+- **Localization**: Strings live in `packages/recozik-webui/src/i18n`. Add new keys to every locale file and verify both English and French output before shipping. Prefer structured message IDs instead of inline literals.
 - **Dev commands**: `npm install`, `npm run dev`, `npm run lint`, `npm run build`, `npm run start -- --hostname 0.0.0.0 --port 3000`.
 
 ## Docker / Compose Stack
@@ -144,3 +155,18 @@ See `packages/recozik-web/src/recozik_web/config.py` for the exhaustive list.
 | Docker         | `.env` file mirrors backend + frontend vars; supply tokens and storage paths once to keep all services consistent.                         |
 
 Keep these tables up to date whenever behaviour or configuration changes so every agent (CLI, backend, UI) consumes the same source of truth.
+
+## Security & External Agent Notes
+
+- Run `uv run python scripts/token_audit.py --database-url <url>` whenever the auth DB schema changes or before releases to ensure all stored tokens use hashed format (see `DEPLOYMENT_SECURITY.md` for the full checklist).
+- Backend environments must honour `RECOZIK_WEB_SECURITY_*`, rate-limit knobs, and TLS guidance in `DEPLOYMENT_SECURITY.md`. Document any deviation directly in `docs/deploy-backend*.md`.
+- Autonomous agents (Jules, Copilot, Codex Web…) work in isolated Linux VMs; spell out the system prep in `GEMINI.md` so they can bootstrap without human intervention. Include at minimum:
+  - Debian/Ubuntu packages derived from `docker/backend.Dockerfile`:
+    ```bash
+    sudo apt-get update && sudo apt-get install -y \
+      curl libsndfile1 ffmpeg libchromaprint1 libchromaprint-tools gettext
+    ```
+    Add other binary deps (e.g. `msgfmt`, `ffprobe`) if tests require them.
+  - Project bootstrap commands: `uv sync --all-groups`, `uv run pytest`, `uv run ruff check --fix`, `uv run mypy`, `npm install`, `npm run lint`, `npm run build`.
+  - Node.js ≥20 (frontend) and Python 3.11 (backend) availability; document how to install them when the base image lacks the right versions (e.g. `curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -` followed by `sudo apt-get install -y nodejs`).
+  - Any additional secrets or environment variables required to run integration tests (dummy API tokens, local `.env` expectations) so Jules can inject them via its secure vault.

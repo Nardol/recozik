@@ -29,7 +29,14 @@ Thanks for your interest in improving recozik! This guide summarizes how to get 
 - Format code with `uv run ruff format`.
 - Lint with `uv run ruff check --fix` before opening a PR.
 - Add or update tests whenever you change CLI behaviour.
-- Compile translations with `python scripts/compile_translations.py` after editing `.po` files.
+- Compile translations with `python scripts/compile_translations.py` after editing `.po` files and keep English/French `.po` files in sync.
+- Update the Next.js locale bundles (`packages/recozik-webui/src/i18n`) whenever you touch UI copy. Run `npm run lint` to validate the frontend.
+
+## Documentation & localization expectations
+
+- Any change to CLI options, service behaviour, backend routes, or web UI must include documentation updates: `.github/copilot-instructions.md`, `README.md`, `README.fr.md`, `docs/deploy-*.md` (EN + FR), `TRANSLATION.md`, and any feature-focused docs.
+- Keep `AGENTS.md` (and its symlinked counterparts) synced when new workflow or permission requirements are introduced for automation agents.
+- When a new translatable string is introduced (CLI/services/frontend), wrap it in `_()` (Python) or add it to the i18n dictionaries (Next.js), then recompile the `.mo` catalogs with `python scripts/compile_translations.py`.
 
 ## Commit conventions
 
