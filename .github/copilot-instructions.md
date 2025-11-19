@@ -30,12 +30,12 @@
 
 ## Coding Style & Naming Conventions
 
-- Python 3.10–3.13, 4-space indentation, type hints encouraged. Python 3.14 stays experimental until upstream (librosa/numba) ships stable wheels.
+- Supported Python versions mirror `pyproject.toml` (currently 3.10–3.13). Python 3.14 stays experimental until upstream (librosa/numba) ships stable wheels.
 - CLI options use kebab-case (e.g., `--log-format`); internal functions use snake_case.
 - Keep Typer command logic inside the relevant module under `src/recozik/commands/`; `cli.py` should only register commands and surface compatibility wrappers.
 - When adding or modifying core behaviour (identify/batch/rename workflows), write it under `packages/recozik-services` first, then add the thin CLI glue that builds requests and forwards callbacks/prompts.
 - When touching completion logic, update both `src/recozik/commands/completion.py` and the wrapper wiring in `cli.py` so tests that monkeypatch `recozik.cli` continue to work.
-- Sanitize filenames using `_sanitize_filename`; reuse helpers instead of ad-hoc logic.
+- Sanitize filenames using `sanitize_filename` from `recozik_services.cli_support.paths`; reuse helpers instead of ad-hoc logic.
 - Route every user-facing string through `recozik_core.i18n._` using an English msgid. Update the relevant `.po` file under `packages/recozik-core/src/recozik_core/locales/<lang>/LC_MESSAGES/` and recompile the `.mo` file when strings change.
 - Store AcoustID/AudD secrets via `recozik_core.secrets` (system keyring); never write them in plaintext config files.
 - Honor locale precedence in this order: CLI option `--locale` > environment variable `RECOZIK_LOCALE` > config `[general].locale` > system locale.
@@ -102,17 +102,19 @@ Whenever you add new behaviour, extend the shared core/service first so CLI, bac
 - `ServiceFeature` values: `identify`, `identify_batch`, `rename`, `audd`, `musicbrainz_enrich`. Tokens carry an `allowed_features` set; `TokenAccessPolicy` rejects unsupported calls with 403.
 - Quotas use `QuotaScope` keys (`acoustid_lookup`, `musicbrainz_enrich`, `audd_standard_lookup`, `audd_enterprise_lookup`). `InMemoryQuotaPolicy` + optional persistent policy (`persistent_quota.py`) enforce per-user limits and raise 429.
 
-### Backend settings (`RECOZIK_WEB_*`)
+### Backend settings (`RECOZIK_WEB_*` prefix)
 
-| Variable                                                                         | Meaning (defaults in `WebSettings`)                                         |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `ADMIN_TOKEN`, `READONLY_TOKEN`                                                  | Default admin/readonly API tokens (set strong random values in production). |
-| `ACOUSTID_API_KEY`, `AUDD_TOKEN`, `AUDD_ENDPOINT_*`                              | Credentials forwarded to `identify_track`.                                  |
-| `BASE_MEDIA_ROOT`, `UPLOAD_SUBDIR`, `MAX_UPLOAD_MB`, `ALLOWED_UPLOAD_EXTENSIONS` | File-system sandbox + upload limits.                                        |
-| `CACHE_ENABLED`, `CACHE_TTL_HOURS`                                               | Server-side LookupCache options.                                            |
-| `MUSICBRAINZ_*`                                                                  | Toggle + user-agent metadata for enrichment.                                |
-| `JOBS_DB_FILENAME`, `AUTH_DB_FILENAME`, `JOBS_DATABASE_URL`, `AUTH_DATABASE_URL` | SQLModel persistence paths/URLs.                                            |
-| `CORS_ENABLED`, `CORS_ORIGINS`, `SECURITY_*`, `RATE_LIMIT_*`                     | HTTP hardening (CORS, HSTS, CSP, throttling).                               |
+All backend environment variables inherit the `RECOZIK_WEB_` prefix defined in `WebSettings`. Examples:
+
+| Variable                                                                                                                         | Meaning (defaults in `WebSettings`)                                         |
+| -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `RECOZIK_WEB_ADMIN_TOKEN`, `RECOZIK_WEB_READONLY_TOKEN`                                                                          | Default admin/readonly API tokens (set strong random values in production). |
+| `RECOZIK_WEB_ACOUSTID_API_KEY`, `RECOZIK_WEB_AUDD_TOKEN`, `RECOZIK_WEB_AUDD_ENDPOINT_STANDARD/ENTERPRISE`                        | Credentials forwarded to `identify_track`.                                  |
+| `RECOZIK_WEB_BASE_MEDIA_ROOT`, `RECOZIK_WEB_UPLOAD_SUBDIR`, `RECOZIK_WEB_MAX_UPLOAD_MB`, `RECOZIK_WEB_ALLOWED_UPLOAD_EXTENSIONS` | File-system sandbox + upload limits.                                        |
+| `RECOZIK_WEB_CACHE_ENABLED`, `RECOZIK_WEB_CACHE_TTL_HOURS`                                                                       | Server-side LookupCache options.                                            |
+| `RECOZIK_WEB_MUSICBRAINZ_*`                                                                                                      | Toggle + user-agent metadata for enrichment.                                |
+| `RECOZIK_WEB_JOBS_DB_FILENAME`, `RECOZIK_WEB_AUTH_DB_FILENAME`, `RECOZIK_WEB_JOBS_DATABASE_URL`, `RECOZIK_WEB_AUTH_DATABASE_URL` | SQLModel persistence paths/URLs.                                            |
+| `RECOZIK_WEB_CORS_ENABLED`, `RECOZIK_WEB_CORS_ORIGINS`, `RECOZIK_WEB_SECURITY_*`, `RECOZIK_WEB_RATE_LIMIT_*`                     | HTTP hardening (CORS, HSTS, CSP, throttling).                               |
 
 See `packages/recozik-web/src/recozik_web/config.py` for the exhaustive list.
 
