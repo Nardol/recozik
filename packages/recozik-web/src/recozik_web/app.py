@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from http.cookies import SimpleCookie
 from pathlib import Path
@@ -114,9 +115,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app = FastAPI(title="Recozik Web API", version="0.1.0")
-
-
 def _configure_security_headers() -> None:
     settings = get_settings()
     if not settings.security_headers_enabled:
@@ -139,18 +137,12 @@ def _configure_security_headers() -> None:
     )
 
 
-_configure_security_headers()
-
-
-# Configure application on startup
-@app.on_event("startup")
-def configure_security() -> None:
-    """Configure security middleware and CORS on startup."""
+def _configure_runtime_security(fastapi_app: FastAPI) -> None:
+    """Apply runtime security settings when the app starts."""
     settings = get_settings()
 
-    # Configure CORS if enabled
     if settings.cors_enabled and settings.cors_origins:
-        app.add_middleware(
+        fastapi_app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origins,
             allow_credentials=True,
@@ -162,6 +154,19 @@ def configure_security() -> None:
 
     if settings.security_headers_enabled:
         logger.info("Security headers middleware enabled")
+
+
+@asynccontextmanager
+async def _lifespan(fastapi_app: FastAPI):
+    """FastAPI lifespan handler configuring runtime security."""
+    _configure_runtime_security(fastapi_app)
+    yield
+
+
+app = FastAPI(title="Recozik Web API", version="0.1.0", lifespan=_lifespan)
+
+
+_configure_security_headers()
 
 
 @app.middleware("http")
