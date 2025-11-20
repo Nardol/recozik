@@ -7,11 +7,6 @@ export default defineConfig({
     setupFiles: "./vitest.setup.ts",
     globals: false,
     pool: "threads",
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
     exclude: ["node_modules/**", "tests/e2e/**"],
   },
   resolve: {
