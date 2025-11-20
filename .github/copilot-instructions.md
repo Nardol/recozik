@@ -25,6 +25,7 @@
 - Frontend (web UI):
   - `cd packages/recozik-webui && npm install && npm run lint` – Install deps and lint/type-check the dashboard.
   - `cd packages/recozik-webui && npm test -- --run` – Run Vitest component/unit tests (jsdom + Testing Library).
+  - `cd packages/recozik-webui && npm run test:e2e` – Playwright E2E suite (ensure browsers are installed with `npx playwright install --with-deps chromium`).
   - `cd packages/recozik-webui && npm run build` – Production build; CI runs lint → tests → build in that order.
 - `cd docker && docker compose up --build` – Launch the full stack (backend + frontend + Nginx). Populate `docker/.env` with real tokens/keys before sharing instructions.
 - `uv build` – Produce wheel + sdist for validation before releases.

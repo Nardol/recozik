@@ -12,6 +12,7 @@ export default defineConfig({
         singleThread: true,
       },
     },
+    exclude: ["node_modules/**", "tests/e2e/**"],
   },
   resolve: {
     alias: {
