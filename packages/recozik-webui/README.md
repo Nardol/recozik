@@ -31,6 +31,7 @@ npm test
 # end-to-end tests (Playwright)
 npx playwright install --with-deps chromium
 npm run test:e2e
+# includes axe-core accessibility smoke checks
 
 # production build
 npm run build
