@@ -14,7 +14,10 @@ test.describe("Locale and landing flow", () => {
   });
 
   test("renders French locale route", async ({ page }) => {
-    await page.goto("/fr");
+    await page.context().setExtraHTTPHeaders({
+      "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+    });
+    await page.goto("/");
     await expect(page).toHaveURL(/\/fr$/);
     await expect(page.getByTestId("main-heading")).toHaveText(
       "Console Web Recozik",
