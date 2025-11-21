@@ -32,6 +32,8 @@ npm test
 npx playwright install --with-deps chromium firefox webkit
 npm run test:e2e
 # includes axe-core accessibility smoke checks
+# visual baselines (chromium only), opt-in:
+# VISUAL_SNAPSHOTS=1 npm run test:e2e -- tests/e2e/visual.spec.ts --update-snapshots
 
 # production build
 npm run build
