@@ -74,14 +74,11 @@ describe("NavigationBar", () => {
     });
 
     const form = screen.getByTestId("logout-form") as HTMLFormElement;
-    if (!form.requestSubmit) {
-      // jsdom fallback
-      // @ts-expect-error allow shim for test
-      form.requestSubmit = () => {};
-    }
-    const submitSpy = vi
-      .spyOn(form, "requestSubmit")
-      .mockImplementation(() => {});
+    const submitSpy = vi.fn();
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitSpy();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 
