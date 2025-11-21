@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { NavigationBar } from "../NavigationBar";
 import { renderWithProviders } from "../../tests/test-utils";
 import type { WhoAmI } from "../../lib/api";
@@ -64,6 +64,43 @@ describe("NavigationBar", () => {
     );
     expect(screen.getByRole("button", { name: "Disconnect" })).toHaveClass(
       "secondary",
+    );
+  });
+
+  it("submits logout action when Disconnect is clicked", () => {
+    renderWithProviders(<NavigationBar />, {
+      token: "demo-token",
+      profile: mockProfile,
+    });
+
+    const form = screen.getByTestId("logout-form") as HTMLFormElement;
+    const submitSpy = vi.fn();
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitSpy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+
+    expect(submitSpy).toHaveBeenCalled();
+  });
+
+  it("navigates to anchors when links clicked", () => {
+    renderWithProviders(<NavigationBar />, {
+      token: "demo-token",
+      profile: mockProfile,
+    });
+
+    fireEvent.click(screen.getByRole("link", { name: "Jobs" }));
+    fireEvent.click(screen.getByRole("link", { name: "Upload" }));
+
+    expect(screen.getByRole("link", { name: "Jobs" })).toHaveAttribute(
+      "href",
+      "#jobs-section",
+    );
+    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute(
+      "href",
+      "#upload-section",
     );
   });
 });

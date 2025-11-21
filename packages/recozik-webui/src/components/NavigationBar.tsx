@@ -28,7 +28,7 @@ export function NavigationBar() {
       </ul>
       <div className="nav-actions">
         <LanguageSwitcher />
-        <form action={logoutAction}>
+        <form action={logoutAction} data-testid="logout-form">
           <input type="hidden" name="locale" value={locale} />
           <button type="submit" className="secondary small">
             {t("nav.disconnect")}
