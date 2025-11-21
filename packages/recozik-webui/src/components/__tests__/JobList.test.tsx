@@ -4,24 +4,27 @@ import { JobList } from "../JobList";
 import type { JobDetail } from "../../lib/api";
 import { renderWithProviders } from "../../tests/test-utils";
 
+type SocketEvent = "message" | "close" | "error";
+type Listener = (event: MessageEvent) => void;
+
 const mockSockets: Array<{
-  emit: (type: string, event: any) => void;
+  emit: (type: SocketEvent, event: MessageEvent) => void;
 }> = [];
 
 vi.mock("../../lib/job-websocket", () => {
   return {
     createJobWebSocket: vi.fn(() => {
-      const listeners: Record<string, Array<(event: any) => void>> = {
+      const listeners: Record<SocketEvent, Listener[]> = {
         message: [],
         close: [],
         error: [],
       };
       const socket = {
-        addEventListener: (type: string, cb: (event: any) => void) => {
+        addEventListener: (type: SocketEvent, cb: Listener) => {
           listeners[type]?.push(cb);
         },
         close: vi.fn(),
-        emit: (type: string, event: any) => {
+        emit: (type: SocketEvent, event: MessageEvent) => {
           listeners[type]?.forEach((cb) => cb(event));
         },
       };
@@ -241,9 +244,10 @@ describe("JobList", () => {
       },
     };
 
-    mockSockets[0]?.emit("message", {
+    const message = new MessageEvent("message", {
       data: JSON.stringify({ job: updated }),
     });
+    mockSockets[0]?.emit("message", message);
 
     expect(onUpdate).toHaveBeenCalledWith(updated);
   });
