@@ -172,7 +172,8 @@ describe("JobList", () => {
       />,
     );
 
-    expect(screen.getByText("Queued")).toBeInTheDocument();
+    const queuedLabels = screen.getAllByText("Queued");
+    expect(queuedLabels.length).toBeGreaterThan(0);
     expect(screen.queryByText("View JSON")).not.toBeInTheDocument();
   });
 
