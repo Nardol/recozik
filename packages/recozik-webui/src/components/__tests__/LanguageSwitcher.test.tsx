@@ -4,6 +4,7 @@ import { LanguageSwitcher } from "../LanguageSwitcher";
 import { I18nProvider } from "../../i18n/I18nProvider";
 
 const push = vi.fn();
+const mockUsePathname = vi.fn().mockReturnValue("/en/dashboard/jobs");
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -14,13 +15,14 @@ vi.mock("next/navigation", () => ({
     back: vi.fn(),
     forward: vi.fn(),
   }),
-  usePathname: () => "/en/dashboard/jobs",
+  usePathname: () => mockUsePathname(),
   useSearchParams: () => new URLSearchParams(),
 }));
 
 describe("LanguageSwitcher", () => {
   beforeEach(() => {
     push.mockClear();
+    mockUsePathname.mockReturnValue("/en/dashboard/jobs");
   });
 
   it("shows the current locale and navigates to the selected one", () => {
@@ -38,5 +40,22 @@ describe("LanguageSwitcher", () => {
 
     fireEvent.change(select, { target: { value: "fr" } });
     expect(push).toHaveBeenCalledWith("/fr/dashboard/jobs");
+  });
+
+  it("updates locale from root path and supports keyboard activation", () => {
+    mockUsePathname.mockReturnValue("/en");
+
+    render(
+      <I18nProvider locale="en">
+        <LanguageSwitcher />
+      </I18nProvider>,
+    );
+
+    const select = screen.getByRole("combobox", { name: "Interface language" });
+    fireEvent.keyDown(select, { key: "ArrowDown" });
+    fireEvent.change(select, { target: { value: "fr" } });
+    fireEvent.keyDown(select, { key: "Enter" });
+
+    expect(push).toHaveBeenCalledWith("/fr");
   });
 });
