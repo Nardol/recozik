@@ -2,6 +2,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isSupportedLocale } from "../lib/constants";
 
+// Force dynamic rendering so Accept-Language is evaluated per request (used by E2E locale tests).
+export const dynamic = "force-dynamic";
+
 function detectLocale(header: string | null): string {
   if (!header) return "en";
   const candidates = header.split(",").map((token) => token.trim());
