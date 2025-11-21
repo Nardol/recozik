@@ -21,4 +21,18 @@ test.describe("Locale and landing flow", () => {
     );
     await expect(page.getByTestId("login-prompt")).toBeVisible();
   });
+
+  test("redirects / to /fr when Accept-Language prefers French", async ({
+    request,
+  }) => {
+    const response = await request.get("/", {
+      headers: {
+        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+      },
+      maxRedirects: 0,
+    });
+
+    expect([307, 308]).toContain(response.status());
+    expect(response.headers()["location"]).toBe("/fr");
+  });
 });
