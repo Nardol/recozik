@@ -7,9 +7,20 @@ test.describe("Locale and landing flow", () => {
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/en$/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    await expect(page.getByTestId("main-heading")).toHaveText(
       "Recozik Web Console",
     );
-    await expect(page.getByText("Connect with an API token")).toBeVisible();
+    await expect(page.getByTestId("login-prompt")).toBeVisible();
+  });
+
+  test("honors French locale preference", async ({ page }) => {
+    await page.goto("/", {
+      headers: { "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8" },
+    });
+    await expect(page).toHaveURL(/\/fr$/);
+    await expect(page.getByTestId("main-heading")).toHaveText(
+      "Console Web Recozik",
+    );
+    await expect(page.getByTestId("login-prompt")).toBeVisible();
   });
 });
