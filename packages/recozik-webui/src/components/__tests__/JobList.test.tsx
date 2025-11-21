@@ -1,10 +1,42 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { JobList } from "../JobList";
 import type { JobDetail } from "../../lib/api";
 import { renderWithProviders } from "../../tests/test-utils";
 
+const mockSockets: Array<{
+  emit: (type: string, event: any) => void;
+}> = [];
+
+vi.mock("../../lib/job-websocket", () => {
+  return {
+    createJobWebSocket: vi.fn(() => {
+      const listeners: Record<string, Array<(event: any) => void>> = {
+        message: [],
+        close: [],
+        error: [],
+      };
+      const socket = {
+        addEventListener: (type: string, cb: (event: any) => void) => {
+          listeners[type]?.push(cb);
+        },
+        close: vi.fn(),
+        emit: (type: string, event: any) => {
+          listeners[type]?.forEach((cb) => cb(event));
+        },
+      };
+      mockSockets.push(socket);
+      return socket;
+    }),
+  };
+});
+
 describe("JobList", () => {
+  beforeEach(() => {
+    mockSockets.length = 0;
+    vi.clearAllMocks();
+  });
+
   it("shows the empty state when no jobs are provided", () => {
     renderWithProviders(
       <JobList jobs={[]} onUpdate={vi.fn()} sectionId="jobs-section" />,
@@ -115,5 +147,104 @@ describe("JobList", () => {
     expect(screen.getByText("job-500")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
     expect(screen.getByText("Error: Network error")).toBeInTheDocument();
+  });
+
+  it("renders queued jobs without JSON details", () => {
+    const queuedJob: JobDetail = {
+      job_id: "job-queued",
+      status: "queued",
+      created_at: "2024-01-04T12:00:00Z",
+      updated_at: "2024-01-04T12:00:00Z",
+      finished_at: null,
+      messages: [],
+      error: null,
+      result: null,
+    };
+
+    renderWithProviders(
+      <JobList
+        jobs={[queuedJob]}
+        onUpdate={vi.fn()}
+        sectionId="jobs-section"
+      />,
+    );
+
+    expect(screen.getByText("Queued")).toBeInTheDocument();
+    expect(screen.queryByText("View JSON")).not.toBeInTheDocument();
+  });
+
+  it("shows no-match summary and source when matches are empty", () => {
+    const noMatchJob: JobDetail = {
+      job_id: "job-nomatch",
+      status: "completed",
+      created_at: "2024-01-05T12:00:00Z",
+      updated_at: "2024-01-05T12:05:00Z",
+      finished_at: "2024-01-05T12:05:00Z",
+      messages: [],
+      error: null,
+      result: {
+        matches: [],
+        match_source: "audd",
+        metadata: null,
+        audd_note: null,
+        audd_error: null,
+        fingerprint: "abc",
+        duration_seconds: 10,
+      },
+    };
+
+    renderWithProviders(
+      <JobList
+        jobs={[noMatchJob]}
+        onUpdate={vi.fn()}
+        sectionId="jobs-section"
+      />,
+    );
+
+    expect(screen.getByText("No matches returned.")).toBeInTheDocument();
+    expect(screen.getByText("Source: audd")).toBeInTheDocument();
+  });
+
+  it("invokes onUpdate when a WebSocket job update arrives", async () => {
+    const runningJob: JobDetail = {
+      job_id: "job-live",
+      status: "running",
+      created_at: "2024-01-06T12:00:00Z",
+      updated_at: "2024-01-06T12:00:00Z",
+      finished_at: null,
+      messages: [],
+      error: null,
+      result: null,
+    };
+    const onUpdate = vi.fn();
+
+    renderWithProviders(
+      <JobList jobs={[runningJob]} onUpdate={onUpdate} sectionId="jobs" />,
+      { token: "token" },
+    );
+
+    await waitFor(() => expect(mockSockets.length).toBeGreaterThan(0));
+
+    const updated: JobDetail = {
+      ...runningJob,
+      status: "completed",
+      updated_at: "2024-01-06T12:01:00Z",
+      finished_at: "2024-01-06T12:01:00Z",
+      result: {
+        matches: [],
+        match_source: null,
+        metadata: null,
+        audd_note: null,
+        audd_error: null,
+        fingerprint: "abc",
+        duration_seconds: 10,
+      },
+    };
+
+    mockSockets[0]?.emit("message", {
+      data: JSON.stringify({ job: updated }),
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(updated);
   });
 });
