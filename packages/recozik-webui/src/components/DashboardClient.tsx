@@ -65,8 +65,8 @@ export function DashboardClient() {
     return (
       <main className="container" id="main-content">
         <header>
-          <h1>{t("app.title")}</h1>
-          <p>{t("app.lead")}</p>
+          <h1 data-testid="main-heading">{t("app.title")}</h1>
+          <p data-testid="login-prompt">{t("app.lead")}</p>
         </header>
         <TokenForm />
       </main>
