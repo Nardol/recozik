@@ -121,6 +121,7 @@ jobs:
           cd packages/recozik-webui
           node tests/e2e/mock-api-server.js &
           MOCK_PID=$!
+          npx wait-on http://localhost:9999/health
           trap "kill $MOCK_PID" EXIT
           npm run test:e2e -- --reporter=line
 
