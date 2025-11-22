@@ -41,8 +41,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-function buildCookieHeader(): string | undefined {
-  return headers().get("cookie") ?? undefined;
+async function buildCookieHeader(): Promise<string | undefined> {
+  const hdrs = await headers();
+  return hdrs.get("cookie") ?? undefined;
 }
 
 export async function serverFetch<T = unknown>(
@@ -50,7 +51,7 @@ export async function serverFetch<T = unknown>(
   init?: RequestInit,
 ) {
   const headers = new Headers(init?.headers);
-  const cookieHeader = buildCookieHeader();
+  const cookieHeader = await buildCookieHeader();
   if (cookieHeader) {
     headers.set("cookie", cookieHeader);
   }
@@ -68,7 +69,7 @@ export async function serverFormPost<T = unknown>(
   formData: FormData,
 ) {
   const headers = new Headers();
-  const cookieHeader = buildCookieHeader();
+  const cookieHeader = await buildCookieHeader();
   if (cookieHeader) {
     headers.set("cookie", cookieHeader);
   }
