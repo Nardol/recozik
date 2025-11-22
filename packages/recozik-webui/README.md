@@ -35,6 +35,17 @@ npm run test:e2e
 # visual baselines (chromium only), opt-in:
 # VISUAL_SNAPSHOTS=1 npm run test:e2e -- tests/e2e/visual.spec.ts --update-snapshots
 
+# e2e without backend (mock API)
+MOCK_API_PORT=9999 \
+NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:9999 \
+RECOZIK_WEB_API_BASE=http://localhost:9999 \
+RECOZIK_INTERNAL_API_BASE=http://localhost:9999 \
+PORT=3000 BASE_URL=http://localhost:3000 VISUAL_SNAPSHOTS=0 \
+node tests/e2e/mock-api-server.js & MOCK_PID=$! && \
+npx wait-on http://localhost:9999/health && \
+npm run test:e2e -- --reporter=line tests/e2e/joblist.spec.ts && \
+kill $MOCK_PID
+
 # production build
 npm run build
 npm run start -- --hostname 0.0.0.0 --port 3000
