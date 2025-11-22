@@ -41,10 +41,12 @@ const jobsResponse = [
   },
 ];
 
-const sendJson = (res, status, data) => {
+const sendJson = (req, res, status, data) => {
+  const origin = req.headers.origin || "http://localhost:3000";
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,X-API-Token");
   res.end(JSON.stringify(data));
 };
@@ -54,20 +56,22 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (req.method === "OPTIONS") {
+    const origin = req.headers.origin || "http://localhost:3000";
     res.statusCode = 204;
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type,X-API-Token");
     res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
     return res.end();
   }
   if (url.pathname === "/whoami") {
-    return sendJson(res, 200, whoamiResponse);
+    return sendJson(req, res, 200, whoamiResponse);
   }
   if (url.pathname.startsWith("/jobs")) {
-    return sendJson(res, 200, jobsResponse);
+    return sendJson(req, res, 200, jobsResponse);
   }
   if (url.pathname === "/health") {
-    return sendJson(res, 200, { ok: true });
+    return sendJson(req, res, 200, { ok: true });
   }
   res.statusCode = 404;
   res.end("not found");
