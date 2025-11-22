@@ -108,13 +108,28 @@ jobs:
         run: |
           cd packages/recozik-webui
           npx playwright install --with-deps chromium firefox webkit
+      - name: Start Next.js server
+        run: |
+          cd packages/recozik-webui
+          npm run start -- --hostname 0.0.0.0 --port 3000 &
+          echo $! > /tmp/webui.pid
+        env:
+          NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:3000/api
+      - name: Wait for server
+        run: |
+          npx wait-on http://localhost:3000/en
       - name: Run E2E tests
         env:
-          PORT: 9999
-          NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:9999
+          PORT: 3000
+          NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:3000/api
+          VISUAL_SNAPSHOTS: "0"
         run: |
           cd packages/recozik-webui
           npm run test:e2e -- --reporter=line
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/webui.pid ]; then kill "$(cat /tmp/webui.pid)"; fi
 
   all-checks:
     name: All Checks
