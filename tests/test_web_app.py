@@ -118,7 +118,8 @@ def test_identify_requires_token(web_app) -> None:
     client, media_root, _, _ = web_app
     (media_root / "clip.flac").write_bytes(b"data")
     response = client.post("/identify/from-path", json={"audio_path": "clip.flac"})
-    assert response.status_code == 422  # missing header
+    # With session-based auth, missing credentials now yields 401
+    assert response.status_code == 401
 
 
 def test_identify_from_path_invokes_service(monkeypatch, web_app) -> None:
