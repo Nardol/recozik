@@ -49,6 +49,9 @@ from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
 
 from .auth import API_TOKEN_HEADER, RequestContext, get_request_context, resolve_user_from_token
+from .auth_models import get_auth_store
+from .auth_routes import router as auth_router
+from .auth_service import ACCESS_COOKIE, seed_admin_user
 from .auth_store import TokenRecord, get_token_repository
 from .config import WebSettings, get_settings
 from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
@@ -73,8 +76,11 @@ def _token_from_websocket(websocket: WebSocket) -> str | None:
     try:
         jar = SimpleCookie()
         jar.load(cookie_header)
-        cookie = jar.get("recozik_token")
-        return cookie.value if cookie and cookie.value else None
+        for name in ("recozik_token", ACCESS_COOKIE):
+            cookie = jar.get(name)
+            if cookie and cookie.value:
+                return cookie.value
+        return None
     except Exception:  # pragma: no cover - defensive fallback
         logger.warning("Failed to parse cookies during WebSocket auth", exc_info=True)
         return None
@@ -160,6 +166,8 @@ def _configure_runtime_security(fastapi_app: FastAPI) -> None:
 async def _lifespan(fastapi_app: FastAPI):
     """FastAPI lifespan handler configuring runtime security."""
     _configure_runtime_security(fastapi_app)
+    settings = get_settings()
+    seed_admin_user(get_auth_store(settings.auth_database_url_resolved), settings)
     yield
 
 
@@ -167,6 +175,7 @@ app = FastAPI(title="Recozik Web API", version="0.1.0", lifespan=_lifespan)
 
 
 _configure_security_headers()
+app.include_router(auth_router)
 
 
 @app.middleware("http")

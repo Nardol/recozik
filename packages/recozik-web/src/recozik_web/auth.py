@@ -269,7 +269,7 @@ def resolve_user_from_token(
 
 def get_request_context(
     request: Request,
-    api_token: str = Header(..., alias=API_TOKEN_HEADER),
+    api_token: str | None = Header(None, alias=API_TOKEN_HEADER),
     settings: WebSettings = Depends(get_settings),
 ) -> RequestContext:
     """FastAPI dependency injecting ServiceUser + policies.
@@ -300,19 +300,29 @@ def get_request_context(
             logger.warning("Rate limit exceeded for IP %s", client_ip)
             raise
 
-    # Resolve user from token
-    try:
-        user = resolve_user_from_token(api_token, settings, request=request)
-    except HTTPException:
-        # Record failed attempt if rate limiting is enabled
-        if settings.rate_limit_enabled:
-            auth_limiter = get_auth_rate_limiter(
-                max_requests=settings.rate_limit_per_minute,
-                window_seconds=60,
-                trusted_proxies=settings.rate_limit_trusted_proxies,
-            )
-            auth_limiter.record_failed_auth(request)
-        raise
+    user: ServiceUser | None = None
+
+    # Prefer session cookie if present
+    from .auth_service import resolve_session_user  # local import to avoid cycles
+
+    user = resolve_session_user(request, settings)
+
+    # Fallback to API token header for machine clients
+    if user is None:
+        if not api_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing auth")
+        try:
+            user = resolve_user_from_token(api_token, settings, request=request)
+        except HTTPException:
+            # Record failed attempt if rate limiting is enabled
+            if settings.rate_limit_enabled:
+                auth_limiter = get_auth_rate_limiter(
+                    max_requests=settings.rate_limit_per_minute,
+                    window_seconds=60,
+                    trusted_proxies=settings.rate_limit_trusted_proxies,
+                )
+                auth_limiter.record_failed_auth(request)
+            raise
 
     # Record successful auth if rate limiting is enabled
     if settings.rate_limit_enabled:
