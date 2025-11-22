@@ -26,6 +26,20 @@
   - `cd packages/recozik-webui && npm install && npm run lint` – Install deps and lint/type-check the dashboard.
   - `cd packages/recozik-webui && npm test -- --run` – Run Vitest component/unit tests (jsdom + Testing Library).
   - `cd packages/recozik-webui && npm run test:e2e` – Playwright E2E suite (includes axe-core accessibility smoke); ensure browsers are installed with `npx playwright install --with-deps chromium firefox webkit`.
+  - Local E2E with mock API (no backend needed):
+    ```bash
+    cd packages/recozik-webui
+    export MOCK_API_PORT=9999
+    NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:$MOCK_API_PORT \
+    RECOZIK_WEB_API_BASE=http://localhost:$MOCK_API_PORT \
+    RECOZIK_INTERNAL_API_BASE=http://localhost:$MOCK_API_PORT \
+    PORT=3000 BASE_URL=http://localhost:3000 VISUAL_SNAPSHOTS=0
+    node tests/e2e/mock-api-server.js & MOCK_PID=$!
+    npx wait-on http://localhost:$MOCK_API_PORT/health
+    npm run test:e2e -- --reporter=line tests/e2e/joblist.spec.ts
+    kill $MOCK_PID
+    ```
+    Install Playwright browsers once with `npx playwright install chromium firefox webkit` (no `--with-deps` if system deps are preinstalled).
   - `cd packages/recozik-webui && npm run test:e2e -- tests/e2e/visual.spec.ts --update-snapshots` – Update visual baselines (chromium only) for UI screenshots; keep viewport and data deterministic.
   - `cd packages/recozik-webui && npm run build` – Production build; CI runs lint → tests → build in that order.
 - `cd docker && docker compose up --build` – Launch the full stack (backend + frontend + Nginx). Populate `docker/.env` with real tokens/keys before sharing instructions.
