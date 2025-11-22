@@ -145,9 +145,11 @@ describe("JobList", () => {
       />,
     );
 
-    expect(screen.getByText("job-999")).toBeInTheDocument();
-    expect(screen.getAllByText("Running").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("job-500")).toBeInTheDocument();
+    expect(screen.getByTestId("job-row-job-999")).toBeInTheDocument();
+    expect(screen.getByTestId("job-row-job-500")).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId("job-status").map((el) => el.textContent),
+    ).toContain("Running");
     expect(screen.getByText("Failed")).toBeInTheDocument();
     expect(screen.getByText("Error: Network error")).toBeInTheDocument();
   });
@@ -172,8 +174,10 @@ describe("JobList", () => {
       />,
     );
 
-    const queuedLabels = screen.getAllByText("Queued");
-    expect(queuedLabels.length).toBeGreaterThanOrEqual(2);
+    const statuses = screen
+      .getAllByTestId("job-status")
+      .map((el) => el.textContent);
+    expect(statuses).toContain("Queued");
     expect(screen.queryByText("View JSON")).not.toBeInTheDocument();
   });
 

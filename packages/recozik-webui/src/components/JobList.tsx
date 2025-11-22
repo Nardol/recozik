@@ -125,8 +125,15 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
 
   return (
     <section id={sectionId} aria-labelledby={headingId} className="panel">
-      <h2 id={headingId}>{t("jobs.title")}</h2>
-      <div className="table-wrapper" role="region" aria-live="polite">
+      <h2 id={headingId} data-testid="jobs-title">
+        {t("jobs.title")}
+      </h2>
+      <div
+        className="table-wrapper"
+        role="region"
+        aria-live="polite"
+        data-testid="jobs-table-wrapper"
+      >
         <table>
           <thead>
             <tr>
@@ -139,19 +146,22 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
           </thead>
           <tbody>
             {jobs.map((job) => (
-              <tr key={job.job_id}>
+              <tr key={job.job_id} data-testid={`job-row-${job.job_id}`}>
                 <td>
-                  <code>{job.job_id}</code>
+                  <code data-testid="job-id">{job.job_id}</code>
                 </td>
                 <td>
-                  <span className={`badge badge-${job.status.toLowerCase()}`}>
+                  <span
+                    className={`badge badge-${job.status.toLowerCase()}`}
+                    data-testid="job-status"
+                  >
                     {statusLabel(job.status)}
                   </span>
                   {job.error ? <p className="error">{job.error}</p> : null}
                 </td>
                 <td>{new Date(job.updated_at).toLocaleString()}</td>
                 <td>
-                  <ul>
+                  <ul data-testid="job-messages">
                     {job.messages.map((message, index) => (
                       <li key={index}>{message}</li>
                     ))}
