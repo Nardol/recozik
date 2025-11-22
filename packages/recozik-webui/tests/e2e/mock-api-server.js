@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const http = require("http");
 
 const PORT = process.env.MOCK_API_PORT || 9999;
