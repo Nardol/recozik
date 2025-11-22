@@ -62,7 +62,7 @@ test.describe("JobList states (mocked API)", () => {
     // mock token cookie so dashboard renders as authenticated
     await context.addCookies([
       {
-        name: "recozik-token",
+        name: "recozik_token",
         value: "fake-token",
         url: "http://localhost:3000",
       },
