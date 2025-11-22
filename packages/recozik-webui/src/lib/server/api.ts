@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 
 const DEFAULT_INTERNAL_BASE = stripTrailingSlash(
   process.env.RECOZIK_INTERNAL_API_BASE || "http://backend:8000",
@@ -42,10 +42,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 function buildCookieHeader(): string | undefined {
-  const store = cookies();
-  const all = store.getAll();
-  if (all.length === 0) return undefined;
-  return all.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+  return headers().get("cookie") ?? undefined;
 }
 
 export async function serverFetch<T = unknown>(
