@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { DashboardClient } from "../../components/DashboardClient";
 import { Providers } from "../../components/Providers";
-import { serverFetchWhoami } from "../../lib/server/whoami";
 import { isSupportedLocale } from "../../lib/constants";
 
 interface Props {
@@ -15,21 +14,12 @@ export default async function LocaleDashboard({ params }: Props) {
     notFound();
   }
   const cookieStore = await cookies();
-  const token = cookieStore.get("recozik_token")?.value ?? null;
-  let profile = null;
-  if (token) {
-    try {
-      profile = await serverFetchWhoami(token);
-    } catch (error) {
-      console.error("Failed to fetch user profile:", error);
-      profile = null;
-    }
-  }
+  const sessionId = cookieStore.get("recozik_session")?.value ?? null;
   return (
     <Providers
       locale={resolved.locale}
-      initialToken={token}
-      initialProfile={profile}
+      initialToken={sessionId}
+      initialProfile={null}
     >
       <DashboardClient />
     </Providers>

@@ -1,4 +1,5 @@
 import "server-only";
+import { cookies } from "next/headers";
 
 const DEFAULT_INTERNAL_BASE = stripTrailingSlash(
   process.env.RECOZIK_INTERNAL_API_BASE || "http://backend:8000",
@@ -40,16 +41,26 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+function buildCookieHeader(): string | undefined {
+  const store = cookies();
+  const all = store.getAll();
+  if (all.length === 0) return undefined;
+  return all.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+}
+
 export async function serverFetch<T = unknown>(
   path: string,
-  token: string,
   init?: RequestInit,
 ) {
   const headers = new Headers(init?.headers);
-  headers.set("X-API-Token", token);
+  const cookieHeader = buildCookieHeader();
+  if (cookieHeader) {
+    headers.set("cookie", cookieHeader);
+  }
   const response = await fetch(resolve(path), {
     ...init,
     headers,
+    credentials: "include",
     cache: "no-store",
   });
   return handleResponse<T>(response);
@@ -57,15 +68,18 @@ export async function serverFetch<T = unknown>(
 
 export async function serverFormPost<T = unknown>(
   path: string,
-  token: string,
   formData: FormData,
 ) {
   const headers = new Headers();
-  headers.set("X-API-Token", token);
+  const cookieHeader = buildCookieHeader();
+  if (cookieHeader) {
+    headers.set("cookie", cookieHeader);
+  }
   const response = await fetch(resolve(path), {
     method: "POST",
     body: formData,
     headers,
+    credentials: "include",
     cache: "no-store",
   });
   return handleResponse<T>(response);

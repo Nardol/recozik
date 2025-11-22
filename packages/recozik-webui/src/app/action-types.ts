@@ -7,7 +7,7 @@ export type LoginState = {
 
 export type UploadState = {
   status: "idle" | "error" | "success";
-  code?: "queued" | "missing_token" | "missing_file" | "backend";
+  code?: "queued" | "missing_file" | "backend";
   message?: string;
   job?: JobDetail | null;
 };

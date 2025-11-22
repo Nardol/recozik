@@ -1,9 +1,9 @@
 const en = {
   "app.title": "Recozik Web Console",
-  "app.lead":
-    "Authenticate with an API token to access jobs and admin features.",
+  "app.lead": "Sign in to access identify jobs and admin tools.",
   "app.leadAuthed":
     "Monitor identify jobs, trigger uploads, and manage API tokens.",
+  "app.loading": "Checking your session…",
   "skip.link": "Skip to content",
   "nav.upload": "Upload",
   "nav.jobs": "Jobs",
@@ -12,21 +12,20 @@ const en = {
   "nav.language": "Interface language",
   "language.en": "English",
   "language.fr": "French",
-  "tokenForm.title": "Connect with an API token",
-  "tokenForm.description":
-    "Tokens are managed in the CLI or via the admin API.",
-  "tokenForm.label": "Token",
-  "tokenForm.help":
-    "Your token is stored locally in the browser and never shared with Recozik.",
-  "tokenForm.remember": "Keep me signed in on this browser",
-  "tokenForm.save": "Save token",
-  "tokenForm.saving": "Validating…",
-  "tokenForm.errorRequired": "Please provide an API token.",
-  "tokenForm.errorGeneric": "Unable to save token.",
+  "login.title": "Sign in",
+  "login.description":
+    "Use your username and password. Sessions are stored securely with HttpOnly cookies.",
+  "login.username": "Username",
+  "login.password": "Password",
+  "login.remember": "Keep me signed in on this browser",
+  "login.submit": "Sign in",
+  "login.loading": "Signing in…",
+  "login.errorMissing": "Please provide both username and password.",
+  "login.errorInvalid": "Invalid username or password.",
   "profile.signedInAs": "Signed in as",
   "profile.roles": "Roles",
   "profile.features": "Features",
-  "profile.forget": "Forget token",
+  "profile.forget": "Log out",
   "uploader.title": "Upload & identify audio",
   "uploader.description":
     "Upload an audio clip to trigger the identify workflow. Jobs are processed asynchronously with live updates.",
@@ -41,7 +40,6 @@ const en = {
   "uploader.submitting": "Submitting…",
   "uploader.status.uploading": "Uploading…",
   "uploader.status.queued": "Job queued. Polling for updates…",
-  "uploader.error.noToken": "Provide an API token before uploading files.",
   "uploader.error.noFile": "Select an audio file before submitting.",
   "uploader.error.generic": "Upload failed. Try again later.",
   "jobs.title": "Jobs",
@@ -110,9 +108,10 @@ type MessageKey = keyof typeof en;
 const fr: Record<MessageKey, string> = {
   "app.title": "Console Web Recozik",
   "app.lead":
-    "Authentifiez-vous avec un jeton API pour accéder aux tâches et aux fonctions d'administration.",
+    "Connectez-vous pour accéder aux tâches d'identification et aux outils d'administration.",
   "app.leadAuthed":
-    "Surveillez les tâches d'identification, déclenchez des envois et gérez les jetons API.",
+    "Surveillez les tâches, lancez des envois et gérez les jetons API.",
+  "app.loading": "Vérification de votre session…",
   "skip.link": "Aller directement au contenu",
   "nav.upload": "Téléverser",
   "nav.jobs": "Tâches",
@@ -121,21 +120,21 @@ const fr: Record<MessageKey, string> = {
   "nav.language": "Langue de l'interface",
   "language.en": "Anglais",
   "language.fr": "Français",
-  "tokenForm.title": "Connexion avec un jeton API",
-  "tokenForm.description":
-    "Les jetons sont gérés via la CLI ou l'API d'administration.",
-  "tokenForm.label": "Jeton",
-  "tokenForm.help":
-    "Votre jeton est stocké localement dans le navigateur et n'est jamais partagé avec Recozik.",
-  "tokenForm.remember": "Connexion permanente sur ce navigateur",
-  "tokenForm.save": "Enregistrer le jeton",
-  "tokenForm.saving": "Validation…",
-  "tokenForm.errorRequired": "Veuillez fournir un jeton API.",
-  "tokenForm.errorGeneric": "Impossible d'enregistrer le jeton.",
+  "login.title": "Connexion",
+  "login.description":
+    "Utilisez votre nom d'utilisateur et votre mot de passe. Les sessions sont stockées en cookies HttpOnly sécurisés.",
+  "login.username": "Nom d'utilisateur",
+  "login.password": "Mot de passe",
+  "login.remember": "Rester connecté sur ce navigateur",
+  "login.submit": "Se connecter",
+  "login.loading": "Connexion…",
+  "login.errorMissing":
+    "Veuillez renseigner le nom d'utilisateur et le mot de passe.",
+  "login.errorInvalid": "Identifiants invalides.",
   "profile.signedInAs": "Connecté en tant que",
   "profile.roles": "Rôles",
   "profile.features": "Fonctionnalités",
-  "profile.forget": "Oublier le jeton",
+  "profile.forget": "Se déconnecter",
   "uploader.title": "Téléverser et identifier un audio",
   "uploader.description":
     "Téléversez un extrait audio pour lancer l'identification. Les tâches sont traitées de façon asynchrone avec mises à jour en direct.",
@@ -150,8 +149,6 @@ const fr: Record<MessageKey, string> = {
   "uploader.submitting": "Envoi…",
   "uploader.status.uploading": "Téléversement…",
   "uploader.status.queued": "Tâche en file d'attente. Mise à jour en cours…",
-  "uploader.error.noToken":
-    "Fournissez un jeton API avant de téléverser des fichiers.",
   "uploader.error.noFile": "Sélectionnez un fichier audio avant de valider.",
   "uploader.error.generic": "Échec du téléversement. Réessayez plus tard.",
   "jobs.title": "Tâches",

@@ -228,7 +228,6 @@ describe("JobList", () => {
 
     renderWithProviders(
       <JobList jobs={[runningJob]} onUpdate={onUpdate} sectionId="jobs" />,
-      { token: "token" },
     );
 
     await waitFor(() => expect(mockSockets.length).toBeGreaterThan(0));

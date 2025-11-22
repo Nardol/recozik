@@ -30,7 +30,7 @@ interface Props {
 }
 
 export function AdminTokenManager({ sectionId }: Props) {
-  const { token, profile } = useToken();
+  const { profile } = useToken();
   const { t } = useI18n();
   const isAdmin = profile?.roles.includes("admin");
   const [records, setRecords] = useState<TokenResponse[]>([]);
@@ -40,10 +40,10 @@ export function AdminTokenManager({ sectionId }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const loadTokens = useCallback(async () => {
-    if (!token || !isAdmin) return;
+    if (!isAdmin) return;
     try {
       setLoading(true);
-      const data = await fetchAdminTokens(token);
+      const data = await fetchAdminTokens();
       setRecords(data);
       setError(null);
     } catch (err) {
@@ -51,7 +51,7 @@ export function AdminTokenManager({ sectionId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [token, isAdmin]);
+  }, [isAdmin]);
 
   useEffect(() => {
     loadTokens();
@@ -63,7 +63,6 @@ export function AdminTokenManager({ sectionId }: Props) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token) return;
     const formData = new FormData(event.currentTarget);
     const allowed = FEATURE_OPTIONS.filter((feature) =>
       formData.getAll("feature").includes(feature.key),
@@ -91,7 +90,7 @@ export function AdminTokenManager({ sectionId }: Props) {
       setSaving(true);
       setMessage(t("admin.status.saving"));
       setError(null);
-      await createToken(token, payload);
+      await createToken(payload);
       setMessage(t("admin.status.saved"));
       event.currentTarget.reset();
       await loadTokens();

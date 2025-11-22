@@ -8,7 +8,7 @@
 - `packages/recozik-services/src/recozik_services/` – Service layer consumed by the CLI and future GUIs (identify, batch identify, rename runners plus callback/prompt protocols). Implement new behaviour here first so every frontend stays in sync.
 - `packages/recozik-services/src/recozik_services/security.py` – Auth/authorization/quota protocols + default policies every frontend must wire up.
 - `packages/recozik-web/src/recozik_web/` – FastAPI backend exposing the shared services over HTTP (token auth, quota policy wiring, filesystem identify endpoint, async upload/jobs API + polling/WebSocket hooks).
-- `packages/recozik-webui/` – Next.js dashboard that consumes the HTTP API (token login, upload panel, job monitoring, admin token management). Keep accessibility (screen readers, keyboard navigation) in mind when adding components.
+- `packages/recozik-webui/` – Next.js dashboard that consumes the HTTP API (username/password session login, upload panel, job monitoring, admin token management). Keep accessibility (screen readers, keyboard navigation) in mind when adding components.
 - `packages/recozik-core/src/recozik_core/` – Core libraries (`fingerprint.py`, `cache.py`, `config.py`, `audd.py`, `i18n.py`, locales) consumed by the CLI, backend, and UI.
 - `tests/` – Pytest suites mirroring CLI features and performance guards (includes `test_cli_import_time.py`).
 - `README.md` – User-facing quick start; keep it in sync when commands change.
@@ -127,7 +127,7 @@ Whenever you add new behaviour, extend the shared core/service first so CLI, bac
 
 ### Auth & quota model
 
-- Tokens are supplied via `X-API-Token` header (or cookie for WebSocket). Static tokens: `RECOZIK_WEB_ADMIN_TOKEN`, optional `RECOZIK_WEB_READONLY_TOKEN`. Dynamic tokens stored in SQLite (`auth.db`).
+- Sessions: UI uses password login (`/auth/login`) issuing HttpOnly cookies (`recozik_session` + `recozik_refresh`). Backends still accept `X-API-Token` for CLI/automation. Static tokens: `RECOZIK_WEB_ADMIN_TOKEN`, optional `RECOZIK_WEB_READONLY_TOKEN`. Dynamic tokens stored in SQLite (`auth.db`).
 - `ServiceFeature` values: `identify`, `identify_batch`, `rename`, `audd`, `musicbrainz_enrich`. Tokens carry an `allowed_features` set; `TokenAccessPolicy` rejects unsupported calls with 403.
 - Quotas use `QuotaScope` keys (`acoustid_lookup`, `musicbrainz_enrich`, `audd_standard_lookup`, `audd_enterprise_lookup`). `InMemoryQuotaPolicy` + optional persistent policy (`persistent_quota.py`) enforce per-user limits and raise 429.
 

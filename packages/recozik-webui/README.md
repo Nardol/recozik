@@ -1,6 +1,6 @@
 # Recozik Web UI
 
-Accessible dashboard for the Recozik identify services. Users authenticate with the same API tokens used by the CLI and can:
+Accessible dashboard for the Recozik identify services. Users sign in with a username/password (session cookies) and can:
 
 - Upload audio clips and monitor identify jobs (live updates + polling fallback).
 - Inspect job history with screen-reader-friendly tables.
@@ -12,6 +12,12 @@ The UI is built with Next.js (App Router) and consumes the FastAPI backend docum
 
 - Node.js 20+
 - Running backend at `http://localhost:8000` for local development, or configure `NEXT_PUBLIC_RECOZIK_API_BASE` to point at your server
+
+## Authentication
+
+- Sign in with the credentials configured on the backend (see `RECOZIK_WEB_ADMIN_USERNAME/RECOZIK_WEB_ADMIN_PASSWORD` or users created via `/auth/register`).
+- Sessions use secure HttpOnly cookies; the "keep me signed in" checkbox enables a 7‑day refresh token.
+- The dashboard no longer accepts raw API tokens; admin users can still create tokens for the CLI from the "Admin" panel.
 
 ## Commands
 
