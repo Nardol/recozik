@@ -112,10 +112,16 @@ jobs:
         env:
           PORT: 3000
           BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:3000/api
+          NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:9999
+          RECOZIK_WEB_API_BASE: http://localhost:9999
+          RECOZIK_INTERNAL_API_BASE: http://localhost:9999
+          MOCK_API_PORT: 9999
           VISUAL_SNAPSHOTS: "0"
         run: |
           cd packages/recozik-webui
+          node tests/e2e/mock-api-server.js &
+          MOCK_PID=$!
+          trap "kill $MOCK_PID" EXIT
           npm run test:e2e -- --reporter=line
 
   all-checks:
