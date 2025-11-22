@@ -70,11 +70,20 @@ test.describe("JobList states (mocked API)", () => {
 
     await page.goto("/en");
 
-    await expect(page.getByTestId("jobs-title")).toBeVisible();
-    await expect(page.getByTestId("job-row-job-pending")).toBeVisible();
-    await expect(page.getByTestId("job-row-job-failed")).toBeVisible();
-    await expect(page.getByText("Pending")).toBeVisible();
-    await expect(page.getByText("Failed")).toBeVisible();
-    await expect(page.getByText("Error: Network error")).toBeVisible();
+    const jobsHeading = page.getByRole("heading", { name: "Jobs" });
+    await expect(jobsHeading).toBeVisible();
+
+    const pendingRow = page.getByTestId("job-row-job-pending");
+    const failedRow = page.getByTestId("job-row-job-failed");
+
+    await expect(pendingRow).toBeVisible();
+    await expect(pendingRow.getByTestId("job-status")).toHaveText(/pending/i);
+    await expect(pendingRow.getByTestId("job-messages")).toContainText(
+      "Queued",
+    );
+
+    await expect(failedRow).toBeVisible();
+    await expect(failedRow.getByTestId("job-status")).toHaveText(/failed/i);
+    await expect(failedRow.getByText("Error: Network error")).toBeVisible();
   });
 });
