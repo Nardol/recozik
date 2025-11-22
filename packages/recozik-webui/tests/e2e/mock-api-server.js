@@ -45,11 +45,21 @@ const sendJson = (res, status, data) => {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,X-API-Token");
   res.end(JSON.stringify(data));
 };
 
 const server = http.createServer((req, res) => {
+  console.log(`[mock-api] ${req.method} ${req.url}`);
   const url = new URL(req.url, `http://localhost:${PORT}`);
+
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,X-API-Token");
+    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+    return res.end();
+  }
   if (url.pathname === "/whoami") {
     return sendJson(res, 200, whoamiResponse);
   }
