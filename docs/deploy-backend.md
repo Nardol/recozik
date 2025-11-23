@@ -21,15 +21,20 @@ The sync step creates `.venv/` and installs both runtime and development depende
 
 All settings live under the `RECOZIK_WEB_` prefix. The most important ones:
 
-| Variable                        | Description                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `RECOZIK_WEB_BASE_MEDIA_ROOT`   | Directory that stores uploads, SQLite databases, and cached media. Default: current working directory. |
-| `RECOZIK_WEB_UPLOAD_SUBDIR`     | Relative path under the media root for temporary uploads. Default: `uploads`.                          |
-| `RECOZIK_WEB_ADMIN_TOKEN`       | Token with `admin` role used for the CLI + admin API.                                                  |
-| `RECOZIK_WEB_ACOUSTID_API_KEY`  | Your AcoustID key used during identification.                                                          |
-| `RECOZIK_WEB_AUDD_TOKEN`        | Optional AudD token. Leave unset to disable.                                                           |
-| `RECOZIK_WEB_JOBS_DATABASE_URL` | SQLModel URL for the jobs database. Default: SQLite file next to the media root.                       |
-| `RECOZIK_WEB_AUTH_DATABASE_URL` | SQLModel URL for the auth/token database. Default: SQLite file next to the media root.                 |
+| Variable                            | Description                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `RECOZIK_WEB_BASE_MEDIA_ROOT`       | Directory that stores uploads, SQLite databases, and cached media. Default: current working directory. |
+| `RECOZIK_WEB_UPLOAD_SUBDIR`         | Relative path under the media root for temporary uploads. Default: `uploads`.                          |
+| `RECOZIK_WEB_ADMIN_TOKEN`           | Token with `admin` role used for the CLI + admin API.                                                  |
+| `RECOZIK_WEB_ADMIN_USERNAME`        | Username for the seeded admin account (default: `admin`).                                              |
+| `RECOZIK_WEB_ADMIN_PASSWORD`        | Password for the seeded admin account (must be set to a strong value in production).                   |
+| `RECOZIK_WEB_PRODUCTION_MODE`       | Set to `true` to enforce Secure+Strict cookies and reject default admin token/password.                |
+| `RECOZIK_WEB_ACOUSTID_API_KEY`      | Your AcoustID key used during identification.                                                          |
+| `RECOZIK_WEB_AUDD_TOKEN`            | Optional AudD token. Leave unset to disable.                                                           |
+| `RECOZIK_WEB_JOBS_DATABASE_URL`     | SQLModel URL for the jobs database. Default: SQLite file next to the media root.                       |
+| `RECOZIK_WEB_AUTH_DATABASE_URL`     | SQLModel URL for the auth/token database. Default: SQLite file next to the media root.                 |
+| `RECOZIK_WEB_RATE_LIMIT_ENABLED`    | Toggle global rate limiting (default: `true`).                                                         |
+| `RECOZIK_WEB_RATE_LIMIT_PER_MINUTE` | Default API window (60/min). Auth endpoints enforce their own stricter 5/min limit.                    |
 
 > **Security:** Generate a strong random value for `RECOZIK_WEB_ADMIN_TOKEN` (for example `openssl rand -hex 32`). Never reuse the placeholder token in production.
 
@@ -38,12 +43,21 @@ Example `.env` snippet:
 ```bash
 RECOZIK_WEB_BASE_MEDIA_ROOT=/var/lib/recozik
 RECOZIK_WEB_ADMIN_TOKEN=your-secure-random-token-here
+RECOZIK_WEB_ADMIN_USERNAME=admin
+RECOZIK_WEB_ADMIN_PASSWORD=change-me-strong
 RECOZIK_WEB_ACOUSTID_API_KEY=xxx
 RECOZIK_WEB_AUDD_TOKEN=
 RECOZIK_WEB_UPLOAD_SUBDIR=uploads
+RECOZIK_WEB_PRODUCTION_MODE=true
 ```
 
 Create the media root and uploads directory with the correct permissions before launching the app.
+
+### Session-based auth & CSRF
+
+- Web UI uses session cookies: `recozik_session` (access), `recozik_refresh` (refresh), plus `recozik_csrf` for CSRF double-submit. Cookies are `Secure`/`SameSite=Strict` in production, `Lax` in development.
+- Mutating endpoints expect header `X-CSRF-Token` matching the `recozik_csrf` cookie; the dashboard sets it automatically.
+- CLI/automation still use `X-API-Token` (admin/readonly or generated tokens) as a fallback.
 
 ## 3. Run the FastAPI application
 

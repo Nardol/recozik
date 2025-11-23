@@ -16,8 +16,8 @@ The UI is built with Next.js (App Router) and consumes the FastAPI backend docum
 ## Authentication
 
 - Sign in with the credentials configured on the backend (see `RECOZIK_WEB_ADMIN_USERNAME/RECOZIK_WEB_ADMIN_PASSWORD` or users created via `/auth/register`).
-- Sessions use secure HttpOnly cookies; the "keep me signed in" checkbox enables a 7‑day refresh token.
-- The dashboard no longer accepts raw API tokens; admin users can still create tokens for the CLI from the "Admin" panel.
+- Sessions use secure HttpOnly cookies; the "keep me signed in" checkbox enables a 7‑day refresh token. A CSRF token (`recozik_csrf`) is added automatically as `X-CSRF-Token` on mutating requests.
+- The dashboard no longer accepts raw API tokens; admin users can still create tokens for the CLI from the "Admin" panel (use `X-API-Token` with the backend API).
 
 ## Commands
 
