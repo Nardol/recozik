@@ -18,24 +18,27 @@ export async function loginAction(
     return { status: "error", message: "Missing credentials" };
   }
 
-  const res = await serverFetch("/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password, remember }),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "Invalid credentials");
-    return { status: "error", message: detail || "Invalid credentials" };
+  try {
+    await serverFetch("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, remember }),
+    });
+    revalidatePath(`/${locale}`);
+    return { status: "success", message: "Logged in" };
+  } catch (error) {
+    const detail = (error as Error).message || "Invalid credentials";
+    return { status: "error", message: detail };
   }
-
-  revalidatePath(`/${locale}`);
-  return { status: "success", message: "Logged in" };
 }
 
 export async function logoutAction(formData: FormData) {
   const locale = (formData.get("locale") || "en").toString();
-  await serverFetch("/auth/logout", { method: "POST" });
+  try {
+    await serverFetch("/auth/logout", { method: "POST" });
+  } catch {
+    // ignore errors on logout
+  }
   revalidatePath(`/${locale}`);
 }
 
