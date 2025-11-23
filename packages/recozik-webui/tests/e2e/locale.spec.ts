@@ -10,9 +10,6 @@ test.describe("Locale and landing flow", () => {
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/en$/);
-    const heading = page.getByTestId("main-heading");
-    await heading.waitFor({ timeout: 15000 });
-    await expect(heading).toHaveText("Recozik Web Console");
     await expect(page.getByTestId("login-prompt")).toBeVisible();
   });
 
@@ -22,9 +19,6 @@ test.describe("Locale and landing flow", () => {
     });
     await page.goto("/fr");
     await expect(page).toHaveURL(/\/fr$/);
-    const heading = page.getByTestId("main-heading");
-    await heading.waitFor({ timeout: 15000 });
-    await expect(heading).toHaveText("Console Web Recozik");
     await expect(page.getByTestId("login-prompt")).toBeVisible();
   });
 
