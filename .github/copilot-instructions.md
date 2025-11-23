@@ -40,6 +40,7 @@
     kill $MOCK_PID
     ```
     Install Playwright browsers once with `npx playwright install chromium firefox webkit` (no `--with-deps` if system deps are preinstalled).
+  - E2E storage helper: `packages/recozik-webui/tests/e2e/bootstrap-auth.js` can pre-generate `tests/e2e/storage/auth.json` with mock session cookies for ad-hoc runs (see `packages/recozik-webui/tests/README.md`).
   - `cd packages/recozik-webui && npm run test:e2e -- tests/e2e/visual.spec.ts --update-snapshots` – Update visual baselines (chromium only) for UI screenshots; keep viewport and data deterministic.
   - `cd packages/recozik-webui && npm run build` – Production build; CI runs lint → tests → build in that order.
 - `cd docker && docker compose up --build` – Launch the full stack (backend + frontend + Nginx). Populate `docker/.env` with real tokens/keys before sharing instructions.

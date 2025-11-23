@@ -31,6 +31,7 @@ Thanks for your interest in improving recozik! This guide summarizes how to get 
 - Add or update tests whenever you change CLI behaviour.
 - Compile translations with `python scripts/compile_translations.py` after editing `.po` files and keep English/French `.po` files in sync.
 - Update the Next.js locale bundles (`packages/recozik-webui/src/i18n`) whenever you touch UI copy. Run `npm run lint` to validate the frontend.
+- For frontend E2E, a small helper can pre-create a storage state with mock cookies: see `packages/recozik-webui/tests/README.md` (script `tests/e2e/bootstrap-auth.js`).
 
 ## Documentation & localization expectations
 

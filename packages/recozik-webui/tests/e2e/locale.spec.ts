@@ -1,10 +1,15 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Locale and landing flow", () => {
+  test.use({
+    baseURL: "http://localhost:3000",
+  });
+
   test("redirects to /en and shows unauthenticated landing", async ({
     page,
+    context,
   }) => {
-    await page.route("**/api/whoami", async (route) => {
+    await context.route("**/api/whoami", async (route) => {
       await route.fulfill({ status: 401 });
     });
     await page.goto("/");
@@ -13,8 +18,8 @@ test.describe("Locale and landing flow", () => {
     await expect(page.getByTestId("login-prompt")).toBeVisible();
   });
 
-  test("renders French locale route", async ({ page }) => {
-    await page.route("**/api/whoami", async (route) => {
+  test("renders French locale route", async ({ page, context }) => {
+    await context.route("**/api/whoami", async (route) => {
       await route.fulfill({ status: 401 });
     });
     await page.goto("/fr");
