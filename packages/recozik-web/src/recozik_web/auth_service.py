@@ -9,21 +9,31 @@ from dataclasses import dataclass
 
 from argon2 import PasswordHasher
 from argon2 import exceptions as argon_exc
+from argon2.low_level import Type
 from fastapi import HTTPException, status
 from recozik_services.security import ServiceFeature, ServiceUser
 
 from .auth_models import AuthStore, SessionToken, User, get_auth_store
 from .config import WebSettings
+from .token_utils import hash_token_for_storage
 
 logger = logging.getLogger(__name__)
 
-ph = PasswordHasher()
+ph = PasswordHasher(
+    time_cost=2,
+    memory_cost=19_456,
+    parallelism=1,
+    hash_len=32,
+    salt_len=16,
+    type=Type.ID,
+)
 DUMMY_HASH = ph.hash("dummy-password-for-timing")
 UTC = dt.timezone.utc
 
 
 ACCESS_TTL = dt.timedelta(hours=1)
-REFRESH_TTL = dt.timedelta(days=7)
+REFRESH_TTL_SHORT = dt.timedelta(days=7)
+REFRESH_TTL_LONG = dt.timedelta(days=30)
 
 
 @dataclass
@@ -101,15 +111,15 @@ def seed_admin_user(store: AuthStore, settings: WebSettings) -> None:
 def issue_session(user: User, remember: bool, store: AuthStore) -> SessionPair:
     """Persist a new session + refresh token pair."""
     now = dt.datetime.now(UTC)
-    access_expires = now + (REFRESH_TTL if remember else ACCESS_TTL)
-    refresh_expires = now + REFRESH_TTL
+    access_expires = now + ACCESS_TTL
+    refresh_expires = now + (REFRESH_TTL_LONG if remember else REFRESH_TTL_SHORT)
     session_id = secrets.token_urlsafe(32)
     refresh_token = secrets.token_urlsafe(32)
     store.save_session(
         SessionToken(
-            session_id=session_id,
+            session_id=hash_token_for_storage(session_id),
             user_id=user.id,  # type: ignore[arg-type]
-            refresh_token=refresh_token,
+            refresh_token=hash_token_for_storage(refresh_token),
             created_at=now,
             expires_at=access_expires,
             refresh_expires_at=refresh_expires,
@@ -149,6 +159,7 @@ def ensure_login_enabled(settings: WebSettings) -> None:
 # Cookie helpers
 ACCESS_COOKIE = "recozik_session"
 REFRESH_COOKIE = "recozik_refresh"
+CSRF_COOKIE = "recozik_csrf"
 COOKIE_PATH = "/"
 
 
@@ -160,6 +171,7 @@ def set_session_cookies(
     """Set HttpOnly cookies for access and refresh tokens."""
     secure = settings.production_mode
     samesite = "strict" if secure else "lax"
+    csrf_token = secrets.token_urlsafe(32)
     response.set_cookie(
         ACCESS_COOKIE,
         pair.session_id,
@@ -178,6 +190,15 @@ def set_session_cookies(
         samesite=samesite,
         path=COOKIE_PATH,
     )
+    response.set_cookie(
+        CSRF_COOKIE,
+        csrf_token,
+        expires=pair.access_expires_at,
+        httponly=False,
+        secure=secure,
+        samesite=samesite,
+        path=COOKIE_PATH,
+    )
 
 
 def clear_session_cookies(response) -> None:
@@ -186,6 +207,7 @@ def clear_session_cookies(response) -> None:
     for secure_flag in (False, True):
         response.delete_cookie(ACCESS_COOKIE, path=COOKIE_PATH, httponly=True, secure=secure_flag)
         response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, secure=secure_flag)
+        response.delete_cookie(CSRF_COOKIE, path=COOKIE_PATH, httponly=False, secure=secure_flag)
 
 
 def resolve_session_user(request, settings: WebSettings) -> ServiceUser | None:
@@ -198,7 +220,10 @@ def resolve_session_user(request, settings: WebSettings) -> ServiceUser | None:
     if not record:
         return None
     now = dt.datetime.now(UTC)
-    if record.expires_at <= now:
+    expires_at = record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at <= now:
         store.delete_session(session_id)
         return None
     user = store.get_user_by_id(record.user_id)

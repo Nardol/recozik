@@ -8,6 +8,8 @@ from pathlib import Path
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
+from .token_utils import compare_token
+
 
 class User(SQLModel, table=True):
     """User account with hashed password and allowed features/roles."""
@@ -71,7 +73,7 @@ class AuthStore:
             return user
 
     def upsert_user(self, user: User) -> User:
-        """Insert or update a user keyed by username."""
+        """Insert or update a user keyed by primary key."""
         with self._session() as session:
             session.merge(user)
             session.commit()
@@ -87,26 +89,45 @@ class AuthStore:
             session.refresh(token)
             return token
 
-    def get_session_by_id(self, session_id: str) -> SessionToken | None:
-        """Return session by id."""
+    def get_session_by_id(self, session_token: str) -> SessionToken | None:
+        """Return session by id (hashed storage, constant-time comparison)."""
         with self._session() as session:
-            stmt = select(SessionToken).where(SessionToken.session_id == session_id)
-            return session.exec(stmt).first()
+            now = dt.datetime.now(dt.timezone.utc)
+            rows = session.exec(select(SessionToken).where(SessionToken.expires_at > now)).all()
+            for row in rows:
+                if compare_token(session_token, row.session_id):
+                    return row
+            return None
 
     def get_session_by_refresh(self, refresh_token: str) -> SessionToken | None:
-        """Return session by refresh token."""
+        """Return session by refresh token (hashed storage)."""
         with self._session() as session:
-            stmt = select(SessionToken).where(SessionToken.refresh_token == refresh_token)
-            return session.exec(stmt).first()
+            now = dt.datetime.now(dt.timezone.utc)
+            for row in session.exec(
+                select(SessionToken).where(SessionToken.refresh_expires_at > now)
+            ).all():
+                if compare_token(refresh_token, row.refresh_token):
+                    return row
+            return None
 
-    def delete_session(self, session_id: str) -> None:
-        """Delete a session by id."""
+    def delete_session(self, session_token: str) -> None:
+        """Delete a session by id (raw token)."""
         with self._session() as session:
-            row = session.exec(
-                select(SessionToken).where(SessionToken.session_id == session_id)
-            ).first()
+            row = None
+            for candidate in session.exec(select(SessionToken)).all():
+                if compare_token(session_token, candidate.session_id):
+                    row = candidate
+                    break
             if row:
                 session.delete(row)
+                session.commit()
+
+    def delete_session_record(self, record: SessionToken) -> None:
+        """Delete the provided session record."""
+        with self._session() as session:
+            persistent = session.get(SessionToken, record.id)
+            if persistent:
+                session.delete(persistent)
                 session.commit()
 
     def purge_user_sessions(self, user_id: int) -> None:

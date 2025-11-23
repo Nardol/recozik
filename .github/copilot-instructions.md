@@ -128,7 +128,7 @@ Whenever you add new behaviour, extend the shared core/service first so CLI, bac
 
 ### Auth & quota model
 
-- Sessions: UI uses password login (`/auth/login`) issuing HttpOnly cookies (`recozik_session` + `recozik_refresh`). Backends still accept `X-API-Token` for CLI/automation. Static tokens: `RECOZIK_WEB_ADMIN_TOKEN`, optional `RECOZIK_WEB_READONLY_TOKEN`. Dynamic tokens stored in SQLite (`auth.db`).
+- Sessions: UI uses password login (`/auth/login`) issuing HttpOnly cookies (`recozik_session` + `recozik_refresh`) plus CSRF double-submit (`recozik_csrf` cookie + `X-CSRF-Token` header for mutating routes). Backends still accept `X-API-Token` for CLI/automation. Static tokens: `RECOZIK_WEB_ADMIN_TOKEN`, optional `RECOZIK_WEB_READONLY_TOKEN`. Dynamic tokens stored in SQLite (`auth.db`). Auth endpoints are rate-limited (defaults: 5/min IP).
 - `ServiceFeature` values: `identify`, `identify_batch`, `rename`, `audd`, `musicbrainz_enrich`. Tokens carry an `allowed_features` set; `TokenAccessPolicy` rejects unsupported calls with 403.
 - Quotas use `QuotaScope` keys (`acoustid_lookup`, `musicbrainz_enrich`, `audd_standard_lookup`, `audd_enterprise_lookup`). `InMemoryQuotaPolicy` + optional persistent policy (`persistent_quota.py`) enforce per-user limits and raise 429.
 

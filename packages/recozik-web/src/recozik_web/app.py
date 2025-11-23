@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Any
@@ -51,7 +52,7 @@ from recozik_core.fingerprint import AcoustIDMatch
 from .auth import API_TOKEN_HEADER, RequestContext, get_request_context, resolve_user_from_token
 from .auth_models import get_auth_store
 from .auth_routes import router as auth_router
-from .auth_service import ACCESS_COOKIE, seed_admin_user
+from .auth_service import ACCESS_COOKIE, resolve_session_user, seed_admin_user
 from .auth_store import TokenRecord, get_token_repository
 from .config import WebSettings, get_settings
 from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
@@ -67,9 +68,12 @@ security_logger = logging.getLogger("recozik.web.security")
 
 
 def _token_from_websocket(websocket: WebSocket) -> str | None:
-    token = websocket.headers.get(API_TOKEN_HEADER)
-    if token:
-        return token
+    """Return API token from WebSocket headers if provided."""
+    return websocket.headers.get(API_TOKEN_HEADER)
+
+
+def _session_cookie_from_websocket(websocket: WebSocket) -> str | None:
+    """Return access session cookie value from WebSocket headers."""
     cookie_header = websocket.headers.get("cookie")
     if not cookie_header:
         return None
@@ -83,6 +87,13 @@ def _token_from_websocket(websocket: WebSocket) -> str | None:
     except Exception:  # pragma: no cover - defensive fallback
         logger.warning("Failed to parse cookies during WebSocket auth", exc_info=True)
         return None
+
+
+class _CookieRequest:
+    """Lightweight request shim exposing cookies for session resolution."""
+
+    def __init__(self, cookies: dict[str, str]) -> None:
+        self.cookies = cookies
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -166,8 +177,24 @@ async def _lifespan(fastapi_app: FastAPI):
     """FastAPI lifespan handler configuring runtime security."""
     _configure_runtime_security(fastapi_app)
     settings = get_settings()
-    seed_admin_user(get_auth_store(settings.auth_database_url_resolved), settings)
-    yield
+    store = get_auth_store(settings.auth_database_url_resolved)
+    seed_admin_user(store, settings)
+    # Cleanup expired sessions on startup to avoid DB bloat.
+    store.delete_expired_sessions(datetime.now(timezone.utc))
+    cleanup_task = asyncio.create_task(_session_cleanup_loop(store))
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await cleanup_task
+
+
+async def _session_cleanup_loop(store):
+    """Periodically purge expired sessions."""
+    while True:
+        await asyncio.sleep(3600)
+        store.delete_expired_sessions(datetime.now(timezone.utc))
 
 
 app = FastAPI(title="Recozik Web API", version="0.1.0", lifespan=_lifespan)
@@ -808,22 +835,32 @@ def list_jobs(
 async def job_updates(websocket: WebSocket, job_id: str) -> None:
     """Stream job updates over WebSocket.
 
-    Security: Token must be provided via X-API-Token header only.
+    Security: Auth is accepted via X-API-Token header or auth cookies.
     Query parameters are not accepted to prevent token leakage in logs.
     """
     logger.debug("WebSocket connect for %s", job_id)
-    token = _token_from_websocket(websocket)
     settings = get_settings()
+    token = _token_from_websocket(websocket)
+    session_cookie = _session_cookie_from_websocket(websocket)
+    session_user = None
+    if session_cookie:
+        session_user = resolve_session_user(
+            _CookieRequest({ACCESS_COOKIE: session_cookie}), settings
+        )
 
-    if not token:
+    if not token and not session_user:
         security_logger.warning(
-            "WebSocket connection rejected: missing token in header for job %s", job_id
+            "WebSocket connection rejected: missing auth header/cookie for job %s", job_id
         )
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
     try:
-        user = resolve_user_from_token(token, settings)
+        if token:
+            user = resolve_user_from_token(token, settings)
+        else:
+            assert session_user is not None
+            user = session_user
         repo = get_job_repository(settings.jobs_database_url_resolved)
         job = repo.get(job_id)
 

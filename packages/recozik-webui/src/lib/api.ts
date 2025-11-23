@@ -21,10 +21,23 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 
 type ApiRequestInit = RequestInit & { timeoutMs?: number };
 
+function getCsrfToken(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("recozik_csrf="));
+  return match ? decodeURIComponent(match.split("=", 2)[1]) : undefined;
+}
+
 async function apiFetch<T>(path: string, init?: ApiRequestInit): Promise<T> {
   const headers = new Headers(init?.headers as HeadersInit | undefined);
   if (!(init?.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
+  }
+  const csrf = getCsrfToken();
+  if (csrf) {
+    headers.set("X-CSRF-Token", csrf);
   }
 
   const { timeoutMs, ...requestInit } = init ?? {};

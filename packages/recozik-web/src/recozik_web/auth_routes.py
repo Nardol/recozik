@@ -12,6 +12,7 @@ from recozik_services.security import ServiceUser
 from .auth_models import User, get_auth_store
 from .auth_service import (
     ACCESS_COOKIE,
+    CSRF_COOKIE,
     DUMMY_HASH,
     REFRESH_COOKIE,
     clear_session_cookies,
@@ -23,6 +24,7 @@ from .auth_service import (
     verify_password,
 )
 from .config import WebSettings, get_settings
+from .rate_limit import get_auth_rate_limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -82,20 +84,49 @@ def get_session_user(
     return resolve_session_user(request, settings)
 
 
+def _validate_csrf(request: Request, settings: WebSettings) -> None:
+    """Double-submit cookie defense: cookie must match header."""
+    cookie_token = request.cookies.get(CSRF_COOKIE)
+    header_token = request.headers.get("X-CSRF-Token")
+    if not cookie_token or not header_token or cookie_token != header_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF token missing or invalid",
+        )
+
+
+def _maybe_limiter(settings: WebSettings, max_requests: int = 5):
+    if not settings.rate_limit_enabled:
+        return None
+    return get_auth_rate_limiter(
+        max_requests=max_requests,
+        window_seconds=60,
+        trusted_proxies=settings.rate_limit_trusted_proxies,
+    )
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(
     payload: LoginRequest,
     response: Response,
+    request: Request,
     settings: Annotated[WebSettings, Depends(get_settings)],
 ):
     """Authenticate user with password and set session cookies."""
+    limiter = _maybe_limiter(settings, max_requests=5)
+    if limiter:
+        limiter.check_auth_attempt(request)
     store = get_auth_store(settings.auth_database_url_resolved)
     user = store.get_user(payload.username)
     password_hash = user.password_hash if user else DUMMY_HASH
     is_valid = user is not None and verify_password(payload.password, password_hash)
     if not is_valid:
+        if limiter:
+            limiter.record_failed_auth(request)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     assert user is not None
+    if limiter:
+        limiter.record_successful_auth(request)
     pair = issue_session(user, payload.remember, store)
     set_session_cookies(response, pair, settings)
     return LoginResponse(
@@ -114,28 +145,45 @@ def refresh(
     settings: Annotated[WebSettings, Depends(get_settings)],
 ):
     """Rotate session using refresh cookie."""
+    limiter = _maybe_limiter(settings, max_requests=10)
+    if limiter:
+        limiter.check_auth_attempt(request)
+    _validate_csrf(request, settings)
     refresh_token = request.cookies.get(REFRESH_COOKIE)
     if not refresh_token:
+        if limiter:
+            limiter.record_failed_auth(request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token"
         )
     store = get_auth_store(settings.auth_database_url_resolved)
     record = store.get_session_by_refresh(refresh_token)
     if not record:
+        if limiter:
+            limiter.record_failed_auth(request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
     now = dt.datetime.now(dt.timezone.utc)
-    if record.refresh_expires_at <= now:
-        store.delete_session(record.session_id)
+    refresh_expires_at = record.refresh_expires_at
+    if refresh_expires_at.tzinfo is None:
+        refresh_expires_at = refresh_expires_at.replace(tzinfo=dt.timezone.utc)
+    if refresh_expires_at <= now:
+        if limiter:
+            limiter.record_failed_auth(request)
+        store.delete_session_record(record)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh expired")
     user = store.get_user_by_id(record.user_id)
     if not user:
-        store.delete_session(record.session_id)
+        if limiter:
+            limiter.record_failed_auth(request)
+        store.delete_session_record(record)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User missing")
 
     # rotate session
-    store.delete_session(record.session_id)
+    if limiter:
+        limiter.record_successful_auth(request)
+    store.delete_session_record(record)
     pair = issue_session(user, record.remember, store)
     set_session_cookies(response, pair, settings)
     return LoginResponse(
@@ -162,7 +210,7 @@ def logout(
     if refresh_token:
         record = store.get_session_by_refresh(refresh_token)
         if record:
-            store.delete_session(record.session_id)
+            store.delete_session_record(record)
     clear_session_cookies(response)
     return {"status": "ok"}
 
@@ -171,10 +219,15 @@ def logout(
 def register_user(
     payload: RegisterRequest,
     response: Response,
+    request: Request,
     current_user: Annotated[ServiceUser | None, Depends(get_session_user)],
     settings: Annotated[WebSettings, Depends(get_settings)],
 ):
     """Create a new user (admin only) and issue a session."""
+    limiter = _maybe_limiter(settings, max_requests=5)
+    if limiter:
+        limiter.check_auth_attempt(request)
+    _validate_csrf(request, settings)
     _require_admin(current_user)
     store = get_auth_store(settings.auth_database_url_resolved)
     if store.get_user(payload.username):
@@ -189,6 +242,8 @@ def register_user(
         quota_limits=payload.quota_limits,
     )
     store.create_user(user)
+    if limiter:
+        limiter.record_successful_auth(request)
     return {"status": "ok"}
 
 
@@ -196,18 +251,27 @@ def register_user(
 def change_password(
     payload: ChangePasswordRequest,
     response: Response,
+    request: Request,
     current_user: Annotated[ServiceUser | None, Depends(get_session_user)],
     settings: Annotated[WebSettings, Depends(get_settings)],
 ):
     """Change password for the current user and purge sessions."""
+    limiter = _maybe_limiter(settings, max_requests=5)
+    if limiter:
+        limiter.check_auth_attempt(request)
+    _validate_csrf(request, settings)
     user = _require_user(current_user)
     store = get_auth_store(settings.auth_database_url_resolved)
     db_user = store.get_user(user.user_id)  # type: ignore[arg-type]
     if not db_user or not verify_password(payload.old_password, db_user.password_hash):
+        if limiter:
+            limiter.record_failed_auth(request)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     validate_password_strength(payload.new_password)
     db_user.password_hash = hash_password(payload.new_password)
     store.upsert_user(db_user)
     store.purge_user_sessions(db_user.id)  # type: ignore[arg-type]
     clear_session_cookies(response)
+    if limiter:
+        limiter.record_successful_auth(request)
     return {"status": "ok"}
