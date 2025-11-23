@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import secrets
 from dataclasses import dataclass
 
 from argon2 import PasswordHasher
+from argon2 import exceptions as argon_exc
 from fastapi import HTTPException, status
 from recozik_services.security import ServiceFeature, ServiceUser
 
 from .auth_models import AuthStore, SessionToken, User, get_auth_store
 from .config import WebSettings
 
+logger = logging.getLogger(__name__)
+
 ph = PasswordHasher()
+DUMMY_HASH = ph.hash("dummy-password-for-timing")
+UTC = dt.timezone.utc
 
 
 ACCESS_TTL = dt.timedelta(hours=1)
@@ -36,11 +42,43 @@ def hash_password(password: str) -> str:
     return ph.hash(password)
 
 
+def validate_password_strength(password: str) -> None:
+    """Raise HTTP 400 if password is too weak."""
+    if len(password) < 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 12 characters",
+        )
+    if not any(c.isupper() for c in password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must include an uppercase letter",
+        )
+    if not any(c.islower() for c in password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must include a lowercase letter",
+        )
+    if not any(c.isdigit() for c in password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must include a digit",
+        )
+    if not any(not ch.isalnum() for ch in password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must include a symbol",
+        )
+
+
 def verify_password(password: str, hashed: str) -> bool:
     """Return True if password matches the stored hash."""
     try:
         return ph.verify(hashed, password)
-    except Exception:
+    except (argon_exc.VerifyMismatchError, argon_exc.InvalidHashError):
+        return False
+    except Exception as exc:  # pragma: no cover - unexpected errors
+        logger.exception("Unexpected error verifying password: %s", exc)
         return False
 
 
@@ -49,6 +87,7 @@ def seed_admin_user(store: AuthStore, settings: WebSettings) -> None:
     admin = store.get_user(settings.admin_username)
     if admin:
         return
+    validate_password_strength(settings.admin_password)
     admin_user = User(
         username=settings.admin_username,
         password_hash=hash_password(settings.admin_password),
@@ -61,7 +100,7 @@ def seed_admin_user(store: AuthStore, settings: WebSettings) -> None:
 
 def issue_session(user: User, remember: bool, store: AuthStore) -> SessionPair:
     """Persist a new session + refresh token pair."""
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(UTC)
     access_expires = now + (REFRESH_TTL if remember else ACCESS_TTL)
     refresh_expires = now + REFRESH_TTL
     session_id = secrets.token_urlsafe(32)
@@ -116,15 +155,18 @@ COOKIE_PATH = "/"
 def set_session_cookies(
     response,
     pair: SessionPair,
+    settings: WebSettings,
 ) -> None:
     """Set HttpOnly cookies for access and refresh tokens."""
+    secure = settings.production_mode
+    samesite = "strict" if secure else "lax"
     response.set_cookie(
         ACCESS_COOKIE,
         pair.session_id,
         expires=pair.access_expires_at,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=secure,
+        samesite=samesite,
         path=COOKIE_PATH,
     )
     response.set_cookie(
@@ -132,16 +174,18 @@ def set_session_cookies(
         pair.refresh_token,
         expires=pair.refresh_expires_at,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=secure,
+        samesite=samesite,
         path=COOKIE_PATH,
     )
 
 
 def clear_session_cookies(response) -> None:
     """Clear session cookies."""
-    response.delete_cookie(ACCESS_COOKIE, path=COOKIE_PATH, httponly=True, secure=True)
-    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, secure=True)
+    # best-effort: clear both secure/non-secure variants
+    for secure_flag in (False, True):
+        response.delete_cookie(ACCESS_COOKIE, path=COOKIE_PATH, httponly=True, secure=secure_flag)
+        response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, secure=secure_flag)
 
 
 def resolve_session_user(request, settings: WebSettings) -> ServiceUser | None:
@@ -153,7 +197,7 @@ def resolve_session_user(request, settings: WebSettings) -> ServiceUser | None:
     record = store.get_session_by_id(session_id)
     if not record:
         return None
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(UTC)
     if record.expires_at <= now:
         store.delete_session(session_id)
         return None

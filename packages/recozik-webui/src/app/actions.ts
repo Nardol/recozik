@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { serverCreateJob } from "../lib/server/jobs";
+import { serverFetch } from "../lib/server/api";
 import type { LoginState, UploadState } from "./action-types";
 
 export async function loginAction(
@@ -17,7 +18,7 @@ export async function loginAction(
     return { status: "error", message: "Missing credentials" };
   }
 
-  const res = await fetch("/auth/login", {
+  const res = await serverFetch("/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password, remember }),
@@ -34,7 +35,7 @@ export async function loginAction(
 
 export async function logoutAction(formData: FormData) {
   const locale = (formData.get("locale") || "en").toString();
-  await fetch("/auth/logout", { method: "POST" });
+  await serverFetch("/auth/logout", { method: "POST" });
   revalidatePath(`/${locale}`);
 }
 

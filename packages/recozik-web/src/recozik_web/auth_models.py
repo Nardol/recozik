@@ -18,7 +18,7 @@ class User(SQLModel, table=True):
     roles: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     allowed_features: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     quota_limits: dict[str, int | None] = Field(default_factory=dict, sa_column=Column(JSON))
-    created_at: dt.datetime = Field(default_factory=lambda: dt.datetime.utcnow())
+    created_at: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.timezone.utc))
 
 
 class SessionToken(SQLModel, table=True):
@@ -26,9 +26,9 @@ class SessionToken(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     session_id: str = Field(index=True, unique=True)
-    user_id: int = Field(index=True)
+    user_id: int = Field(index=True, foreign_key="user.id")
     refresh_token: str = Field(index=True, unique=True)
-    created_at: dt.datetime = Field(default_factory=lambda: dt.datetime.utcnow())
+    created_at: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.timezone.utc))
     expires_at: dt.datetime
     refresh_expires_at: dt.datetime
     remember: bool = Field(default=False)
@@ -116,6 +116,18 @@ class AuthStore:
             for row in rows:
                 session.delete(row)
             session.commit()
+
+    def delete_expired_sessions(self, before: dt.datetime) -> int:
+        """Delete all sessions expired before timestamp; return count."""
+        with self._session() as session:
+            rows = session.exec(
+                select(SessionToken).where(SessionToken.refresh_expires_at <= before)
+            ).all()
+            count = len(rows)
+            for row in rows:
+                session.delete(row)
+            session.commit()
+            return count
 
 
 _STORES: dict[str, AuthStore] = {}

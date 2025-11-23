@@ -12,12 +12,14 @@ from recozik_services.security import ServiceUser
 from .auth_models import User, get_auth_store
 from .auth_service import (
     ACCESS_COOKIE,
+    DUMMY_HASH,
     REFRESH_COOKIE,
     clear_session_cookies,
     hash_password,
     issue_session,
     resolve_session_user,
     set_session_cookies,
+    validate_password_strength,
     verify_password,
 )
 from .config import WebSettings, get_settings
@@ -89,10 +91,13 @@ def login(
     """Authenticate user with password and set session cookies."""
     store = get_auth_store(settings.auth_database_url_resolved)
     user = store.get_user(payload.username)
-    if not user or not verify_password(payload.password, user.password_hash):
+    password_hash = user.password_hash if user else DUMMY_HASH
+    is_valid = user is not None and verify_password(payload.password, password_hash)
+    if not is_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    assert user is not None
     pair = issue_session(user, payload.remember, store)
-    set_session_cookies(response, pair)
+    set_session_cookies(response, pair, settings)
     return LoginResponse(
         username=user.username,
         roles=user.roles,
@@ -120,7 +125,7 @@ def refresh(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(dt.timezone.utc)
     if record.refresh_expires_at <= now:
         store.delete_session(record.session_id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh expired")
@@ -132,7 +137,7 @@ def refresh(
     # rotate session
     store.delete_session(record.session_id)
     pair = issue_session(user, record.remember, store)
-    set_session_cookies(response, pair)
+    set_session_cookies(response, pair, settings)
     return LoginResponse(
         username=user.username,
         roles=user.roles,
@@ -162,7 +167,7 @@ def logout(
     return {"status": "ok"}
 
 
-@router.post("/register", response_model=LoginResponse)
+@router.post("/register")
 def register_user(
     payload: RegisterRequest,
     response: Response,
@@ -173,7 +178,9 @@ def register_user(
     _require_admin(current_user)
     store = get_auth_store(settings.auth_database_url_resolved)
     if store.get_user(payload.username):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User exists")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot create user")
+    hash_password(payload.password)  # ensure consistent timing
+    validate_password_strength(payload.password)
     user = User(
         username=payload.username,
         password_hash=hash_password(payload.password),
@@ -182,15 +189,7 @@ def register_user(
         quota_limits=payload.quota_limits,
     )
     store.create_user(user)
-    pair = issue_session(user, remember=False, store=store)
-    set_session_cookies(response, pair)
-    return LoginResponse(
-        username=user.username,
-        roles=user.roles,
-        allowed_features=user.allowed_features,
-        access_expires_at=pair.access_expires_at,
-        refresh_expires_at=pair.refresh_expires_at,
-    )
+    return {"status": "ok"}
 
 
 @router.post("/change-password")
@@ -206,6 +205,7 @@ def change_password(
     db_user = store.get_user(user.user_id)  # type: ignore[arg-type]
     if not db_user or not verify_password(payload.old_password, db_user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    validate_password_strength(payload.new_password)
     db_user.password_hash = hash_password(payload.new_password)
     store.upsert_user(db_user)
     store.purge_user_sessions(db_user.id)  # type: ignore[arg-type]

@@ -76,10 +76,9 @@ def _token_from_websocket(websocket: WebSocket) -> str | None:
     try:
         jar = SimpleCookie()
         jar.load(cookie_header)
-        for name in ("recozik_token", ACCESS_COOKIE):
-            cookie = jar.get(name)
-            if cookie and cookie.value:
-                return cookie.value
+        cookie = jar.get(ACCESS_COOKIE)
+        if cookie and cookie.value:
+            return cookie.value
         return None
     except Exception:  # pragma: no cover - defensive fallback
         logger.warning("Failed to parse cookies during WebSocket auth", exc_info=True)

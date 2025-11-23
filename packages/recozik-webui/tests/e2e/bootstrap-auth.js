@@ -20,6 +20,9 @@ const path = require("path");
   const context = await browser.newContext();
 
   await context.addCookies([
+    // NOTE: Relaxed settings for local E2E (no HttpOnly/Secure, SameSite=Lax) so
+    // Playwright can inspect cookies on http://localhost. Production uses
+    // HttpOnly, Secure, and SameSite=Strict.
     {
       name: "recozik_session",
       value: "session",
