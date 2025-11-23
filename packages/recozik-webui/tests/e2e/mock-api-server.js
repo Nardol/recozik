@@ -3,6 +3,13 @@ const http = require("http");
 
 const PORT = process.env.MOCK_API_PORT || 9999;
 
+// Whitelist of allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "http://localhost:4000",
+  "http://localhost:9999",
+];
+
 const whoamiResponse = {
   user_id: "demo",
   display_name: "Demo",
@@ -42,7 +49,10 @@ const jobsResponse = [
 ];
 
 const sendJson = (req, res, status, data) => {
-  const origin = req.headers.origin || "http://localhost:3000";
+  const requestOrigin = req.headers.origin;
+  const origin = ALLOWED_ORIGINS.includes(requestOrigin)
+    ? requestOrigin
+    : "http://localhost:3000";
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Access-Control-Allow-Origin", origin);
@@ -56,7 +66,10 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (req.method === "OPTIONS") {
-    const origin = req.headers.origin || "http://localhost:3000";
+    const requestOrigin = req.headers.origin;
+    const origin = ALLOWED_ORIGINS.includes(requestOrigin)
+      ? requestOrigin
+      : "http://localhost:3000";
     res.statusCode = 204;
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
