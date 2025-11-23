@@ -1,18 +1,43 @@
-const API_BASE =
+const RAW_API_BASE =
   process.env.NEXT_PUBLIC_RECOZIK_API_BASE?.replace(/\/$/, "") ?? "/api";
+function resolveApiBase(): string {
+  if (RAW_API_BASE.startsWith("http")) {
+    return RAW_API_BASE;
+  }
+  if (typeof window === "undefined") {
+    const origin =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+      "http://localhost:3000";
+    return `${origin}${RAW_API_BASE}`;
+  }
+  const origin =
+    typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : "http://localhost:3000";
+  return `${origin}${RAW_API_BASE}`;
+}
+const API_BASE = resolveApiBase();
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 type ApiRequestInit = RequestInit & { timeoutMs?: number };
 
-async function apiFetch<T>(
-  path: string,
-  token: string,
-  init?: ApiRequestInit,
-): Promise<T> {
+function getCsrfToken(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("recozik_csrf="));
+  return match ? decodeURIComponent(match.split("=", 2)[1]) : undefined;
+}
+
+async function apiFetch<T>(path: string, init?: ApiRequestInit): Promise<T> {
   const headers = new Headers(init?.headers as HeadersInit | undefined);
-  headers.set("X-API-Token", token);
   if (!(init?.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
+  }
+  const csrf = getCsrfToken();
+  if (csrf) {
+    headers.set("X-CSRF-Token", csrf);
   }
 
   const { timeoutMs, ...requestInit } = init ?? {};
@@ -106,23 +131,24 @@ export interface TokenCreatePayload {
   quota_limits: Record<string, number | null>;
 }
 
-export async function fetchWhoami(token: string): Promise<WhoAmI> {
-  return apiFetch("/whoami", token, { cache: "no-store" });
+export async function fetchWhoami(): Promise<WhoAmI> {
+  return apiFetch("/whoami", { cache: "no-store", credentials: "include" });
 }
 
-export async function uploadJob(token: string, formData: FormData) {
-  return apiFetch<{ job_id: string }>("/identify/upload", token, {
+export async function uploadJob(formData: FormData) {
+  return apiFetch<{ job_id: string }>("/identify/upload", {
     method: "POST",
     body: formData,
+    credentials: "include",
     timeoutMs: 120_000,
   });
 }
 
-export async function fetchJobDetail(
-  token: string,
-  jobId: string,
-): Promise<JobDetail> {
-  return apiFetch(`/jobs/${jobId}`, token, { cache: "no-store" });
+export async function fetchJobDetail(jobId: string): Promise<JobDetail> {
+  return apiFetch(`/jobs/${jobId}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
 }
 
 interface JobsQuery {
@@ -131,10 +157,7 @@ interface JobsQuery {
   userId?: string;
 }
 
-export async function fetchJobs(
-  token: string,
-  query?: JobsQuery,
-): Promise<JobDetail[]> {
+export async function fetchJobs(query?: JobsQuery): Promise<JobDetail[]> {
   const params = new URLSearchParams();
   if (query?.limit) {
     params.set("limit", String(query.limit));
@@ -146,22 +169,26 @@ export async function fetchJobs(
     params.set("user_id", query.userId);
   }
   const search = params.toString() ? `?${params.toString()}` : "";
-  return apiFetch(`/jobs${search}`, token, { cache: "no-store" });
+  return apiFetch(`/jobs${search}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
 }
 
-export async function fetchAdminTokens(
-  token: string,
-): Promise<TokenResponse[]> {
-  return apiFetch("/admin/tokens", token, { cache: "no-store" });
+export async function fetchAdminTokens(): Promise<TokenResponse[]> {
+  return apiFetch("/admin/tokens", {
+    cache: "no-store",
+    credentials: "include",
+  });
 }
 
 export async function createToken(
-  token: string,
   payload: TokenCreatePayload,
 ): Promise<TokenResponse> {
-  return apiFetch("/admin/tokens", token, {
+  return apiFetch("/admin/tokens", {
     method: "POST",
     body: JSON.stringify(payload),
+    credentials: "include",
   });
 }
 

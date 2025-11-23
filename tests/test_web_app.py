@@ -27,6 +27,7 @@ def _override_settings(tmp_path: Path) -> WebSettings:
     """Return deterministic settings tied to the provided tmp_path."""
     return WebSettings(
         admin_token=API_TOKEN,
+        admin_password="DevPassword1!",  # noqa: S106 - test fixture password
         readonly_token=None,
         acoustid_api_key="api-key",
         audd_token=None,
@@ -53,14 +54,22 @@ def _bootstrap_app(monkeypatch, tmp_path: Path, settings: WebSettings):
     monkeypatch.setenv("RECOZIK_WEB_MAX_UPLOAD_MB", str(settings.max_upload_mb))
     monkeypatch.setenv("RECOZIK_WEB_UPLOAD_SUBDIR", settings.upload_subdir)
 
+    rate_limit_module = reload(import_module("recozik_web.rate_limit"))
+    # Reset rate limiters to avoid cross-test leakage.
+    rate_limit_module._rate_limiter = None
+    rate_limit_module._auth_rate_limiter = None
+
     config_module = reload(import_module("recozik_web.config"))
     config_module.get_settings.cache_clear()
     auth_module = reload(import_module("recozik_web.auth"))
+    auth_routes_module = reload(import_module("recozik_web.auth_routes"))
     app_module = reload(import_module("recozik_web.app"))
 
     app_module.app.dependency_overrides[config_module.get_settings] = _get_settings
     app_module.app.dependency_overrides[auth_module.get_settings] = _get_settings
+    app_module.app.dependency_overrides[auth_routes_module.get_settings] = _get_settings
     app_module.get_settings = _get_settings
+    auth_routes_module.get_settings = _get_settings
 
     client = TestClient(app_module.app)
     return client, tmp_path, app_module, settings
@@ -113,12 +122,130 @@ def test_security_headers_enabled(web_app) -> None:
     assert "default-src" in csp
 
 
+def _ensure_admin(settings: WebSettings):
+    from recozik_web.auth_models import User, get_auth_store
+    from recozik_web.auth_service import hash_password, verify_password
+
+    store = get_auth_store(settings.auth_database_url_resolved)
+    user = store.get_user(settings.admin_username)
+    if not user:
+        user = User(
+            username=settings.admin_username,
+            password_hash=hash_password(settings.admin_password),
+            roles=["admin"],
+            allowed_features=[],
+            quota_limits={},
+        )
+        store.create_user(user)
+    else:
+        # ensure password matches configured one for this test run
+        user.password_hash = hash_password(settings.admin_password)
+        store.upsert_user(user)
+    assert verify_password(settings.admin_password, user.password_hash)
+
+
+def _login_admin(client: TestClient, settings: WebSettings):
+    _ensure_admin(settings)
+    resp = client.post(
+        "/auth/login",
+        json={"username": settings.admin_username, "password": settings.admin_password},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp
+
+
+def test_auth_refresh_requires_csrf(web_app) -> None:
+    """Refresh must reject when CSRF header is missing."""
+    client, _, _, settings = web_app
+    login = _login_admin(client, settings)
+    client.cookies.update(login.cookies)
+    cookies = client.cookies
+
+    resp_missing = client.post("/auth/refresh")
+    assert resp_missing.status_code == status.HTTP_403_FORBIDDEN
+
+    csrf = cookies.get("recozik_csrf")
+    resp_ok = client.post(
+        "/auth/refresh",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp_ok.status_code == status.HTTP_200_OK
+
+
+def test_register_requires_csrf(web_app) -> None:
+    """Admin user creation must enforce CSRF."""
+    client, _, _, settings = web_app
+    login = _login_admin(client, settings)
+    client.cookies.update(login.cookies)
+    cookies = client.cookies
+    payload = {
+        "username": "newuser",
+        "password": "Str0ngPassw0rd!",
+        "roles": ["user"],
+        "allowed_features": [],
+        "quota_limits": {},
+    }
+
+    resp_missing = client.post("/auth/register", json=payload)
+    assert resp_missing.status_code == status.HTTP_403_FORBIDDEN
+
+    csrf = cookies.get("recozik_csrf")
+    resp_ok = client.post(
+        "/auth/register",
+        json=payload,
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp_ok.status_code == status.HTTP_200_OK
+
+
+def test_change_password_requires_csrf(web_app) -> None:
+    """Password change must enforce CSRF."""
+    client, _, _, settings = web_app
+    login = _login_admin(client, settings)
+    client.cookies.update(login.cookies)
+    cookies = client.cookies
+    payload = {"old_password": "DevPassword1!", "new_password": "Str0ngPassw0rd!"}
+
+    resp_missing = client.post("/auth/change-password", json=payload)
+    assert resp_missing.status_code == status.HTTP_403_FORBIDDEN
+
+    csrf = cookies.get("recozik_csrf")
+    resp_ok = client.post(
+        "/auth/change-password",
+        json=payload,
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp_ok.status_code == status.HTTP_200_OK
+
+
+def test_login_rate_limited(web_app) -> None:
+    """Repeated failed logins should be rate limited."""
+    client, _, _, settings = web_app
+    _ensure_admin(settings)
+    headers = {"X-Forwarded-For": "203.0.113.1"}
+    for _ in range(5):
+        resp = client.post(
+            "/auth/login",
+            json={"username": settings.admin_username, "password": "wrong"},
+            headers=headers,
+        )
+        assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+
+    resp_limit = client.post(
+        "/auth/login",
+        json={"username": "admin", "password": "wrong"},
+        headers=headers,
+    )
+    assert resp_limit.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+
 def test_identify_requires_token(web_app) -> None:
-    """Missing auth header should cause a 422 error at validation time."""
+    """Missing auth header should return 401 when auth is required."""
     client, media_root, _, _ = web_app
     (media_root / "clip.flac").write_bytes(b"data")
     response = client.post("/identify/from-path", json={"audio_path": "clip.flac"})
-    assert response.status_code == 422  # missing header
+    # With session-based auth, missing credentials now yields 401
+    assert response.status_code == 401
 
 
 def test_identify_from_path_invokes_service(monkeypatch, web_app) -> None:

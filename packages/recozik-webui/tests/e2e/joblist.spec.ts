@@ -59,15 +59,6 @@ test.describe("JobList states (mocked API)", () => {
       });
     });
 
-    // mock token cookie so dashboard renders as authenticated
-    await context.addCookies([
-      {
-        name: "recozik_token",
-        value: "fake-token",
-        url: "http://localhost:3000",
-      },
-    ]);
-
     await page.goto("/en");
 
     const jobsHeading = page.getByRole("heading", { name: "Jobs" });

@@ -1,4 +1,5 @@
 import "server-only";
+import { cookies, headers } from "next/headers";
 
 const DEFAULT_INTERNAL_BASE = stripTrailingSlash(
   process.env.RECOZIK_INTERNAL_API_BASE || "http://backend:8000",
@@ -40,16 +41,33 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function buildCookieHeader(): Promise<string | undefined> {
+  const hdrs = await headers();
+  return hdrs.get("cookie") ?? undefined;
+}
+
+async function resolveServerCsrf(): Promise<string | undefined> {
+  const store = await cookies();
+  return store.get("recozik_csrf")?.value;
+}
+
 export async function serverFetch<T = unknown>(
   path: string,
-  token: string,
   init?: RequestInit,
 ) {
   const headers = new Headers(init?.headers);
-  headers.set("X-API-Token", token);
+  const csrf = await resolveServerCsrf();
+  if (csrf) {
+    headers.set("X-CSRF-Token", csrf);
+  }
+  const cookieHeader = await buildCookieHeader();
+  if (cookieHeader) {
+    headers.set("cookie", cookieHeader);
+  }
   const response = await fetch(resolve(path), {
     ...init,
     headers,
+    credentials: "include",
     cache: "no-store",
   });
   return handleResponse<T>(response);
@@ -57,15 +75,22 @@ export async function serverFetch<T = unknown>(
 
 export async function serverFormPost<T = unknown>(
   path: string,
-  token: string,
   formData: FormData,
 ) {
   const headers = new Headers();
-  headers.set("X-API-Token", token);
+  const csrf = await resolveServerCsrf();
+  if (csrf) {
+    headers.set("X-CSRF-Token", csrf);
+  }
+  const cookieHeader = await buildCookieHeader();
+  if (cookieHeader) {
+    headers.set("cookie", cookieHeader);
+  }
   const response = await fetch(resolve(path), {
     method: "POST",
     body: formData,
     headers,
+    credentials: "include",
     cache: "no-store",
   });
   return handleResponse<T>(response);

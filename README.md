@@ -50,7 +50,13 @@ Browse <http://localhost:8080> for the dashboard; the backend API lives under `/
 
 The default admin API token is `dev-admin` (set via `RECOZIK_WEB_ADMIN_TOKEN` or `RECOZIK_ADMIN_TOKEN` in `docker/.env`). Make sure to override it for production deployments.
 
-The dashboard talks to the backend via API tokens, so existing CLI users can reuse their credentials while administrators manage fine-grained permissions (including AudD access) from a browser.
+The dashboard now authenticates with username/password and session cookies (HttpOnly, Secure/SameSite=Strict in production). A CSRF token cookie (`recozik_csrf`) is sent alongside a `X-CSRF-Token` header for mutating requests; the UI handles this automatically. CLI/automation continues to use `X-API-Token` headers (static tokens via `RECOZIK_WEB_ADMIN_TOKEN` / `RECOZIK_WEB_READONLY_TOKEN`, or tokens created in the admin UI).
+
+Minimal prod env vars (backend):
+
+- `RECOZIK_WEB_ADMIN_USERNAME`, `RECOZIK_WEB_ADMIN_PASSWORD` (strong password required in production)
+- `RECOZIK_WEB_ADMIN_TOKEN` / `RECOZIK_WEB_READONLY_TOKEN` for CLI/automation
+- `RECOZIK_WEB_PRODUCTION_MODE=true` to enforce secure cookies/HSTS
 
 ## Prerequisites
 

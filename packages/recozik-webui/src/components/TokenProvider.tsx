@@ -32,36 +32,28 @@ export function TokenProvider({
 }: Props) {
   const [token, setTokenState] = useState<string | null>(initialToken);
   const [profile, setProfile] = useState<WhoAmI | null>(initialProfile);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-
-  useEffect(() => {
-    setTokenState(initialToken ?? null);
-    setProfile(initialProfile ?? null);
-    setStatus("idle");
-  }, [initialToken, initialProfile]);
+  const [status, setStatus] = useState<"idle" | "loading" | "error">(
+    initialProfile ? "idle" : "loading",
+  );
 
   const refreshProfile = useCallback(async () => {
-    if (!token) return;
     try {
       setStatus("loading");
-      const data = await fetchWhoami(token);
+      const data = await fetchWhoami();
       setProfile(data);
       setStatus("idle");
+      setTokenState("session");
     } catch (error) {
       console.error("Unable to load profile", error);
       setStatus("error");
       setProfile(null);
+      setTokenState(null);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
-    if (token) {
-      refreshProfile();
-    } else {
-      setProfile(null);
-      setStatus("idle");
-    }
-  }, [token, refreshProfile]);
+    refreshProfile();
+  }, [refreshProfile]);
 
   const value = useMemo(
     () => ({ token, profile, status, refreshProfile }),

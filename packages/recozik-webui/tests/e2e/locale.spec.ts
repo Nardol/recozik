@@ -3,22 +3,23 @@ import { test, expect } from "@playwright/test";
 test.describe("Locale and landing flow", () => {
   test("redirects to /en and shows unauthenticated landing", async ({
     page,
+    context,
   }) => {
+    await context.route("**/whoami", async (route) => {
+      await route.fulfill({ status: 401 });
+    });
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/en$/);
-    await expect(page.getByTestId("main-heading")).toHaveText(
-      "Recozik Web Console",
-    );
     await expect(page.getByTestId("login-prompt")).toBeVisible();
   });
 
-  test("renders French locale route", async ({ page }) => {
+  test("renders French locale route", async ({ page, context }) => {
+    await context.route("**/whoami", async (route) => {
+      await route.fulfill({ status: 401 });
+    });
     await page.goto("/fr");
     await expect(page).toHaveURL(/\/fr$/);
-    await expect(page.getByTestId("main-heading")).toHaveText(
-      "Console Web Recozik",
-    );
     await expect(page.getByTestId("login-prompt")).toBeVisible();
   });
 

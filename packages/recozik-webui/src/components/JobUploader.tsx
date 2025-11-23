@@ -42,9 +42,7 @@ export function JobUploader({ onJobUpdate, sectionId }: Props) {
   if (state.status === "success" && state.code === "queued") {
     statusText = t("uploader.status.queued");
   } else if (state.status === "error") {
-    if (state.code === "missing_token") {
-      statusText = t("uploader.error.noToken");
-    } else if (state.code === "missing_file") {
+    if (state.code === "missing_file") {
       statusText = t("uploader.error.noFile");
     } else {
       statusText = state.message ?? t("uploader.error.generic");

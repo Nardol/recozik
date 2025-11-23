@@ -40,14 +40,13 @@ describe("NavigationBar", () => {
     push.mockClear();
   });
 
-  it("does not render when no token is available", () => {
+  it("does not render when no profile is available", () => {
     const { container } = renderWithProviders(<NavigationBar />);
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders navigation links when a token is present", () => {
+  it("renders navigation links when a profile is present", () => {
     renderWithProviders(<NavigationBar />, {
-      token: "demo-token",
       profile: mockProfile,
     });
 
@@ -69,7 +68,6 @@ describe("NavigationBar", () => {
 
   it("submits logout action when Disconnect is clicked", () => {
     renderWithProviders(<NavigationBar />, {
-      token: "demo-token",
       profile: mockProfile,
     });
 
@@ -87,7 +85,6 @@ describe("NavigationBar", () => {
 
   it("navigates to anchors when links clicked", () => {
     renderWithProviders(<NavigationBar />, {
-      token: "demo-token",
       profile: mockProfile,
     });
 

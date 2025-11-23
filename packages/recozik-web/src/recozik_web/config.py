@@ -18,6 +18,8 @@ class WebSettings(BaseSettings):
 
     admin_token: str = "dev-admin"  # noqa: S105 - default token for local dev
     readonly_token: str | None = None
+    admin_username: str = "admin"
+    admin_password: str = "dev-password"  # noqa: S105 - for dev only
     production_mode: bool = False
     acoustid_api_key: str = "demo-key"
     audd_token: str | None = None
@@ -99,6 +101,13 @@ class WebSettings(BaseSettings):
                 "SECURITY ERROR: Default admin token detected in production mode!\n"
                 "Set RECOZIK_WEB_ADMIN_TOKEN to a secure random value.\n"
                 f"Example: RECOZIK_WEB_ADMIN_TOKEN={secrets.token_urlsafe(32)}"
+            )
+            print(msg, file=sys.stderr)
+            raise ValueError(msg)
+        if self.production_mode and self.admin_password == "dev-password":  # noqa: S105
+            msg = (
+                "SECURITY ERROR: Default admin password detected in production mode!\n"
+                "Set RECOZIK_WEB_ADMIN_PASSWORD to a secure value."
             )
             print(msg, file=sys.stderr)
             raise ValueError(msg)

@@ -3,13 +3,12 @@
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useI18n } from "../i18n/I18nProvider";
 import { useToken } from "./TokenProvider";
-import { logoutAction } from "../app/actions";
 
 export function NavigationBar() {
-  const { token } = useToken();
+  const { profile } = useToken();
   const { t, locale } = useI18n();
 
-  if (!token) {
+  if (!profile) {
     return null;
   }
 
@@ -28,7 +27,7 @@ export function NavigationBar() {
       </ul>
       <div className="nav-actions">
         <LanguageSwitcher />
-        <form action={logoutAction} data-testid="logout-form">
+        <form action="/auth/logout" method="post" data-testid="logout-form">
           <input type="hidden" name="locale" value={locale} />
           <button type="submit" className="secondary small">
             {t("nav.disconnect")}

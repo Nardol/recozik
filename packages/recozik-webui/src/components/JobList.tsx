@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { JobDetail, fetchJobDetail } from "../lib/api";
 import { MessageKey, useI18n } from "../i18n/I18nProvider";
-import { useToken } from "./TokenProvider";
 import { createJobWebSocket } from "../lib/job-websocket";
 
 interface Props {
@@ -23,7 +22,6 @@ const STATUS_KEYS: Record<string, MessageKey> = {
 const COMPLETED_STATUSES = new Set(["completed", "failed"]);
 
 export function JobList({ jobs, onUpdate, sectionId }: Props) {
-  const { token } = useToken();
   const { t } = useI18n();
   const headingId = sectionId ? `${sectionId}-jobs-title` : "jobs-title";
   const socketsRef = useRef<Map<string, WebSocket>>(new Map());
@@ -37,11 +35,6 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!token) {
-      socketsRef.current.forEach((socket) => socket.close());
-      socketsRef.current.clear();
-      return;
-    }
     const inFlight = jobs.filter((job) => !COMPLETED_STATUSES.has(job.status));
     if (inFlight.length === 0) {
       socketsRef.current.forEach((socket) => socket.close());
@@ -72,10 +65,7 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
               onUpdate(payload.job as JobDetail);
               return;
             }
-            if (!token) {
-              return;
-            }
-            const detail = await fetchJobDetail(token, job.job_id);
+            const detail = await fetchJobDetail(job.job_id);
             onUpdate(detail);
           } catch (error) {
             console.warn("Unable to process job event", job.job_id, error);
@@ -97,7 +87,7 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
       await Promise.all(
         inFlight.map(async (job) => {
           try {
-            const detail = await fetchJobDetail(token, job.job_id);
+            const detail = await fetchJobDetail(job.job_id);
             onUpdate(detail);
           } catch (error) {
             console.warn("Unable to refresh job", job.job_id, error);
@@ -107,7 +97,7 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [jobs, token, onUpdate]);
+  }, [jobs, onUpdate]);
 
   const statusLabel = (status: string) => {
     const key = STATUS_KEYS[status];
