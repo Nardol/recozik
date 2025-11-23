@@ -119,8 +119,8 @@ def login(
     store = get_auth_store(settings.auth_database_url_resolved)
     user = store.get_user(payload.username)
     password_hash = user.password_hash if user else DUMMY_HASH
-    is_valid = user is not None and verify_password(payload.password, password_hash)
-    if not is_valid:
+    password_ok = verify_password(payload.password, password_hash)
+    if not (user and password_ok):
         if limiter:
             limiter.record_failed_auth(request)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -202,6 +202,7 @@ def logout(
     settings: Annotated[WebSettings, Depends(get_settings)],
 ):
     """Invalidate current session and refresh tokens."""
+    _validate_csrf(request, settings)
     session_id = request.cookies.get(ACCESS_COOKIE)
     refresh_token = request.cookies.get(REFRESH_COOKIE)
     store = get_auth_store(settings.auth_database_url_resolved)
@@ -218,12 +219,11 @@ def logout(
 @router.post("/register")
 def register_user(
     payload: RegisterRequest,
-    response: Response,
     request: Request,
     current_user: Annotated[ServiceUser | None, Depends(get_session_user)],
     settings: Annotated[WebSettings, Depends(get_settings)],
 ):
-    """Create a new user (admin only) and issue a session."""
+    """Create a new user (admin only)."""
     limiter = _maybe_limiter(settings, max_requests=5)
     if limiter:
         limiter.check_auth_attempt(request)

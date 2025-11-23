@@ -194,7 +194,10 @@ async def _session_cleanup_loop(store):
     """Periodically purge expired sessions."""
     while True:
         await asyncio.sleep(3600)
-        store.delete_expired_sessions(datetime.now(timezone.utc))
+        try:
+            store.delete_expired_sessions(datetime.now(timezone.utc))
+        except Exception:  # pragma: no cover - defensive logging
+            logger.exception("Failed to delete expired sessions")
 
 
 app = FastAPI(title="Recozik Web API", version="0.1.0", lifespan=_lifespan)

@@ -148,7 +148,7 @@ def _login_admin(client: TestClient, settings: WebSettings):
     _ensure_admin(settings)
     resp = client.post(
         "/auth/login",
-        json={"username": "admin", "password": "DevPassword1!"},
+        json={"username": settings.admin_username, "password": settings.admin_password},
     )
     assert resp.status_code == 200, resp.text
     return resp
@@ -226,7 +226,7 @@ def test_login_rate_limited(web_app) -> None:
     for _ in range(5):
         resp = client.post(
             "/auth/login",
-            json={"username": "admin", "password": "wrong"},
+            json={"username": settings.admin_username, "password": "wrong"},
             headers=headers,
         )
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED

@@ -87,8 +87,8 @@ def verify_password(password: str, hashed: str) -> bool:
         return ph.verify(hashed, password)
     except (argon_exc.VerifyMismatchError, argon_exc.InvalidHashError):
         return False
-    except Exception as exc:  # pragma: no cover - unexpected errors
-        logger.exception("Unexpected error verifying password: %s", exc)
+    except Exception:  # pragma: no cover - unexpected errors
+        logger.exception("Unexpected error verifying password")
         return False
 
 
