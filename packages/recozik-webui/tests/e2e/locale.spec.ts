@@ -4,6 +4,9 @@ test.describe("Locale and landing flow", () => {
   test("redirects to /en and shows unauthenticated landing", async ({
     page,
   }) => {
+    await page.route("**/api/whoami", async (route) => {
+      await route.fulfill({ status: 401 });
+    });
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/en$/);
@@ -14,6 +17,9 @@ test.describe("Locale and landing flow", () => {
   });
 
   test("renders French locale route", async ({ page }) => {
+    await page.route("**/api/whoami", async (route) => {
+      await route.fulfill({ status: 401 });
+    });
     await page.goto("/fr");
     await expect(page).toHaveURL(/\/fr$/);
     await expect(page.getByTestId("main-heading")).toHaveText(

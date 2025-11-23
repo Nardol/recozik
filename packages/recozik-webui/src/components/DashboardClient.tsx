@@ -88,7 +88,7 @@ export function DashboardClient() {
       <NavigationBar />
       <main className="container" id="main-content">
         <header>
-          <h1>{t("app.title")}</h1>
+          <h1 data-testid="main-heading">{t("app.title")}</h1>
           <p className="muted">{t("app.leadAuthed")}</p>
         </header>
         <ProfileCard />
