@@ -61,25 +61,19 @@ export function DashboardClient() {
     });
   }, []);
 
-  if (status === "loading") {
-    return (
-      <main className="container" id="main-content">
-        <header>
-          <h1 data-testid="main-heading">{t("app.title")}</h1>
-          <p className="muted">{t("app.lead")}</p>
-        </header>
-        <p>{t("app.loading")}</p>
-      </main>
-    );
-  }
+  const heading = (
+    <header>
+      <h1 data-testid="main-heading">{t("app.title")}</h1>
+      <p data-testid="login-prompt" className="muted">
+        {t("app.lead")}
+      </p>
+    </header>
+  );
 
   if (!profile) {
     return (
       <main className="container" id="main-content">
-        <header>
-          <h1 data-testid="main-heading">{t("app.title")}</h1>
-          <p data-testid="login-prompt">{t("app.lead")}</p>
-        </header>
+        {heading}
         <div className="panel">
           <h2>{t("login.title")}</h2>
           <p className="muted">{t("login.description")}</p>

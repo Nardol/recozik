@@ -61,6 +61,7 @@ test.describe("JobList states (mocked API)", () => {
 
     await page.goto("/en");
 
+    await expect(page.getByTestId("main-heading")).toBeVisible();
     const jobsHeading = page.getByRole("heading", { name: "Jobs" });
     await expect(jobsHeading).toBeVisible();
 
