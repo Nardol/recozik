@@ -12,7 +12,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { LoginForm } from "./LoginForm";
 
 export function DashboardClient() {
-  const { token, profile, status } = useToken();
+  const { token, profile } = useToken();
   const { t } = useI18n();
   const [jobs, setJobs] = useState<JobDetail[]>([]);
 

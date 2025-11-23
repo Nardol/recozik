@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { serverCreateJob } from "../lib/server/jobs";
 import type { LoginState, UploadState } from "./action-types";
 

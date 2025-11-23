@@ -1,6 +1,7 @@
 // Generate a Playwright storage state with session/profile/locale cookies for localhost
 // Usage: node tests/e2e/bootstrap-auth.js
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("playwright");
 const path = require("path");
 
