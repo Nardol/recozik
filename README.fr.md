@@ -49,7 +49,7 @@ Le fichier `.env.example` recense toutes les variables consommées par le `docke
 - `RECOZIK_WEB_PRODUCTION_MODE` pour activer les garde-fous (cookies sécurisés, blocage des secrets par défaut)
 - `RECOZIK_WEB_BASE_MEDIA_ROOT`, `RECOZIK_WEB_UPLOAD_SUBDIR`, `RECOZIK_WEBUI_UPLOAD_LIMIT`
 
-Les valeurs `dev-*`/`demo-key` ne servent qu’au développement local : remplacez-les par des secrets robustes avant toute exposition.
+Les valeurs `dev-*`/`demo-key` ne servent qu'au développement local : remplacez-les par des secrets robustes avant toute exposition.
 
 ## Prérequis
 
@@ -120,13 +120,13 @@ Conseil : laissez le fallback désactivé dans les scripts partagés tant que ch
 
 ## Enrichissement MusicBrainz optionnel
 
-Lorsque AcoustID ou AudD retournent un identifiant sans métadonnées complètes, Recozik peut interroger l’API JSON de [MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) pour renseigner l’artiste, le titre et les identifiants de release :
+Lorsque AcoustID ou AudD retournent un identifiant sans métadonnées complètes, Recozik peut interroger l'API JSON de [MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) pour renseigner l'artiste, le titre et les identifiants de release :
 
-1. Renseignez un User-Agent poli (par défaut `recozik/0.10.0`) et, si possible, une adresse de contact dans la section `[musicbrainz]` du `config.toml`. Aucun token n’est requis pour les requêtes en lecture seule.
-2. Activez/désactivez l’enrichissement à la volée via `--with-musicbrainz/--without-musicbrainz`. Contrôlez si la requête doit se limiter aux correspondances incomplètes avec `--musicbrainz-missing-only/--musicbrainz-always`.
+1. Renseignez un User-Agent poli (par défaut `recozik/0.10.0`) et, si possible, une adresse de contact dans la section `[musicbrainz]` du `config.toml`. Aucun token n'est requis pour les requêtes en lecture seule.
+2. Activez/désactivez l'enrichissement à la volée via `--with-musicbrainz/--without-musicbrainz`. Contrôlez si la requête doit se limiter aux correspondances incomplètes avec `--musicbrainz-missing-only/--musicbrainz-always`.
 3. Respectez la limite de une requête par seconde : ajustez `rate_limit_per_second` et `timeout_seconds` si votre usage exige un rythme différent.
 
-L’opération se fait localement : aucun appel n’est envoyé aux mainteneurs de Recozik, et les réponses déjà mises en cache sont automatiquement enrichies si de nouvelles métadonnées sont découvertes.
+L'opération se fait localement : aucun appel n'est envoyé aux mainteneurs de Recozik, et les réponses déjà mises en cache sont automatiquement enrichies si de nouvelles métadonnées sont découvertes.
 
 ## Exemples d'utilisation
 
@@ -176,9 +176,9 @@ Le flux de renommage respecte également plusieurs clés sous `[rename]` :
 - `metadata_confirm` : impose (ou non) la confirmation des renommages basés sur les métadonnées (par défaut `true`).
 - `deduplicate_template` : fusionne les propositions qui aboutiraient au même nom de fichier final lorsqu'il est réglé à `true` (valeur par défaut). Surchagez-le via `--deduplicate-template/--keep-template-duplicates`.
 - `log_cleanup` : politique de nettoyage du journal JSONL après `--apply` (`ask`, `always` ou `never` ; valeur par défaut `ask`). Surchargez-la par commande avec `--log-cleanup`.
-- `require_template_fields` : ignore les propositions qui n’ont pas toutes les valeurs exigées par le modèle (par défaut `false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
+- `require_template_fields` : ignore les propositions qui n'ont pas toutes les valeurs exigées par le modèle (par défaut `false`). Modifiez-la à la volée avec `--require-template-fields/--allow-missing-template-fields`.
 
-Deux sections optionnelles permettent aussi d’ajuster les commandes d’identification :
+Deux sections optionnelles permettent aussi d'ajuster les commandes d'identification :
 
 - `[musicbrainz]` paramètre l'enrichissement des correspondances (activation, User-Agent, contact, limite de requêtes, timeout, mode « missing only », token).
 - `[identify]` configure la limite de résultats (`3`), la sortie JSON (`false`), le rafraîchissement du cache (`false`) et les réglages AudD (`audd_enabled = true`, `prefer_audd = false`) uniquement pour `identify`.
@@ -285,7 +285,7 @@ audd_enabled = true
 prefer_audd = false
 announce_source = true
 
-# La commande batch ne lit que la section [identify_batch]; aucune valeur n’est reprise
+# La commande batch ne lit que la section [identify_batch]; aucune valeur n'est reprise
 # depuis [identify].
 [identify_batch]
 limit = 3
@@ -347,14 +347,14 @@ Chaque commande ne lit que la section qui porte son nom. Les valeurs définies s
 | Fichier `[identify]`       | `limit`                    | entier >= 1                              | `3`                              | Nombre de résultats retournés par défaut par `identify`.                     | Édition de `config.toml`.                                                                      |
 | Fichier `[identify]`       | `json`                     | booléen                                  | `false`                          | Affiche du JSON par défaut.                                                  | Édition de `config.toml`.                                                                      |
 | Fichier `[identify]`       | `refresh`                  | booléen                                  | `false`                          | Ignore le cache sauf désactivation explicite.                                | Édition de `config.toml`.                                                                      |
-| Fichier `[identify]`       | `audd_enabled`             | booléen                                  | `true`                           | Active le fallback AudD lorsqu’un jeton est configuré.                       | `--use-audd/--no-audd` ou édition de `config.toml`.                                            |
+| Fichier `[identify]`       | `audd_enabled`             | booléen                                  | `true`                           | Active le fallback AudD lorsqu'un jeton est configuré.                       | `--use-audd/--no-audd` ou édition de `config.toml`.                                            |
 | Fichier `[identify]`       | `prefer_audd`              | booléen                                  | `false`                          | Lance AudD avant AcoustID si activé.                                         | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                                 |
 | Fichier `[identify]`       | `announce_source`          | booléen                                  | `true`                           | Affiche la stratégie retenue sur `stderr`.                                   | `--announce-source/--silent-source` ou édition de `config.toml`.                               |
 | Fichier `[identify_batch]` | `limit`                    | entier >= 1                              | `3`                              | Maximum de propositions conservées par fichier.                              | Édition de `config.toml`.                                                                      |
 | Fichier `[identify_batch]` | `best_only`                | booléen                                  | `false`                          | Conserve uniquement la meilleure proposition.                                | Édition de `config.toml`.                                                                      |
 | Fichier `[identify_batch]` | `recursive`                | booléen                                  | `false`                          | Analyse les sous-dossiers par défaut.                                        | Édition de `config.toml`.                                                                      |
 | Fichier `[identify_batch]` | `log_file`                 | chaîne (chemin)                          | non défini → `recozik-batch.log` | Destination par défaut des journaux batch.                                   | Édition de `config.toml`.                                                                      |
-| Fichier `[identify_batch]` | `audd_enabled`             | booléen                                  | `true`                           | Active AudD pendant l’identification en lot.                                 | `--use-audd/--no-audd` ou édition de `config.toml`.                                            |
+| Fichier `[identify_batch]` | `audd_enabled`             | booléen                                  | `true`                           | Active AudD pendant l'identification en lot.                                 | `--use-audd/--no-audd` ou édition de `config.toml`.                                            |
 | Fichier `[identify_batch]` | `prefer_audd`              | booléen                                  | `false`                          | Tente AudD avant AcoustID lors des traitements batch.                        | `--prefer-audd/--prefer-acoustid` ou édition de `config.toml`.                                 |
 | Fichier `[identify_batch]` | `announce_source`          | booléen                                  | `true`                           | Affiche la stratégie lot sur `stderr`.                                       | `--announce-source/--silent-source` ou édition de `config.toml`.                               |
 | Fichier `[rename]`         | `default_mode`             | `dry-run` \| `apply`                     | `"dry-run"`                      | Comportement implicite si ni `--dry-run` ni `--apply` ne sont passés.        | Édition de `config.toml`.                                                                      |

@@ -49,10 +49,10 @@ recozik-api.example.com {
 
 Utilisez idéalement le même domaine de premier niveau pour l'UI et l'API afin d'éviter les soucis de cookies ou de stratégies CORS.
 
-## 5. Tests d’accessibilité et smoke tests
+## 5. Tests d'accessibilité et smoke tests
 
-- Se connecter avec un jeton admin et vérifier les annonces du lecteur d’écran lorsque l’état change.
-- Téléverser un fichier audio, contrôler que la liste des tâches se met à jour (live region) et que le statut vocalise l’avancement.
+- Se connecter avec un jeton admin et vérifier les annonces du lecteur d'écran lorsque l'état change.
+- Téléverser un fichier audio, contrôler que la liste des tâches se met à jour (live region) et que le statut vocalise l'avancement.
 - Naviguer uniquement au clavier (Tab / Shift+Tab) et vérifier la visibilité des focus.
 - Lancer `npm run lint` pour exécuter ESLint + les vérifications Next.js.
 
