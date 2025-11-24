@@ -49,10 +49,10 @@ recozik-api.example.com {
 
 Utilisez idéalement le même domaine de premier niveau pour l'UI et l'API afin d'éviter les soucis de cookies ou de stratégies CORS.
 
-## 5. Tests d’accessibilité et smoke tests
+## 5. Tests d'accessibilité et smoke tests
 
-- Se connecter avec un jeton admin et vérifier les annonces du lecteur d’écran lorsque l’état change.
-- Téléverser un fichier audio, contrôler que la liste des tâches se met à jour (live region) et que le statut vocalise l’avancement.
+- Se connecter avec un jeton admin et vérifier les annonces du lecteur d'écran lorsque l'état change.
+- Téléverser un fichier audio, contrôler que la liste des tâches se met à jour (live region) et que le statut vocalise l'avancement.
 - Naviguer uniquement au clavier (Tab / Shift+Tab) et vérifier la visibilité des focus.
 - Lancer `npm run lint` pour exécuter ESLint + les vérifications Next.js.
 
@@ -72,3 +72,8 @@ docker compose up --build
 - API backend : <http://localhost:8080/api>
 
 Dans ce scénario, `NEXT_PUBLIC_RECOZIK_API_BASE` vaut `/api`, ce qui permet aux navigateurs d'utiliser la même origine via Nginx. Ajustez la variable dans `.env` si vous exposez la stack sous un autre hôte ou chemin.
+
+Autres réglages `.env` utiles avec le Compose :
+
+- `RECOZIK_WEBUI_UPLOAD_LIMIT` (transmis au build frontend ; `100mb` par défaut dans `.env.example`)
+- L'auth du tableau de bord passe par une session (username/mot de passe). Les jetons API statiques (`RECOZIK_ADMIN_TOKEN`, éventuel `RECOZIK_WEB_READONLY_TOKEN`) visent les clients machines ; il n'existe pas de session UI « lecture seule » par défaut.

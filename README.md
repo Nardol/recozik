@@ -48,7 +48,14 @@ docker compose up --build
 
 Browse <http://localhost:8080> for the dashboard; the backend API lives under `/api`.
 
-The default admin API token is `dev-admin` (set via `RECOZIK_WEB_ADMIN_TOKEN` or `RECOZIK_ADMIN_TOKEN` in `docker/.env`). Make sure to override it for production deployments.
+`.env.example` now lists every value that the Compose stack reads:
+
+- `RECOZIK_ADMIN_TOKEN` (maps to `RECOZIK_WEB_ADMIN_TOKEN`), `RECOZIK_AUDD_TOKEN`, `RECOZIK_ACOUSTID_API_KEY`
+- `RECOZIK_WEB_ADMIN_USERNAME`, `RECOZIK_WEB_ADMIN_PASSWORD` (seeded admin user), optional `RECOZIK_WEB_READONLY_TOKEN`
+- `RECOZIK_WEB_PRODUCTION_MODE` (set to `true` in prod)
+- `RECOZIK_WEB_BASE_MEDIA_ROOT`, `RECOZIK_WEB_UPLOAD_SUBDIR`, `RECOZIK_WEBUI_UPLOAD_LIMIT`
+
+The defaults (`dev-*`, `demo-key`) are for local dev only—replace them before deploying.
 
 The dashboard now authenticates with username/password and session cookies (HttpOnly, Secure/SameSite=Strict in production). A CSRF token cookie (`recozik_csrf`) is sent alongside a `X-CSRF-Token` header for mutating requests; the UI handles this automatically. CLI/automation continues to use `X-API-Token` headers (static tokens via `RECOZIK_WEB_ADMIN_TOKEN` / `RECOZIK_WEB_READONLY_TOKEN`, or tokens created in the admin UI).
 

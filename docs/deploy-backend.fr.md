@@ -116,3 +116,20 @@ La stack démarre trois services :
 3. **nginx** – proxy facultatif sur le port `8080` (`/` vers l'UI, `/api` vers FastAPI). Activez-le avec le profil `reverse-proxy`.
 
 Mettez à jour `.env` avec vos secrets avant la mise en production. Le Compose est également utile pour reproduire l'environnement sur une machine de développement dépourvue de Nginx.
+
+Variables `.env` spécifiques au Compose (toutes optionnelles mais à renseigner explicitement) :
+
+| Variable                      | Rôle / mapping backend                               | Valeur par défaut dans l'exemple |
+| ----------------------------- | ---------------------------------------------------- | -------------------------------- |
+| `RECOZIK_ADMIN_TOKEN`         | Jeton admin (passe en `RECOZIK_WEB_ADMIN_TOKEN`)     | `dev-admin`                      |
+| `RECOZIK_WEB_ADMIN_USERNAME`  | Nom d'utilisateur admin seedé                        | `admin`                          |
+| `RECOZIK_WEB_ADMIN_PASSWORD`  | Mot de passe admin seedé                             | `dev-password`                   |
+| `RECOZIK_WEB_READONLY_TOKEN`  | Jeton API lecture seule (facultatif)                 | vide                             |
+| `RECOZIK_ACOUSTID_API_KEY`    | Clé AcoustID                                         | `demo-key`                       |
+| `RECOZIK_AUDD_TOKEN`          | Jeton AudD (laisser vide pour désactiver)            | vide                             |
+| `RECOZIK_WEB_PRODUCTION_MODE` | Active cookies sécurisés / bloque les secrets défaut | `false`                          |
+| `RECOZIK_WEB_BASE_MEDIA_ROOT` | Dossier media + BDD monté dans le conteneur          | `/data`                          |
+| `RECOZIK_WEB_UPLOAD_SUBDIR`   | Sous-dossier d'upload relatif                        | `uploads`                        |
+| `RECOZIK_WEBUI_UPLOAD_LIMIT`  | Limite de taille d'upload pour le build frontend     | `100mb`                          |
+
+Remplacez les placeholders de développement avant toute exposition publique.
