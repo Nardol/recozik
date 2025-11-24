@@ -72,3 +72,8 @@ docker compose up --build
 - API backend : <http://localhost:8080/api>
 
 Dans ce scénario, `NEXT_PUBLIC_RECOZIK_API_BASE` vaut `/api`, ce qui permet aux navigateurs d'utiliser la même origine via Nginx. Ajustez la variable dans `.env` si vous exposez la stack sous un autre hôte ou chemin.
+
+Autres réglages `.env` utiles avec le Compose :
+
+- `RECOZIK_WEBUI_UPLOAD_LIMIT` (transmis au build frontend ; `100mb` par défaut dans `.env.example`)
+- L'auth du tableau de bord passe par une session (username/mot de passe). Les jetons API statiques (`RECOZIK_ADMIN_TOKEN`, éventuel `RECOZIK_WEB_READONLY_TOKEN`) visent les clients machines ; il n'existe pas de session UI « lecture seule » par défaut.

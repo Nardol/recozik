@@ -34,7 +34,22 @@ Recozik fournit désormais un backend FastAPI mutualisé et un tableau de bord N
 - Consultez [docs/deploy-backend.md](docs/deploy-backend.md) (EN) ou [docs/deploy-backend.fr.md](docs/deploy-backend.fr.md) (FR) pour exposer l'API HTTP (téléversements, WebSockets, gestion des jetons).
 - Consultez [docs/deploy-frontend.md](docs/deploy-frontend.md) (EN) ou [docs/deploy-frontend.fr.md](docs/deploy-frontend.fr.md) (FR) pour construire et déployer l'interface web.
 
-Les définitions Docker Compose décrites dans la documentation permettent également de lancer le backend, le frontend et Nginx en une seule commande (utile pour les tests locaux ou une mise en production minimale).
+Les définitions Docker Compose décrites dans la documentation permettent également de lancer le backend, le frontend et Nginx en une seule commande (utile pour les tests locaux ou une mise en production minimale) :
+
+```bash
+cd docker
+cp .env.example .env  # éditez les tokens/mots de passe avant de démarrer
+docker compose up --build
+```
+
+Le fichier `.env.example` recense toutes les variables consommées par le `docker-compose.yml` :
+
+- `RECOZIK_ADMIN_TOKEN` (injecté en `RECOZIK_WEB_ADMIN_TOKEN`), `RECOZIK_AUDD_TOKEN`, `RECOZIK_ACOUSTID_API_KEY`
+- `RECOZIK_WEB_ADMIN_USERNAME`, `RECOZIK_WEB_ADMIN_PASSWORD`, éventuel `RECOZIK_WEB_READONLY_TOKEN`
+- `RECOZIK_WEB_PRODUCTION_MODE` pour activer les garde-fous (cookies sécurisés, blocage des secrets par défaut)
+- `RECOZIK_WEB_BASE_MEDIA_ROOT`, `RECOZIK_WEB_UPLOAD_SUBDIR`, `RECOZIK_WEBUI_UPLOAD_LIMIT`
+
+Les valeurs `dev-*`/`demo-key` ne servent qu’au développement local : remplacez-les par des secrets robustes avant toute exposition.
 
 ## Prérequis
 

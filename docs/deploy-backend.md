@@ -134,3 +134,20 @@ This stack launches three containers:
    - `http://localhost:8080/api` → FastAPI REST endpoints
 
 Update `.env` with your production tokens/keys before deploying. The Compose setup is also handy for local development if you don't want to maintain a bare-metal Nginx installation.
+
+Compose-specific `.env` keys (all optional but recommended to set explicitly):
+
+| Variable                      | Purpose / maps to backend env                      | Default in example |
+| ----------------------------- | -------------------------------------------------- | ------------------ |
+| `RECOZIK_ADMIN_TOKEN`         | Admin API token → `RECOZIK_WEB_ADMIN_TOKEN`        | `dev-admin`        |
+| `RECOZIK_WEB_ADMIN_USERNAME`  | Seeded admin username                              | `admin`            |
+| `RECOZIK_WEB_ADMIN_PASSWORD`  | Seeded admin password                              | `dev-password`     |
+| `RECOZIK_WEB_READONLY_TOKEN`  | Optional readonly API token                        | empty              |
+| `RECOZIK_ACOUSTID_API_KEY`    | AcoustID key                                       | `demo-key`         |
+| `RECOZIK_AUDD_TOKEN`          | AudD token (leave empty to disable)                | empty              |
+| `RECOZIK_WEB_PRODUCTION_MODE` | Enforce secure cookies/HSTS, block default secrets | `false`            |
+| `RECOZIK_WEB_BASE_MEDIA_ROOT` | Media + DB root mounted into the backend container | `/data`            |
+| `RECOZIK_WEB_UPLOAD_SUBDIR`   | Relative upload folder under the media root        | `uploads`          |
+| `RECOZIK_WEBUI_UPLOAD_LIMIT`  | Upload size limit passed at frontend build time    | `100mb`            |
+
+Replace every development placeholder before exposing the stack publicly.
