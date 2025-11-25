@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "../i18n/I18nProvider";
+import { getApiBase } from "../lib/api";
 import { useToken } from "./TokenProvider";
 
 export function LoginForm() {
@@ -26,7 +27,8 @@ export function LoginForm() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/auth/login", {
+      const apiBase = getApiBase().replace(/\/$/, "");
+      const res = await fetch(`${apiBase}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

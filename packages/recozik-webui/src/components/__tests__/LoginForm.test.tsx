@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LoginForm } from "../LoginForm";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { getApiBase } from "../../lib/api";
 
 const refreshProfile = vi.fn();
 const replace = vi.fn();
@@ -56,7 +57,7 @@ describe("LoginForm", () => {
 
     await waitFor(() => expect(refreshProfile).toHaveBeenCalled());
     expect(global.fetch).toHaveBeenCalledWith(
-      "/auth/login",
+      `${getApiBase().replace(/\/$/, "")}/auth/login`,
       expect.objectContaining({
         method: "POST",
         credentials: "include",
