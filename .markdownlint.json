@@ -7,6 +7,6 @@
     "heading_line_length": 120
   },
   "MD031": {
-    "tables": true
+    "list_items": true
   }
 }

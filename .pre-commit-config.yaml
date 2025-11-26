@@ -44,7 +44,7 @@ repos:
     rev: v0.41.0
     hooks:
       - id: markdownlint
-        files: "^docs/|^README|^packages/recozik-webui/.*\\.md$"
+        files: "^docs/|^README\\.md$|^packages/recozik-webui/.*\\.md$"
         args: ["--config", ".markdownlint.json"]
   - repo: https://github.com/zricethezav/gitleaks
     rev: v8.18.4
