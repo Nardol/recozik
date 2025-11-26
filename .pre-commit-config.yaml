@@ -3,6 +3,9 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
       - id: check-toml
       - id: check-yaml
       - id: end-of-file-fixer
@@ -29,16 +32,74 @@ repos:
     rev: 42.19.6
     hooks:
       - id: renovate-config-validator
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: ["--toml", "pyproject.toml"]
+        types: [text]
+        additional_dependencies:
+          - tomli
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.41.0
+    hooks:
+      - id: markdownlint
+        files: "^docs/|^README\\.md$|^packages/recozik-webui/.*\\.md$"
+        args: ["--config", ".markdownlint.json"]
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+        args: ["protect", "--staged"]
+        pass_filenames: false
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args:
+          [
+            "-lll",
+            "-r",
+            "packages/recozik-services",
+            "packages/recozik-web",
+            "src/recozik",
+          ]
+        exclude: "tests/"
+  - repo: https://github.com/thibaudcolas/pre-commit-stylelint
+    rev: v16.23.0
+    hooks:
+      - id: stylelint
+        files: "^packages/recozik-webui/.*\\.(css|scss)$"
+        args: ["--allow-empty-input", "--fix"]
+        additional_dependencies:
+          - stylelint@16.23.0
+          - stylelint-config-standard@36.0.0
   - repo: local
     hooks:
+      - id: ensure-webui-deps
+        name: ensure webui deps
+        entry: bash scripts/ensure_webui_deps.sh
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, manual, pre-push]
       - id: mypy
         name: mypy
         entry: uv run mypy
         language: system
         pass_filenames: false
         types: [python]
+      - id: eslint-webui
+        name: eslint (web UI)
+        entry: >
+          bash -c
+          "cd packages/recozik-webui && npm run lint -- --max-warnings=0"
+        language: system
+        pass_filenames: false
+        types_or: [javascript, jsx, ts, tsx]
 ci:
   skip:
     - "uv-lock"
     - "renovate-config-validator"
     - "mypy"
+    - "eslint-webui"
+    - "ensure-webui-deps"

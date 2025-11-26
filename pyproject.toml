@@ -131,3 +131,8 @@ files = [
     "packages/recozik-web/src/recozik_web",
     "src/recozik",
 ]
+
+
+[tool.codespell]
+skip = "*.fr.md,*/fr/*,packages/recozik-webui/src/i18n/messages.ts,*.po,*.mo,packages/recozik-webui/package-lock.json,packages/recozik-core/src/recozik_core/fingerprint.py,tests/test_cli_identify.py,tests/test_cli_rename_metadata.py,node_modules,dist,build"
+ignore-words-list = "crate,te,nd,exemple,correspondance,correspondants"

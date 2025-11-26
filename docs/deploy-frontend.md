@@ -1,6 +1,7 @@
 # Deploying the Recozik web frontend
 
-The React/Next.js frontend in `packages/recozik-webui` provides an accessible dashboard for operators and admins. It consumes the FastAPI backend over HTTPS.
+The React/Next.js frontend in `packages/recozik-webui` provides an accessible dashboard for operators and admins. It
+consumes the FastAPI backend over HTTPS.
 
 ## Prerequisites
 
@@ -26,7 +27,8 @@ cp .env.example .env.local
 NEXT_PUBLIC_RECOZIK_API_BASE=https://recozik.example.com
 ```
 
-The value must point to the publicly accessible backend hostname (without a trailing slash). The frontend never stores tokens server-side; tokens live in the browser.
+The value must point to the publicly accessible backend hostname (without a trailing slash). The frontend never stores
+tokens server-side; tokens live in the browser.
 
 ## 3. Build & start (bare-metal)
 
@@ -76,9 +78,11 @@ docker compose up --build
 - Dashboard: <http://localhost:8080>
 - Backend API: <http://localhost:8080/api>
 
-The frontend container defaults to `NEXT_PUBLIC_RECOZIK_API_BASE=/api`, so browsers automatically target the same origin served by Nginx. Override the variable in `.env` if you expose the stack under a different hostname or path.
+The frontend container defaults to `NEXT_PUBLIC_RECOZIK_API_BASE=/api`, so browsers automatically target the same origin
+served by Nginx. Override the variable in `.env` if you expose the stack under a different hostname or path.
 
 Additional Compose env knobs:
 
 - `RECOZIK_WEBUI_UPLOAD_LIMIT` (forwarded at build time; default `100mb` in `.env.example`)
-- API auth in the dashboard uses session login (username/password). Static API tokens (`RECOZIK_ADMIN_TOKEN`, optional `RECOZIK_WEB_READONLY_TOKEN`) are for machine clients; there is no “readonly” UI session by défaut.
+- API auth in the dashboard uses session login (username/password). Static API tokens (`RECOZIK_ADMIN_TOKEN`, optional
+  `RECOZIK_WEB_READONLY_TOKEN`) are for machine clients; there is no “readonly” UI session by défaut.
