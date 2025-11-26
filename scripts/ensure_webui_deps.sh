@@ -15,7 +15,7 @@ if [[ ! -f package-lock.json ]]; then
 fi
 
 if [[ ! -d node_modules || ! -f "${STAMP}" || "${STAMP}" -ot package-lock.json ]]; then
-  npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
+  npm ci --ignore-scripts --prefer-offline --no-audit --no-fund --omit=optional
   mkdir -p "$(dirname "${STAMP}")"
   touch "${STAMP}"
 fi

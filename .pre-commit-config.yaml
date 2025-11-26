@@ -36,11 +36,10 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        args: ["-L", "crate,te,nd,exemple,correspondance,correspondants"]
+        args: ["--toml", "pyproject.toml"]
         types: [text]
-        exclude: >
-          ^node_modules/|fr\.md$|/fr/|\.po$|/i18n/|package-lock\.json$|
-          tests/test_cli_.*\.py|recozik_core/fingerprint\.py|TRANSLATION\.md
+        additional_dependencies:
+          - tomli
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.41.0
     hooks:
