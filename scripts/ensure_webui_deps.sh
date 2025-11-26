@@ -9,6 +9,11 @@ STAMP="${WEBUI}/node_modules/.deps-stamp"
 
 cd "${WEBUI}"
 
+if [[ "${PRE_COMMIT_RUNNING_IN_CI:-""}" == "true" || "${CI:-""}" == "true" ]]; then
+  echo "skip webui deps install in CI"
+  exit 0
+fi
+
 if [[ ! -f package-lock.json ]]; then
   echo "package-lock.json is missing in ${WEBUI}" >&2
   exit 1
