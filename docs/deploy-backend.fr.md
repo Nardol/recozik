@@ -1,6 +1,8 @@
 # Déployer le backend web Recozik
 
-Le backend FastAPI contenu dans `packages/recozik-web` expose les fonctionnalités de la CLI via HTTP (authentification par jeton, quotas, gestion des téléversements, WebSockets). Ce guide explique comment l'exécuter sur une machine Linux ou dans les conteneurs fournis.
+Le backend FastAPI contenu dans `packages/recozik-web` expose les fonctionnalités de la CLI via HTTP (authentification
+par jeton, quotas, gestion des téléversements, WebSockets). Ce guide explique comment l'exécuter sur une machine Linux
+ou dans les conteneurs fournis.
 
 ## Prérequis
 
@@ -31,7 +33,8 @@ Toutes les options commencent par `RECOZIK_WEB_`. Les plus importantes :
 | `RECOZIK_WEB_JOBS_DATABASE_URL` | URL SQLModel pour la base des tâches (SQLite par défaut, stockée près du media root). |
 | `RECOZIK_WEB_AUTH_DATABASE_URL` | URL SQLModel pour la base des jetons/quotas (SQLite par défaut).                      |
 
-> **Sécurité :** générez toujours un jeton aléatoire pour `RECOZIK_WEB_ADMIN_TOKEN` (`openssl rand -hex 32` par exemple). N'utilisez jamais les valeurs d'exemple en production.
+> **Sécurité :** générez toujours un jeton aléatoire pour `RECOZIK_WEB_ADMIN_TOKEN` (`openssl rand -hex 32` par
+> exemple). N'utilisez jamais les valeurs d'exemple en production.
 
 Exemple de `.env` :
 
@@ -54,7 +57,8 @@ uv run uvicorn recozik_web.app:app \
   --log-level info
 ```
 
-Activez CORS ou placez un reverse proxy TLS devant l'application si elle doit être exposée publiquement ou si le tableau de bord Next.js y accède.
+Activez CORS ou placez un reverse proxy TLS devant l'application si elle doit être exposée publiquement ou si le tableau
+de bord Next.js y accède.
 
 ## 4. Service systemd (optionnel)
 
@@ -111,11 +115,14 @@ docker compose up --build
 
 La stack démarre trois services :
 
-1. **backend** – image Python basée sur `docker/backend.Dockerfile`, stockage persistant dans le volume `recozik-data` monté sur `/data`.
+1. **backend** – image Python basée sur `docker/backend.Dockerfile`, stockage persistant dans le volume `recozik-data`
+   monté sur `/data`.
 2. **frontend** – tableau de bord Next.js (voir `docker/frontend.Dockerfile`).
-3. **nginx** – proxy facultatif sur le port `8080` (`/` vers l'UI, `/api` vers FastAPI). Activez-le avec le profil `reverse-proxy`.
+3. **nginx** – proxy facultatif sur le port `8080` (`/` vers l'UI, `/api` vers FastAPI). Activez-le avec le profil
+   `reverse-proxy`.
 
-Mettez à jour `.env` avec vos secrets avant la mise en production. Le Compose est également utile pour reproduire l'environnement sur une machine de développement dépourvue de Nginx.
+Mettez à jour `.env` avec vos secrets avant la mise en production. Le Compose est également utile pour reproduire
+l'environnement sur une machine de développement dépourvue de Nginx.
 
 Variables `.env` spécifiques au Compose (toutes optionnelles mais à renseigner explicitement) :
 

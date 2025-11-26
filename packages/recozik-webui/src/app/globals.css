@@ -7,8 +7,9 @@
   --accent: #38bdf8;
   --danger: #f87171;
   --success: #4ade80;
+
   font-family:
-    "Inter",
+    Inter,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
@@ -50,7 +51,7 @@ body {
 }
 
 .top-nav {
-  background-color: rgba(15, 23, 42, 0.85);
+  background-color: rgb(15 23 42 / 85%);
   border-bottom: 1px solid var(--panel-border);
   padding: 0.75rem 2rem;
   display: flex;
@@ -84,19 +85,6 @@ body {
   align-items: center;
 }
 
-.language-switcher select {
-  background: transparent;
-  border: 1px solid var(--panel-border);
-  border-radius: 0.5rem;
-  color: var(--foreground);
-  padding: 0.25rem 0.75rem;
-}
-
-.language-switcher select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 main.container {
   min-height: 100vh;
   padding: 2rem;
@@ -115,7 +103,7 @@ header {
   border: 1px solid var(--panel-border);
   border-radius: 1rem;
   padding: 1.5rem;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
+  box-shadow: 0 10px 30px rgb(15 23 42 / 40%);
 }
 
 .stack {
@@ -129,7 +117,7 @@ header {
   gap: 1.5rem;
 }
 
-@media (min-width: 900px) {
+@media (width >= 900px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -140,7 +128,7 @@ header {
   gap: 0.75rem;
 }
 
-@media (min-width: 640px) {
+@media (width >= 640px) {
   .grid-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -151,7 +139,7 @@ header {
   gap: 0.75rem;
 }
 
-@media (min-width: 640px) {
+@media (width >= 640px) {
   .grid-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -177,6 +165,19 @@ textarea {
   border: 1px solid var(--panel-border);
   background-color: #0b1220;
   color: inherit;
+}
+
+.language-switcher select {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.5rem;
+  color: var(--foreground);
+  padding: 0.25rem 0.75rem;
+}
+
+.language-switcher select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 textarea {
@@ -270,17 +271,17 @@ td {
 }
 
 .badge-completed {
-  background-color: rgba(74, 222, 128, 0.15);
+  background-color: rgb(74 222 128 / 15%);
   border-color: var(--success);
 }
 
 .badge-running {
-  background-color: rgba(56, 189, 248, 0.15);
+  background-color: rgb(56 189 248 / 15%);
   border-color: var(--accent);
 }
 
 .badge-failed {
-  background-color: rgba(248, 113, 113, 0.15);
+  background-color: rgb(248 113 113 / 15%);
   border-color: var(--danger);
 }
 

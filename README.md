@@ -1,6 +1,8 @@
 # recozik
 
-Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.org/chromaprint) fingerprints, queries the AcoustID service, and helps you batch-identify or rename audio files. The CLI keeps output screen-reader friendly and now ships with built-in localisation.
+Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.org/chromaprint) fingerprints, queries the
+AcoustID service, and helps you batch-identify or rename audio files. The CLI keeps output screen-reader friendly and
+now ships with built-in localisation.
 
 - [Project summary](#project-summary)
 - [Prerequisites](#prerequisites)
@@ -28,15 +30,19 @@ Recozik is a terminal-first tool that computes [Chromaprint](https://acoustid.or
 
 ## Project status
 
-Recozik is currently in a public alpha phase. Interfaces and outputs may change without notice until the 1.0 release. Track changes in [CHANGELOG.md](CHANGELOG.md) and in the GitHub Releases page.
+Recozik is currently in a public alpha phase. Interfaces and outputs may change without notice until the 1.0 release.
+Track changes in [CHANGELOG.md](CHANGELOG.md) and in the GitHub Releases page.
 
 ## Web backend & dashboard
 
 Recozik now ships with a shared FastAPI backend plus an accessible Next.js dashboard:
 
-- See [docs/deploy-backend.md](docs/deploy-backend.md) to run the HTTP API (token management, upload jobs, WebSocket streaming).
-- See [docs/deploy-frontend.md](docs/deploy-frontend.md) to build and deploy the screen-reader-friendly dashboard under `packages/recozik-webui`.
-- The Docker Compose stack stores uploads + SQLite data under `/data` (mount `recozik-data`). Override the location via `RECOZIK_WEB_BASE_MEDIA_ROOT` or change the upload subdirectory with `RECOZIK_WEB_UPLOAD_SUBDIR` in `docker/.env`.
+- See [docs/deploy-backend.md](docs/deploy-backend.md) to run the HTTP API (token management, upload jobs, WebSocket
+  streaming).
+- See [docs/deploy-frontend.md](docs/deploy-frontend.md) to build and deploy the screen-reader-friendly dashboard under
+  `packages/recozik-webui`.
+- The Docker Compose stack stores uploads + SQLite data under `/data` (mount `recozik-data`). Override the location via
+  `RECOZIK_WEB_BASE_MEDIA_ROOT` or change the upload subdirectory with `RECOZIK_WEB_UPLOAD_SUBDIR` in `docker/.env`.
 
 Quick start with Docker Compose:
 
@@ -57,7 +63,10 @@ Browse <http://localhost:8080> for the dashboard; the backend API lives under `/
 
 The defaults (`dev-*`, `demo-key`) are for local dev only—replace them before deploying.
 
-The dashboard now authenticates with username/password and session cookies (HttpOnly, Secure/SameSite=Strict in production). A CSRF token cookie (`recozik_csrf`) is sent alongside a `X-CSRF-Token` header for mutating requests; the UI handles this automatically. CLI/automation continues to use `X-API-Token` headers (static tokens via `RECOZIK_WEB_ADMIN_TOKEN` / `RECOZIK_WEB_READONLY_TOKEN`, or tokens created in the admin UI).
+The dashboard now authenticates with username/password and session cookies (HttpOnly, Secure/SameSite=Strict in
+production). A CSRF token cookie (`recozik_csrf`) is sent alongside a `X-CSRF-Token` header for mutating requests; the
+UI handles this automatically. CLI/automation continues to use `X-API-Token` headers (static tokens via
+`RECOZIK_WEB_ADMIN_TOKEN` / `RECOZIK_WEB_READONLY_TOKEN`, or tokens created in the admin UI).
 
 Minimal prod env vars (backend):
 
@@ -67,13 +76,16 @@ Minimal prod env vars (backend):
 
 ## Prerequisites
 
-- Python 3.10 through 3.13 (librosa 0.11+ supports 3.13; Recozik bundles the `standard-*`/`audioop-lts` backfill packages automatically).
+- Python 3.10 through 3.13 (librosa 0.11+ supports 3.13; Recozik bundles the `standard-*`/`audioop-lts` backfill
+  packages automatically).
 - [Chromaprint](https://acoustid.org/chromaprint) binaries; the CLI relies on the `fpcalc` executable.
   - Linux: install the `chromaprint`/`libchromaprint-tools` package from your distribution.
   - Windows: download the Chromaprint zip, extract it, and add the folder with `fpcalc.exe` to `PATH`.
-- A system keyring backend (`python-keyring`) to store AcoustID/AudD credentials securely. On headless systems without a keyring, export the `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` environment variables before running commands.
+- A system keyring backend (`python-keyring`) to store AcoustID/AudD credentials securely. On headless systems without a
+  keyring, export the `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` environment variables before running commands.
 - Optional build tooling (`msgfmt`) if you modify translations.
-- Optional FFmpeg CLI + `pip install recozik[ffmpeg-support]` to let the AudD fallback and `recozik inspect` decode formats unsupported by libsndfile (for example large WMA files).
+- Optional FFmpeg CLI + `pip install recozik[ffmpeg-support]` to let the AudD fallback and `recozik inspect` decode
+  formats unsupported by libsndfile (for example large WMA files).
 
 ## Installation
 
@@ -92,78 +104,120 @@ pip install uv
 uv sync --all-groups
 ```
 
-The command above creates a project-local virtual environment and installs runtime + development dependencies defined in `pyproject.toml`.
+The command above creates a project-local virtual environment and installs runtime + development dependencies defined in
+`pyproject.toml`.
 
 ## Configuring AcoustID
 
 1. Create an account on <https://acoustid.org> and generate an API key (`Account → Create API Key`).
 2. Persist the key securely (the CLI stores it in your system keyring via `python-keyring`):
+
    ```bash
    uv run recozik config set-key
    ```
-   If no keyring backend is available (minimal/headless systems), export the `ACOUSTID_API_KEY` environment variable before running the CLI instead of relying on the config command.
-   Remove the stored key later with `uv run recozik config set-key --clear` (or `uv run recozik config clear-secrets` to wipe every credential).
-   Default configuration paths:
+
+   If no keyring backend is available (minimal/headless systems), export the `ACOUSTID_API_KEY` environment variable
+   before running the CLI instead of relying on the config command. Remove the stored key later with
+   `uv run recozik config set-key --clear` (or `uv run recozik config clear-secrets` to wipe every credential). Default
+   configuration paths:
    - Linux/macOS: `~/.config/recozik/config.toml`
    - Windows: `%APPDATA%\recozik\config.toml`
    - Override: set the environment variable `RECOZIK_CONFIG_FILE=/path/to/config.toml` before running the CLI.
+
 3. Inspect the current configuration:
+
    ```bash
    uv run recozik config show
    ```
 
-The config file supports additional settings (cache TTL, output templates, logging mode). See the [sample layout](#development-workflow) below.
-Existing plaintext entries in `config.toml` are migrated automatically the next time you run any `recozik` command: the CLI copies them to the keyring and rewrites the file with placeholder comments.
-Never commit the generated `config.toml` or share your personal AcoustID key; treat it like any other secret credential.
+The config file supports additional settings (cache TTL, output templates, logging mode). See the
+[sample layout](#development-workflow) below. Existing plaintext entries in `config.toml` are migrated automatically the
+next time you run any `recozik` command: the CLI copies them to the keyring and rewrites the file with placeholder
+comments. Never commit the generated `config.toml` or share your personal AcoustID key; treat it like any other secret
+credential.
 
 ## Optional AudD fallback
 
-Recozik can also call the [AudD Music Recognition API](https://audd.io) when AcoustID does not return a match. The integration is strictly opt-in:
+Recozik can also call the [AudD Music Recognition API](https://audd.io) when AcoustID does not return a match. The
+integration is strictly opt-in:
 
-1. Create an AudD account and generate an API token. Each user of Recozik needs to supply **their own** token and remains responsible for AudD’s usage limits and terms (the public “API Test License Agreement” only covers 90 days of evaluation).
-2. Store the token with `uv run recozik config set-audd-token` (remove it later with `uv run recozik config set-audd-token --clear`). The token is saved in the system keyring; on headless systems without a keyring backend, export `AUDD_API_TOKEN` or pass `--audd-token` for each invocation.
-   | Environment | `AUDD_ENDPOINT_STANDARD` | string | unset | Overrides the standard AudD endpoint URL. | Export before running the CLI. |
-   | Environment | `AUDD_ENDPOINT_ENTERPRISE` | string | unset | Overrides the enterprise AudD endpoint URL. | Export before running the CLI. |
-   | Environment | `AUDD_MODE` | `standard`/`enterprise`/`auto` | unset | Forces the AudD mode when CLI/config are unset. | Export before running the CLI. |
-   | Environment | `AUDD_FORCE_ENTERPRISE` | boolean | unset | Forces use of the enterprise endpoint ("true"/"false"). | Export before running the CLI. |
-   | Environment | `AUDD_ENTERPRISE_FALLBACK` | boolean | unset | Retry the enterprise endpoint when the standard call has no match. | Export before running the CLI. |
-   | Environment | `AUDD_SKIP` | comma-separated integers | unset | Enterprise: skip the listed 12-second windows (e.g. `12,24`). | Export before running the CLI. |
-   | Environment | `AUDD_EVERY` | float / seconds | unset | Enterprise: spacing between analysed windows. | Export before running the CLI. |
-   | Environment | `AUDD_LIMIT` | integer | unset | Enterprise: cap the number of matches returned. | Export before running the CLI. |
-   | Environment | `AUDD_SKIP_FIRST_SECONDS` | float / seconds | unset | Enterprise: delay scanning by the given offset. | Export before running the CLI. |
-   | Environment | `AUDD_ACCURATE_OFFSETS` | boolean | unset | Enterprise: enable per-second offset detection. | Export before running the CLI. |
-   | Environment | `AUDD_USE_TIMECODE` | boolean | unset | Enterprise: request formatted timecodes in results. | Export before running the CLI. |
-   | Environment | `AUDD_SNIPPET_OFFSET` | float / seconds | `0` | Standard: shift the 12-second snippet forward before upload. | Export before running the CLI. |
-   | Environment | `AUDD_SNIPPET_MIN_RMS` | float | unset | Warn when the AudD snippet RMS falls below this threshold. | Export before running the CLI. |
-3. The default endpoint (`https://api.audd.io/`) only inspects the first **12 seconds** of audio; AudD support confirmed that longer uploads are truncated rather than analysed in full. Use the enterprise endpoint (`https://enterprise.audd.io/`) when you need to scan an entire file.
-4. When AudD recognises a track, the JSON output still exposes a `source` field (`acoustid` or `audd`) and the batch logs append `Source: AudD.` so you know where every suggestion came from—no console banner required.
-5. For formats that libsndfile cannot decode (e.g. WMA > 10 MB), install `ffmpeg` and the optional extra `pip install recozik[ffmpeg-support]`. Recozik will retry the snippet extraction through FFmpeg before giving up on AudD.
+1. Create an AudD account and generate an API token. Each user of Recozik needs to supply **their own** token and
+   remains responsible for AudD’s usage limits and terms (the public “API Test License Agreement” only covers 90 days of
+   evaluation).
+2. Store the token with `uv run recozik config set-audd-token` (remove it later with
+   `uv run recozik config set-audd-token --clear`). The token is saved in the system keyring; on headless systems
+   without a keyring backend, export `AUDD_API_TOKEN` or pass `--audd-token` for each invocation. | Environment |
+   `AUDD_ENDPOINT_STANDARD` | string | unset | Overrides the standard AudD endpoint URL. | Export before running the
+   CLI. | | Environment | `AUDD_ENDPOINT_ENTERPRISE` | string | unset | Overrides the enterprise AudD endpoint URL. |
+   Export before running the CLI. | | Environment | `AUDD_MODE` | `standard`/`enterprise`/`auto` | unset | Forces the
+   AudD mode when CLI/config are unset. | Export before running the CLI. | | Environment | `AUDD_FORCE_ENTERPRISE` |
+   boolean | unset | Forces use of the enterprise endpoint ("true"/"false"). | Export before running the CLI. | |
+   Environment | `AUDD_ENTERPRISE_FALLBACK` | boolean | unset | Retry the enterprise endpoint when the standard call has
+   no match. | Export before running the CLI. | | Environment | `AUDD_SKIP` | comma-separated integers | unset |
+   Enterprise: skip the listed 12-second windows (e.g. `12,24`). | Export before running the CLI. | | Environment |
+   `AUDD_EVERY` | float / seconds | unset | Enterprise: spacing between analysed windows. | Export before running the
+   CLI. | | Environment | `AUDD_LIMIT` | integer | unset | Enterprise: cap the number of matches returned. | Export
+   before running the CLI. | | Environment | `AUDD_SKIP_FIRST_SECONDS` | float / seconds | unset | Enterprise: delay
+   scanning by the given offset. | Export before running the CLI. | | Environment | `AUDD_ACCURATE_OFFSETS` | boolean |
+   unset | Enterprise: enable per-second offset detection. | Export before running the CLI. | | Environment |
+   `AUDD_USE_TIMECODE` | boolean | unset | Enterprise: request formatted timecodes in results. | Export before running
+   the CLI. | | Environment | `AUDD_SNIPPET_OFFSET` | float / seconds | `0` | Standard: shift the 12-second snippet
+   forward before upload. | Export before running the CLI. | | Environment | `AUDD_SNIPPET_MIN_RMS` | float | unset |
+   Warn when the AudD snippet RMS falls below this threshold. | Export before running the CLI. |
+3. The default endpoint (`https://api.audd.io/`) only inspects the first **12 seconds** of audio; AudD support confirmed
+   that longer uploads are truncated rather than analysed in full. Use the enterprise endpoint
+   (`https://enterprise.audd.io/`) when you need to scan an entire file.
+4. When AudD recognises a track, the JSON output still exposes a `source` field (`acoustid` or `audd`) and the batch
+   logs append `Source: AudD.` so you know where every suggestion came from—no console banner required.
+5. For formats that libsndfile cannot decode (e.g. WMA > 10 MB), install `ffmpeg` and the optional extra
+   `pip install recozik[ffmpeg-support]`. Recozik will retry the snippet extraction through FFmpeg before giving up on
+   AudD.
 
-By default the CLI prints the lookup strategy to `stderr` (for example, “Identification strategy: AcoustID first, AudD fallback.”). Toggle it per run with `--announce-source/--silent-source`, or persist the setting through `announce_source` configuration keys.
+By default the CLI prints the lookup strategy to `stderr` (for example, “Identification strategy: AcoustID first, AudD
+fallback.”). Toggle it per run with `--announce-source/--silent-source`, or persist the setting through
+`announce_source` configuration keys.
 
 Advanced knobs are available when you need enterprise behaviour:
 
-- `--audd-mode standard|enterprise|auto` switches endpoints on demand. `auto` sticks with the standard endpoint unless you enable enterprise-only options.
-- `--force-enterprise` bypasses the standard endpoint entirely, while `--audd-enterprise-fallback` retries the enterprise endpoint automatically when the first pass finds nothing.
+- `--audd-mode standard|enterprise|auto` switches endpoints on demand. `auto` sticks with the standard endpoint unless
+  you enable enterprise-only options.
+- `--force-enterprise` bypasses the standard endpoint entirely, while `--audd-enterprise-fallback` retries the
+  enterprise endpoint automatically when the first pass finds nothing.
 - `--audd-endpoint-standard` / `--audd-endpoint-enterprise` redirect requests to custom AudD hosts.
-- `--audd-snippet-offset` shifts the 12-second snippet forward; `--audd-snippet-min-rms` warns when the snippet is nearly silent.
-- `--audd-skip`, `--audd-every`, `--audd-limit`, `--audd-skip-first`, `--audd-accurate-offsets`, and `--audd-use-timecode` mirror the parameters documented on the AudD enterprise API.
+- `--audd-snippet-offset` shifts the 12-second snippet forward; `--audd-snippet-min-rms` warns when the snippet is
+  nearly silent.
+- `--audd-skip`, `--audd-every`, `--audd-limit`, `--audd-skip-first`, `--audd-accurate-offsets`, and
+  `--audd-use-timecode` mirror the parameters documented on the AudD enterprise API.
 
-Every flag has a matching environment variable (`AUDD_MODE`, `AUDD_FORCE_ENTERPRISE`, `AUDD_ENTERPRISE_FALLBACK`, `AUDD_ENDPOINT_STANDARD`, `AUDD_ENDPOINT_ENTERPRISE`, `AUDD_SKIP`, `AUDD_EVERY`, `AUDD_LIMIT`, `AUDD_SKIP_FIRST_SECONDS`, `AUDD_ACCURATE_OFFSETS`, `AUDD_USE_TIMECODE`, `AUDD_SNIPPET_OFFSET`, `AUDD_SNIPPET_MIN_RMS`) and a configuration field under `[audd]` so you can persist your preferred defaults.
+Every flag has a matching environment variable (`AUDD_MODE`, `AUDD_FORCE_ENTERPRISE`, `AUDD_ENTERPRISE_FALLBACK`,
+`AUDD_ENDPOINT_STANDARD`, `AUDD_ENDPOINT_ENTERPRISE`, `AUDD_SKIP`, `AUDD_EVERY`, `AUDD_LIMIT`,
+`AUDD_SKIP_FIRST_SECONDS`, `AUDD_ACCURATE_OFFSETS`, `AUDD_USE_TIMECODE`, `AUDD_SNIPPET_OFFSET`, `AUDD_SNIPPET_MIN_RMS`)
+and a configuration field under `[audd]` so you can persist your preferred defaults.
 
-On a per-run basis you can still disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID with `--prefer-audd`. Remember that the two commands read separate configuration sections: `identify` pulls defaults from `[identify]`, while `identify-batch` only honours values defined under `[identify_batch]` (keys: `audd_enabled`, `prefer_audd`, `announce_source`).
+On a per-run basis you can still disable the integration entirely with `--no-audd`, or prioritise AudD over AcoustID
+with `--prefer-audd`. Remember that the two commands read separate configuration sections: `identify` pulls defaults
+from `[identify]`, while `identify-batch` only honours values defined under `[identify_batch]` (keys: `audd_enabled`,
+`prefer_audd`, `announce_source`).
 
-Tip: keep the token disabled in shared scripts unless every user has accepted AudD’s terms and provided their own credentials.
+Tip: keep the token disabled in shared scripts unless every user has accepted AudD’s terms and provided their own
+credentials.
 
 ## Optional MusicBrainz enrichment
 
-When AcoustID or AudD return a match without full metadata, Recozik can call the public [MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) JSON API to fill in missing artist, title, album, and release identifiers:
+When AcoustID or AudD return a match without full metadata, Recozik can call the public
+[MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) JSON API to fill in missing artist, title, album, and release
+identifiers:
 
-1. Configure a polite user agent and optional contact address under the `[musicbrainz]` section of `config.toml` (defaults to `recozik/0.10.0`). No API key is required for read-only lookups.
-2. Enable or disable the extra lookup per run with `--with-musicbrainz/--without-musicbrainz`. Use `--musicbrainz-missing-only/--musicbrainz-always` to control whether enrichment only happens when artist/title data is absent.
-3. Respect the rate limit: the defaults honour MusicBrainz’ one-request-per-second guideline. Increase or decrease `rate_limit_per_second` and `timeout_seconds` in `[musicbrainz]` if your workflow needs different pacing.
+1. Configure a polite user agent and optional contact address under the `[musicbrainz]` section of `config.toml`
+   (defaults to `recozik/0.10.0`). No API key is required for read-only lookups.
+2. Enable or disable the extra lookup per run with `--with-musicbrainz/--without-musicbrainz`. Use
+   `--musicbrainz-missing-only/--musicbrainz-always` to control whether enrichment only happens when artist/title data
+   is absent.
+3. Respect the rate limit: the defaults honour MusicBrainz’ one-request-per-second guideline. Increase or decrease
+   `rate_limit_per_second` and `timeout_seconds` in `[musicbrainz]` if your workflow needs different pacing.
 
-Enrichment runs entirely on the client: no match data is sent to Recozik’s maintainers, and cached AcoustID responses will be updated with the extra metadata automatically.
+Enrichment runs entirely on the client: no match data is sent to Recozik’s maintainers, and cached AcoustID responses
+will be updated with the extra metadata automatically.
 
 ## Usage examples
 
@@ -193,7 +247,8 @@ Batch-identify a folder and write results to JSONL:
 uv run recozik identify-batch music/ --recursive --log-format jsonl --log-file logs/recozik.jsonl
 ```
 
-By default the batch command scans files with `.mp3`, `.flac`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.opus`, and `.wma` extensions. Add `--ext` flags to override the selection.
+By default the batch command scans files with `.mp3`, `.flac`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.opus`, and `.wma`
+extensions. Add `--ext` flags to override the selection.
 
 Useful options: `--pattern`, `--ext`, `--best-only`, `--refresh`, `--template "{artist} - {title}"`.
 
@@ -203,24 +258,34 @@ Rename files using a previous batch log (dry-run by default):
 uv run recozik rename-from-log logs/recozik.jsonl --root music/ --apply
 ```
 
-Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use embedded tags when AcoustID fails, `--backup-dir` to keep a copy of originals, and `--keep-template-duplicates` when you want to review proposals that render to the same filename.
-The rename workflow also honours configuration keys under `[rename]`:
+Add `--interactive` to pick a suggestion manually, `--metadata-fallback` to use embedded tags when AcoustID fails,
+`--backup-dir` to keep a copy of originals, and `--keep-template-duplicates` when you want to review proposals that
+render to the same filename. The rename workflow also honours configuration keys under `[rename]`:
 
-- `default_mode`: selects the implicit behaviour for `--dry-run/--apply` (`dry-run` by default, set to `apply` to skip the preview step).
+- `default_mode`: selects the implicit behaviour for `--dry-run/--apply` (`dry-run` by default, set to `apply` to skip
+  the preview step).
 - `interactive`: toggles interactive selection without passing `--interactive` (defaults to `false`).
 - `confirm_each`: requests confirmation before each rename when set to `true` (defaults to `false`).
 - `conflict_strategy`: default collision behaviour (`append`, `skip`, or `overwrite`; default `append`).
 - `metadata_confirm`: controls whether metadata fallbacks require confirmation (defaults to `true`).
-- `deduplicate_template`: collapses proposals that would generate the same target filename when `true` (default). Override with the CLI flag `--deduplicate-template/--keep-template-duplicates`.
-- `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or `never`; default `ask`). You can override it per command with `--log-cleanup`.
-- `require_template_fields`: skips matches that are missing values referenced by the template (defaults to `false`). Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
+- `deduplicate_template`: collapses proposals that would generate the same target filename when `true` (default).
+  Override with the CLI flag `--deduplicate-template/--keep-template-duplicates`.
+- `log_cleanup`: controls whether the JSONL log is deleted after a successful `--apply` run (`ask`, `always`, or
+  `never`; default `ask`). You can override it per command with `--log-cleanup`.
+- `require_template_fields`: skips matches that are missing values referenced by the template (defaults to `false`).
+  Toggle it per run with `--require-template-fields/--allow-missing-template-fields`.
 
 Two optional sections also tune the identification commands:
 
-- `[audd]` centralises the AudD integration (token, endpoints, mode, and enterprise parameters such as `skip`, `every`, `limit`, `skip_first_seconds`, `accurate_offsets`, and `use_timecode`).
-- `[musicbrainz]` toggles the metadata enrichment client (token placeholder, polite user agent strings, rate limiting, timeout, and whether enrichment only runs when fields are missing).
-- `[identify]` sets the default limit (`3`), JSON output mode (`false`), cache refresh behaviour (`false`), and the AudD integration defaults (`audd_enabled = true`, `prefer_audd = false`) for the single-file `identify` command only.
-- `[identify_batch]` controls the per-file result limit (`3`), `best_only` mode (`false`), recursion (`false`), log destination (unset → `recozik-batch.log` in the current directory), and the AudD defaults (`audd_enabled = true`, `prefer_audd = false`) exclusively for `identify-batch`.
+- `[audd]` centralises the AudD integration (token, endpoints, mode, and enterprise parameters such as `skip`, `every`,
+  `limit`, `skip_first_seconds`, `accurate_offsets`, and `use_timecode`).
+- `[musicbrainz]` toggles the metadata enrichment client (token placeholder, polite user agent strings, rate limiting,
+  timeout, and whether enrichment only runs when fields are missing).
+- `[identify]` sets the default limit (`3`), JSON output mode (`false`), cache refresh behaviour (`false`), and the AudD
+  integration defaults (`audd_enabled = true`, `prefer_audd = false`) for the single-file `identify` command only.
+- `[identify_batch]` controls the per-file result limit (`3`), `best_only` mode (`false`), recursion (`false`), log
+  destination (unset → `recozik-batch.log` in the current directory), and the AudD defaults (`audd_enabled = true`,
+  `prefer_audd = false`) exclusively for `identify-batch`.
 
 Install shell completion:
 
@@ -236,7 +301,8 @@ uv run recozik completion install --shell zsh --no-write
 
 ## Internationalisation
 
-Recozik uses GNU gettext. English msgids live in the code; translations ship in `packages/recozik-core/src/recozik_core/locales/`.
+Recozik uses GNU gettext. English msgids live in the code; translations ship in
+`packages/recozik-core/src/recozik_core/locales/`.
 
 Locale precedence:
 
@@ -267,7 +333,8 @@ uv run recozik completion …     # manage shell completion scripts
 uv build                        # build wheel + sdist for release validation
 ```
 
-> Typing status: the entire `src/recozik` tree (and `recozik-core`) is kept under mypy. Please run `uv run mypy` before opening a PR and ensure any new module stays within those checked paths.
+> Typing status: the entire `src/recozik` tree (and `recozik-core`) is kept under mypy. Please run `uv run mypy` before
+> opening a PR and ensure any new module stays within those checked paths.
 
 Sample configuration (`config.toml`):
 
@@ -339,7 +406,10 @@ locale = "en"
 
 ## Configuration reference
 
-Each command reads only the section that matches its name. Values under `[identify]` never fall back to `[identify_batch]`, and the batch command does not reuse single-file defaults. Duplicate keys (for example `audd_enabled`, `prefer_audd`, `announce_source`, or `limit`) must therefore be set in both sections if you want the same behaviour across commands.
+Each command reads only the section that matches its name. Values under `[identify]` never fall back to
+`[identify_batch]`, and the batch command does not reuse single-file defaults. Duplicate keys (for example
+`audd_enabled`, `prefer_audd`, `announce_source`, or `limit`) must therefore be set in both sections if you want the
+same behaviour across commands.
 
 | Scope                          | Name                      | Type / Values                        | Default                         | Description                                                           | How to configure                                                                       |
 | ------------------------------ | ------------------------- | ------------------------------------ | ------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -400,21 +470,33 @@ Each command reads only the section that matches its name. Values under `[identi
 
 ## Managing secrets securely
 
-Recozik stores the AcoustID key and AudD token in the system keyring (via `python-keyring`) instead of leaving them in `config.toml`.
+Recozik stores the AcoustID key and AudD token in the system keyring (via `python-keyring`) instead of leaving them in
+`config.toml`.
 
-- `uv run recozik config set-key` and `uv run recozik config set-audd-token` save the values in the keyring and rewrite the config file with placeholder comments.
-- Headless systems without a keyring backend can export `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` or pass `--api-key` / `--audd-token` on each command.
-- Legacy plaintext entries in `config.toml` are migrated automatically the next time any `recozik` command runs: the CLI copies them into the keyring and rewrites the file without the clear-text secrets.
-- Before rewriting `config.toml`, Recozik writes a timestamped `config.toml.bak-YYYYmmddHHMMSS` backup alongside the original file so you can recover if needed.
-- Use `uv run recozik config clear-secrets` (or the individual `--clear` options described below) to delete stored keys/tokens from the keyring if you rotate credentials or change machines.
+- `uv run recozik config set-key` and `uv run recozik config set-audd-token` save the values in the keyring and rewrite
+  the config file with placeholder comments.
+- Headless systems without a keyring backend can export `ACOUSTID_API_KEY` / `AUDD_API_TOKEN` or pass `--api-key` /
+  `--audd-token` on each command.
+- Legacy plaintext entries in `config.toml` are migrated automatically the next time any `recozik` command runs: the CLI
+  copies them into the keyring and rewrites the file without the clear-text secrets.
+- Before rewriting `config.toml`, Recozik writes a timestamped `config.toml.bak-YYYYmmddHHMMSS` backup alongside the
+  original file so you can recover if needed.
+- Use `uv run recozik config clear-secrets` (or the individual `--clear` options described below) to delete stored
+  keys/tokens from the keyring if you rotate credentials or change machines.
 
 ## Code structure
 
-- `src/recozik/cli.py` registers the Typer application and exposes backwards-compatible aliases for tests and integrations.
-- `src/recozik/commands/` contains the command implementations split by feature (`inspect`, `identify`, `identify-batch`, `rename-from-log`, `config`, `completion`).
-- `src/recozik/cli_support/` re-exports shared helpers from `recozik-services` so the CLI keeps minimal glue code (locale handling, filesystem utilities, metadata parsing, logging helpers, and lazy dependency loaders).
-- `packages/recozik-core/src/recozik_core/` hosts the reusable core library (fingerprinting, AudD integration, caching, config, gettext locales) consumed by the CLI and future front-ends.
-- `packages/recozik-services/src/recozik_services/` exposes the high-level “service” API (identify, batch identify, rename) that both the Typer CLI and upcoming GUIs call. Tests in `tests/test_services.py` interact with these runners directly without importing the CLI.
+- `src/recozik/cli.py` registers the Typer application and exposes backwards-compatible aliases for tests and
+  integrations.
+- `src/recozik/commands/` contains the command implementations split by feature (`inspect`, `identify`,
+  `identify-batch`, `rename-from-log`, `config`, `completion`).
+- `src/recozik/cli_support/` re-exports shared helpers from `recozik-services` so the CLI keeps minimal glue code
+  (locale handling, filesystem utilities, metadata parsing, logging helpers, and lazy dependency loaders).
+- `packages/recozik-core/src/recozik_core/` hosts the reusable core library (fingerprinting, AudD integration, caching,
+  config, gettext locales) consumed by the CLI and future front-ends.
+- `packages/recozik-services/src/recozik_services/` exposes the high-level “service” API (identify, batch identify,
+  rename) that both the Typer CLI and upcoming GUIs call. Tests in `tests/test_services.py` interact with these runners
+  directly without importing the CLI.
 
 This layout keeps the import-time fast while making the command code easier to navigate and test.
 
@@ -460,7 +542,10 @@ response = identify_track(request)
 print(response.matches)
 ```
 
-Any new feature should be implemented in the relevant service module first (so every front-end stays in sync) before adding the CLI glue. The same pattern applies to batch identification (`recozik_services.batch.run_batch_identify`) and rename workflows (`recozik_services.rename.rename_from_log`). This is the API future GUI packages will call, so keep it front-of-mind when adding options.
+Any new feature should be implemented in the relevant service module first (so every front-end stays in sync) before
+adding the CLI glue. The same pattern applies to batch identification (`recozik_services.batch.run_batch_identify`) and
+rename workflows (`recozik_services.rename.rename_from_log`). This is the API future GUI packages will call, so keep it
+front-of-mind when adding options.
 
 ## Testing
 
@@ -470,7 +555,8 @@ uv run ruff check --fix
 uv run pytest
 ```
 
-A pytest fixture (`tests/conftest.py`) forces the English locale during tests, so assertions stay predictable. Override `RECOZIK_LOCALE` inside a test when you want to check translated output.
+A pytest fixture (`tests/conftest.py`) forces the English locale during tests, so assertions stay predictable. Override
+`RECOZIK_LOCALE` inside a test when you want to check translated output.
 
 Import-time performance is guarded by `tests/test_cli_import_time.py` (expected < 0.5 s). Measure it locally with:
 
@@ -484,7 +570,8 @@ uv run python scripts/measure_import_time.py
 - Use imperative, signed-off commit messages (`git commit -s`).
 - When adding user-facing strings, wrap them with `_()` from `recozik_core.i18n` and update the translation catalogues.
 - See [TRANSLATION.md](TRANSLATION.md) for localisation details.
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, the [Code of Conduct](CODE_OF_CONDUCT.md), and the [security policy](SECURITY.md) before opening an issue or pull request.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, the [Code of Conduct](CODE_OF_CONDUCT.md), and the
+  [security policy](SECURITY.md) before opening an issue or pull request.
 
 Issues and pull requests are welcome—thank you for helping to improve Recozik!
 

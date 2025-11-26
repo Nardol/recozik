@@ -1,6 +1,7 @@
 # Deploying the Recozik web backend
 
-The FastAPI backend in `packages/recozik-web` exposes the CLI features over HTTP (token auth, quotas, upload jobs, WebSockets). This guide explains how to run it on a bare-metal host.
+The FastAPI backend in `packages/recozik-web` exposes the CLI features over HTTP (token auth, quotas, upload jobs,
+WebSockets). This guide explains how to run it on a bare-metal host.
 
 ## Prerequisites
 
@@ -36,7 +37,8 @@ All settings live under the `RECOZIK_WEB_` prefix. The most important ones:
 | `RECOZIK_WEB_RATE_LIMIT_ENABLED`    | Toggle global rate limiting (default: `true`).                                                         |
 | `RECOZIK_WEB_RATE_LIMIT_PER_MINUTE` | Default API window (60/min). Auth endpoints enforce their own stricter 5/min limit.                    |
 
-> **Security:** Generate a strong random value for `RECOZIK_WEB_ADMIN_TOKEN` (for example `openssl rand -hex 32`). Never reuse the placeholder token in production.
+> **Security:** Generate a strong random value for `RECOZIK_WEB_ADMIN_TOKEN` (for example `openssl rand -hex 32`). Never
+> reuse the placeholder token in production.
 
 Example `.env` snippet:
 
@@ -55,8 +57,10 @@ Create the media root and uploads directory with the correct permissions before 
 
 ### Session-based auth & CSRF
 
-- Web UI uses session cookies: `recozik_session` (access), `recozik_refresh` (refresh), plus `recozik_csrf` for CSRF double-submit. Cookies are `Secure`/`SameSite=Strict` in production, `Lax` in development.
-- Mutating endpoints expect header `X-CSRF-Token` matching the `recozik_csrf` cookie; the dashboard sets it automatically.
+- Web UI uses session cookies: `recozik_session` (access), `recozik_refresh` (refresh), plus `recozik_csrf` for CSRF
+  double-submit. Cookies are `Secure`/`SameSite=Strict` in production, `Lax` in development.
+- Mutating endpoints expect header `X-CSRF-Token` matching the `recozik_csrf` cookie; the dashboard sets it
+  automatically.
 - CLI/automation still use `X-API-Token` (admin/readonly or generated tokens) as a fallback.
 
 ## 3. Run the FastAPI application
@@ -70,7 +74,8 @@ uv run uvicorn recozik_web.app:app \
   --log-level info
 ```
 
-Enable CORS or TLS termination at the reverse proxy layer if you plan to access the API from the public Internet or the React frontend.
+Enable CORS or TLS termination at the reverse proxy layer if you plan to access the API from the public Internet or the
+React frontend.
 
 ## 4. Optional: systemd service
 
@@ -127,13 +132,15 @@ docker compose up --build
 
 This stack launches three containers:
 
-1. **backend** – Python image built from `docker/backend.Dockerfile`, storing uploads/SQLite data under the `recozik-data` volume (mounted at `/data`).
+1. **backend** – Python image built from `docker/backend.Dockerfile`, storing uploads/SQLite data under the
+   `recozik-data` volume (mounted at `/data`).
 2. **frontend** – Next.js dashboard served via `npm run start` (see `docker/frontend.Dockerfile`).
 3. **nginx** – Fronts both services on port `8080`, exposing:
    - `http://localhost:8080` → dashboard
    - `http://localhost:8080/api` → FastAPI REST endpoints
 
-Update `.env` with your production tokens/keys before deploying. The Compose setup is also handy for local development if you don't want to maintain a bare-metal Nginx installation.
+Update `.env` with your production tokens/keys before deploying. The Compose setup is also handy for local development
+if you don't want to maintain a bare-metal Nginx installation.
 
 Compose-specific `.env` keys (all optional but recommended to set explicitly):
 
