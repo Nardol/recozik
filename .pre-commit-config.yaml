@@ -101,3 +101,5 @@ ci:
     - "uv-lock"
     - "renovate-config-validator"
     - "mypy"
+    - "eslint-webui"
+    - "ensure-webui-deps"

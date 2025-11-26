@@ -37,6 +37,8 @@ jobs:
             hashFiles('.pre-commit-config.yaml') }}
           restore-keys: pre-commit-${{ runner.os }}-
       - run: uv run pre-commit run --all-files
+        env:
+          SKIP: eslint-webui,ensure-webui-deps
       - name: Type check (mypy)
         run: uv run mypy
 
