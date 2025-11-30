@@ -6,6 +6,7 @@ import logging
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
+from secrets import token_urlsafe
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from recozik_services.security import (
@@ -200,11 +201,14 @@ def seed_users_on_startup(settings: WebSettings) -> None:
     if settings.readonly_token:
         readonly_user = auth_store.get_user("readonly")
         if not readonly_user:
+            # Generate a random, secure password that won't be known
+            # This prevents login with an empty/weak password
+            readonly_password = token_urlsafe(32)
             readonly_user = User(
                 username="readonly",
                 email="readonly@localhost",
                 display_name="Read-only User",
-                password_hash=hash_password(""),  # No password login for readonly
+                password_hash=hash_password(readonly_password),
                 roles=["readonly"],
                 allowed_features=_features_for(settings, readonly=True),
                 quota_limits={},

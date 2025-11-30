@@ -203,7 +203,8 @@ export function AdminTokenManager({ sectionId }: Props) {
               <option value="">{t("admin.form.selectUser")}</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.display_name || user.username} ({user.email})
+                  {user.display_name || user.username}
+                  {user.email ? ` (${user.email})` : ""}
                 </option>
               ))}
             </select>

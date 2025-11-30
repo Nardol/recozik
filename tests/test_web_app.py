@@ -86,7 +86,6 @@ def web_app_fixture(monkeypatch, tmp_path: Path):
 
 
 def _create_user(
-    client: TestClient,
     username: str,
     email: str | None = None,
     password: str = "TestPassword1!",  # noqa: S107
@@ -132,7 +131,6 @@ def _create_token(
     if isinstance(user_id, str):
         # Legacy compatibility: create a user with this username
         user_id = _create_user(
-            client,
             username=user_id,
             allowed_features=allowed_features,
             quota_limits=quota_limits,
@@ -641,7 +639,7 @@ def test_job_websocket_rejects_other_user(monkeypatch, web_app) -> None:
 def test_list_jobs_returns_only_current_user(web_app) -> None:
     """GET /jobs should scope results to the current token."""
     client, _, app_module, settings = web_app
-    worker_user_id = _create_user(client, username="worker")
+    worker_user_id = _create_user(username="worker")
     worker_token = _create_token(client, "worker-token", worker_user_id)
     repo = app_module.get_job_repository(settings.jobs_database_url_resolved)
 
@@ -653,7 +651,7 @@ def test_list_jobs_returns_only_current_user(web_app) -> None:
     ]
     for job in worker_jobs:
         repo.set_status(job.id, JobStatus.COMPLETED)
-    _create_user(client, username="other-user")
+    _create_user(username="other-user")
     repo.create_job(user_id="other-user")
 
     resp = client.get("/jobs", headers={"X-API-Token": worker_token})
@@ -683,7 +681,7 @@ def test_admin_can_list_jobs_for_any_user(web_app) -> None:
 def test_admin_tokens_hide_secret(web_app) -> None:
     """Admin token listing must never leak stored token hashes."""
     client, _, _, settings = web_app
-    auditor_user_id = _create_user(client, username="auditor")
+    auditor_user_id = _create_user(username="auditor")
     token_value = "custom-secret-token"  # noqa: S105 - deterministic test fixture
     resp = client.post(
         "/admin/tokens",
@@ -826,7 +824,7 @@ def test_admin_can_manage_tokens(monkeypatch, web_app) -> None:
     client, media_root, app_module, _ = web_app
 
     # Create a user first
-    user_id = _create_user(client, "tester")
+    user_id = _create_user("tester")
 
     new_token = "custom-token"  # noqa: S105 - test fixture token
     payload = {
@@ -897,8 +895,8 @@ def test_admin_can_list_users(web_app) -> None:
     client.cookies.update(login.cookies)
 
     # Create a couple of test users
-    _create_user(client, username="alice", email="alice@example.com")
-    _create_user(client, username="bob", email="bob@example.com")
+    _create_user(username="alice", email="alice@example.com")
+    _create_user(username="bob", email="bob@example.com")
 
     resp = client.get("/admin/users")
     assert resp.status_code == 200
@@ -983,7 +981,7 @@ def test_admin_can_get_user_details(web_app) -> None:
     login = _login_admin(client, settings)
     client.cookies.update(login.cookies)
 
-    user_id = _create_user(client, username="david", email="david@example.com")
+    user_id = _create_user(username="david", email="david@example.com")
 
     resp = client.get(f"/admin/users/{user_id}")
     assert resp.status_code == 200
@@ -1003,7 +1001,6 @@ def test_admin_can_update_user(web_app) -> None:
     csrf = login.cookies.get("recozik_csrf")
 
     user_id = _create_user(
-        client,
         username="eve",
         email="eve@example.com",
         roles=["readonly"],
@@ -1040,7 +1037,7 @@ def test_admin_can_deactivate_user(web_app) -> None:
     client.cookies.update(login.cookies)
     csrf = login.cookies.get("recozik_csrf")
 
-    user_id = _create_user(client, username="frank", email="frank@example.com")
+    user_id = _create_user(username="frank", email="frank@example.com")
 
     # Deactivate user
     resp = client.put(
@@ -1064,7 +1061,7 @@ def test_admin_can_delete_user(web_app) -> None:
     client.cookies.update(login.cookies)
     csrf = login.cookies.get("recozik_csrf")
 
-    user_id = _create_user(client, username="grace", email="grace@example.com")
+    user_id = _create_user(username="grace", email="grace@example.com")
 
     resp = client.delete(
         f"/admin/users/{user_id}",
@@ -1085,7 +1082,6 @@ def test_admin_can_reset_user_password(web_app) -> None:
     csrf = login.cookies.get("recozik_csrf")
 
     user_id = _create_user(
-        client,
         username="henry",
         email="henry@example.com",
         password="OldPassword123!",  # noqa: S106
@@ -1107,7 +1103,7 @@ def test_password_reset_requires_strong_password(web_app) -> None:
     client.cookies.update(login.cookies)
     csrf = login.cookies.get("recozik_csrf")
 
-    user_id = _create_user(client, username="iris", email="iris@example.com")
+    user_id = _create_user(username="iris", email="iris@example.com")
 
     resp = client.post(
         f"/admin/users/{user_id}/reset-password",
@@ -1127,7 +1123,7 @@ def test_admin_can_list_user_sessions(web_app) -> None:
     client.cookies.update(login.cookies)
 
     # Create user and session
-    user_id = _create_user(client, username="jack", email="jack@example.com")
+    user_id = _create_user(username="jack", email="jack@example.com")
     store = get_auth_store(settings.auth_database_url_resolved)
     user = store.get_user_by_id(user_id)
     assert user is not None
@@ -1157,7 +1153,7 @@ def test_admin_can_revoke_user_sessions(web_app) -> None:
     csrf = login.cookies.get("recozik_csrf")
 
     # Create user and session
-    user_id = _create_user(client, username="kelly", email="kelly@example.com")
+    user_id = _create_user(username="kelly", email="kelly@example.com")
     store = get_auth_store(settings.auth_database_url_resolved)
     user = store.get_user_by_id(user_id)
     assert user is not None
@@ -1188,7 +1184,6 @@ def test_non_admin_cannot_access_user_endpoints(web_app) -> None:
 
     # Create a non-admin user and login
     _create_user(
-        client,
         username="normaluser",
         email="normal@example.com",
         password="NormalPass123!",  # noqa: S106
@@ -1216,7 +1211,7 @@ def test_user_list_pagination(web_app) -> None:
 
     # Create multiple users
     for i in range(5):
-        _create_user(client, username=f"user_{i}", email=f"user_{i}@example.com")
+        _create_user(username=f"user_{i}", email=f"user_{i}@example.com")
 
     # Test limit
     resp = client.get("/admin/users?limit=3")

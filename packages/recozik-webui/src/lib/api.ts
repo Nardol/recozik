@@ -134,7 +134,7 @@ export interface TokenCreatePayload {
 export interface UserResponse {
   id: number;
   username: string;
-  email: string;
+  email: string | null;
   display_name: string | null;
   is_active: boolean;
   roles: string[];

@@ -375,6 +375,6 @@ C'est normal si vous avez supprimé la base de données. Les utilisateurs doiven
 
 Pour les problèmes de migration :
 
-1. Consultez les [GitHub Issues](https://github.com/anthropics/claude-code/issues)
+1. Consultez les [GitHub Issues](https://github.com/Nardol/recozik/issues)
 2. Examinez les logs du backend pour les erreurs SQLAlchemy
 3. Vérifiez l'intégrité de la base de données SQLite : `sqlite3 data/auth.db "PRAGMA integrity_check;"`
