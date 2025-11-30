@@ -4,8 +4,10 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   TokenCreatePayload,
   TokenResponse,
+  UserResponse,
   createToken,
   fetchAdminTokens,
+  fetchUsers,
 } from "../lib/api";
 import { MessageKey, useI18n } from "../i18n/I18nProvider";
 import { FEATURE_LABELS, ROLE_LABELS, QUOTA_LABELS } from "../i18n/labels";
@@ -34,6 +36,7 @@ export function AdminTokenManager({ sectionId }: Props) {
   const { t } = useI18n();
   const isAdmin = profile?.roles.includes("admin");
   const [records, setRecords] = useState<TokenResponse[]>([]);
+  const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>("");
@@ -53,9 +56,21 @@ export function AdminTokenManager({ sectionId }: Props) {
     }
   }, [isAdmin]);
 
+  const loadUsers = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const data = await fetchUsers();
+      setUsers(data);
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     loadTokens();
-  }, [loadTokens]);
+    loadUsers();
+  }, [loadTokens, loadUsers]);
 
   if (!isAdmin) {
     return null;
@@ -71,9 +86,16 @@ export function AdminTokenManager({ sectionId }: Props) {
       formData.getAll("role").includes(role.key),
     ).map((role) => role.key);
 
+    const userIdStr = formData.get("user_id")?.toString() ?? "";
+    const userId = parseInt(userIdStr, 10);
+    if (isNaN(userId)) {
+      setError(t("admin.error.invalidUser"));
+      return;
+    }
+
     const payload: TokenCreatePayload = {
       token: formData.get("token")?.toString() || undefined,
-      user_id: formData.get("user_id")?.toString() ?? "",
+      user_id: userId,
       display_name: formData.get("display_name")?.toString() ?? "",
       roles,
       allowed_features: allowed,
@@ -175,12 +197,22 @@ export function AdminTokenManager({ sectionId }: Props) {
         <h3>{t("admin.form.title")}</h3>
         <div className="grid-2">
           <label>
-            {t("admin.form.userId")}
+            {t("admin.form.user")}
             <span className="field-hint">{t("admin.form.userHint")}</span>
-            <input name="user_id" type="text" required />
+            <select name="user_id" required>
+              <option value="">{t("admin.form.selectUser")}</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.display_name || user.username} ({user.email})
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             {t("admin.form.displayName")}
+            <span className="field-hint">
+              {t("admin.form.displayNameHint")}
+            </span>
             <input name="display_name" type="text" required />
           </label>
         </div>

@@ -115,7 +115,7 @@ export interface JobDetail {
 
 export interface TokenResponse {
   token: string;
-  user_id: string;
+  user_id: number;
   display_name: string;
   roles: string[];
   allowed_features: string[];
@@ -124,11 +124,55 @@ export interface TokenResponse {
 
 export interface TokenCreatePayload {
   token?: string;
-  user_id: string;
+  user_id: number;
   display_name: string;
   roles: string[];
   allowed_features: string[];
   quota_limits: Record<string, number | null>;
+}
+
+export interface UserResponse {
+  id: number;
+  username: string;
+  email: string;
+  display_name: string | null;
+  is_active: boolean;
+  roles: string[];
+  allowed_features: string[];
+  quota_limits: Record<string, number | null>;
+  created_at: string;
+}
+
+export interface RegisterUserPayload {
+  username: string;
+  email: string;
+  display_name?: string | null;
+  password: string;
+  roles: string[];
+  allowed_features: string[];
+  quota_limits: Record<string, number | null>;
+}
+
+export interface UpdateUserPayload {
+  email?: string | null;
+  display_name?: string | null;
+  is_active?: boolean | null;
+  roles: string[];
+  allowed_features: string[];
+  quota_limits: Record<string, number | null>;
+}
+
+export interface ResetPasswordPayload {
+  new_password: string;
+}
+
+export interface SessionResponse {
+  id: number;
+  user_id: number;
+  created_at: string;
+  expires_at: string;
+  refresh_expires_at: string;
+  remember: boolean;
 }
 
 export async function fetchWhoami(): Promise<WhoAmI> {
@@ -188,6 +232,88 @@ export async function createToken(
   return apiFetch("/admin/tokens", {
     method: "POST",
     body: JSON.stringify(payload),
+    credentials: "include",
+  });
+}
+
+export async function fetchUsers(
+  limit?: number,
+  offset?: number,
+): Promise<UserResponse[]> {
+  const params = new URLSearchParams();
+  if (limit) {
+    params.set("limit", String(limit));
+  }
+  if (typeof offset === "number") {
+    params.set("offset", String(offset));
+  }
+  const search = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch(`/admin/users${search}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+}
+
+export async function fetchUserDetail(userId: number): Promise<UserResponse> {
+  return apiFetch(`/admin/users/${userId}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+}
+
+export async function registerUser(
+  payload: RegisterUserPayload,
+): Promise<{ status: string }> {
+  return apiFetch("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    credentials: "include",
+  });
+}
+
+export async function updateUser(
+  userId: number,
+  payload: UpdateUserPayload,
+): Promise<UserResponse> {
+  return apiFetch(`/admin/users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    credentials: "include",
+  });
+}
+
+export async function deleteUser(userId: number): Promise<{ status: string }> {
+  return apiFetch(`/admin/users/${userId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+}
+
+export async function adminResetPassword(
+  userId: number,
+  payload: ResetPasswordPayload,
+): Promise<{ status: string }> {
+  return apiFetch(`/admin/users/${userId}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    credentials: "include",
+  });
+}
+
+export async function fetchUserSessions(
+  userId: number,
+): Promise<SessionResponse[]> {
+  return apiFetch(`/admin/users/${userId}/sessions`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+}
+
+export async function revokeUserSessions(
+  userId: number,
+): Promise<{ status: string }> {
+  return apiFetch(`/admin/users/${userId}/sessions`, {
+    method: "DELETE",
     credentials: "include",
   });
 }

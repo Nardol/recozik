@@ -100,6 +100,8 @@ def seed_admin_user(store: AuthStore, settings: WebSettings) -> None:
     validate_password_strength(settings.admin_password)
     admin_user = User(
         username=settings.admin_username,
+        email=f"{settings.admin_username}@localhost",
+        display_name="Administrator",
         password_hash=hash_password(settings.admin_password),
         roles=["admin"],
         allowed_features=[feat.value for feat in ServiceFeature],

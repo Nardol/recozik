@@ -15,7 +15,7 @@ class TokenRecord(SQLModel, table=True):
     """Stored representation of an API token."""
 
     token: str = Field(primary_key=True)
-    user_id: str
+    user_id: int = Field(foreign_key="user.id", index=True)
     display_name: str
     roles: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     allowed_features: list[str] = Field(default_factory=list, sa_column=Column(JSON))
