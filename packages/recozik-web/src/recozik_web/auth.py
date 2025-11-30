@@ -6,6 +6,7 @@ import logging
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
+from secrets import token_urlsafe
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from recozik_services.security import (
@@ -18,6 +19,8 @@ from recozik_services.security import (
     ServiceUser,
 )
 
+from .auth_models import User, get_auth_store
+from .auth_service import hash_password
 from .auth_store import SeedToken, TokenRecord, ensure_seed_tokens, get_token_repository
 from .config import WebSettings, get_settings
 from .persistent_quota import get_persistent_quota_policy
@@ -170,15 +173,71 @@ def _features_for(settings: WebSettings, readonly: bool) -> list[str]:
     return feats
 
 
+def seed_users_on_startup(settings: WebSettings) -> None:
+    """Ensure admin and readonly users exist during application startup.
+
+    This should be called once during app initialization, not on every request.
+    """
+    auth_store = get_auth_store(settings.auth_database_url_resolved)
+
+    # Create admin user if it doesn't exist
+    admin_user = auth_store.get_user(settings.admin_username)
+    if not admin_user:
+        admin_user = User(
+            username=settings.admin_username,
+            email=f"{settings.admin_username}@localhost",
+            display_name="Administrator",
+            password_hash=hash_password(settings.admin_password),
+            roles=["admin"],
+            allowed_features=[feat.value for feat in ServiceFeature],
+            quota_limits={},
+        )
+        admin_user = auth_store.create_user(admin_user)
+
+    if admin_user.id is None:
+        raise RuntimeError("Admin user creation failed - no ID assigned")
+
+    # Create readonly user if configured and doesn't exist
+    if settings.readonly_token:
+        readonly_user = auth_store.get_user("readonly")
+        if not readonly_user:
+            # Generate a random, secure password that won't be known
+            # This prevents login with an empty/weak password
+            readonly_password = token_urlsafe(32)
+            readonly_user = User(
+                username="readonly",
+                email="readonly@localhost",
+                display_name="Read-only User",
+                password_hash=hash_password(readonly_password),
+                roles=["readonly"],
+                allowed_features=_features_for(settings, readonly=True),
+                quota_limits={},
+            )
+            auth_store.create_user(readonly_user)
+
+
 def _seed_defaults(settings: WebSettings) -> list[SeedToken]:
+    """Build default seed tokens from existing users.
+
+    Assumes users have been created by seed_users_on_startup().
+    """
     defaults: list[SeedToken] = []
+    auth_store = get_auth_store(settings.auth_database_url_resolved)
+
+    # Get admin user (must exist from startup seeding)
+    admin_user = auth_store.get_user(settings.admin_username)
+    if not admin_user or admin_user.id is None:
+        raise RuntimeError(
+            f"Admin user '{settings.admin_username}' must exist before seeding tokens. "
+            "Call seed_users_on_startup() during app initialization."
+        )
 
     defaults.append(
         SeedToken(
             raw_value=settings.admin_token,
             record=TokenRecord(
                 token=hash_token_for_storage(settings.admin_token),
-                user_id="admin",
+                user_id=admin_user.id,
                 display_name="Administrator",
                 roles=["admin"],
                 allowed_features=_features_for(settings, readonly=False),
@@ -186,7 +245,16 @@ def _seed_defaults(settings: WebSettings) -> list[SeedToken]:
             ),
         )
     )
+
     if settings.readonly_token:
+        # Get readonly user (must exist from startup seeding)
+        readonly_user = auth_store.get_user("readonly")
+        if not readonly_user or readonly_user.id is None:
+            raise RuntimeError(
+                "Readonly user 'readonly' must exist before seeding tokens. "
+                "Call seed_users_on_startup() during app initialization."
+            )
+
         quota_limits: dict[str, int | None] = {}
         if settings.readonly_quota_acoustid is not None:
             quota_limits[QuotaScope.ACOUSTID_LOOKUP.value] = settings.readonly_quota_acoustid
@@ -202,7 +270,7 @@ def _seed_defaults(settings: WebSettings) -> list[SeedToken]:
                 raw_value=settings.readonly_token,
                 record=TokenRecord(
                     token=hash_token_for_storage(settings.readonly_token),
-                    user_id="readonly",
+                    user_id=readonly_user.id,
                     display_name="Readonly",
                     roles=["readonly"],
                     allowed_features=_features_for(settings, readonly=True),
@@ -245,6 +313,13 @@ def resolve_user_from_token(
         if updated:
             record = updated
 
+    # Look up the username from the User table
+    auth_store = get_auth_store(settings.auth_database_url_resolved)
+    user = auth_store.get_user_by_id(record.user_id)
+    if not user:
+        logger.warning("Token references non-existent user ID %d", record.user_id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API token")
+
     raw_limits = record.quota_limits or {}
     quota_limits: dict[QuotaScope, int | None] = {}
     for scope_key, value in raw_limits.items():
@@ -259,8 +334,8 @@ def resolve_user_from_token(
         "quota_limits": quota_limits,
     }
     return ServiceUser(
-        user_id=record.user_id,
-        email=None,
+        user_id=user.username,
+        email=user.email,
         display_name=record.display_name,
         roles=tuple(record.roles),
         attributes=attributes,

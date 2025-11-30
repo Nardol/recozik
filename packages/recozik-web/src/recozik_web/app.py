@@ -49,10 +49,17 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from recozik_core.audd import AudDEnterpriseParams, AudDMode
 from recozik_core.fingerprint import AcoustIDMatch
 
-from .auth import API_TOKEN_HEADER, RequestContext, get_request_context, resolve_user_from_token
+from .auth import (
+    API_TOKEN_HEADER,
+    RequestContext,
+    get_request_context,
+    resolve_user_from_token,
+    seed_users_on_startup,
+)
 from .auth_models import get_auth_store
+from .auth_routes import admin_router
 from .auth_routes import router as auth_router
-from .auth_service import ACCESS_COOKIE, resolve_session_user, seed_admin_user
+from .auth_service import ACCESS_COOKIE, resolve_session_user
 from .auth_store import TokenRecord, get_token_repository
 from .config import WebSettings, get_settings
 from .jobs import JobRecord, JobStatus, get_job_repository, get_notifier
@@ -178,7 +185,8 @@ async def _lifespan(fastapi_app: FastAPI):
     _configure_runtime_security(fastapi_app)
     settings = get_settings()
     store = get_auth_store(settings.auth_database_url_resolved)
-    seed_admin_user(store, settings)
+    # Seed admin and readonly users on startup (called once, not per-request)
+    seed_users_on_startup(settings)
     # Cleanup expired sessions on startup to avoid DB bloat.
     store.delete_expired_sessions(datetime.now(timezone.utc))
     cleanup_task = asyncio.create_task(_session_cleanup_loop(store))
@@ -205,6 +213,7 @@ app = FastAPI(title="Recozik Web API", version="0.1.0", lifespan=_lifespan)
 
 _configure_security_headers()
 app.include_router(auth_router)
+app.include_router(admin_router)
 
 
 @app.middleware("http")
@@ -358,7 +367,7 @@ class TokenResponseModel(BaseModel):
 
     token: str | None = None
     token_hint: str
-    user_id: str
+    user_id: int
     display_name: str
     roles: list[str]
     allowed_features: list[str]
@@ -369,7 +378,7 @@ class TokenCreateModel(BaseModel):
     """Payload used to create or update tokens."""
 
     token: str | None = None
-    user_id: str
+    user_id: int
     display_name: str
     roles: list[str] = Field(default_factory=list)
     allowed_features: list[str] = Field(default_factory=list)
@@ -919,6 +928,15 @@ def create_token(
     _: None = Depends(_ensure_admin),
 ) -> TokenResponseModel:
     """Create or update API tokens (admin only)."""
+    # Validate that the user exists
+    auth_store = get_auth_store(settings.auth_database_url_resolved)
+    user = auth_store.get_user_by_id(payload.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {payload.user_id} not found",
+        )
+
     repo = get_token_repository(settings.auth_database_url_resolved)
     token_value = payload.token or uuid4().hex
     stored_token_value = hash_token_for_storage(token_value)

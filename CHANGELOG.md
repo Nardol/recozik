@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Normalized AudD responses now capture MusicBrainz identifiers when returned by the API, letting cached results retain MBIDs and improving downstream metadata merges.
 - Internal: introduced the `recozik-services` workspace package, rewired CLI commands to call its identify/batch/rename runners, and added docs/tests for the shared service layer that future GUIs will consume.
 - Migrated the Next.js web interface from `middleware.ts` to the new `proxy.ts` entry point so locale routing keeps working on Next 16.
+- **BREAKING**: Added comprehensive user management system to the web backend with User table, role-based access control (admin/operator/readonly), per-user feature permissions, and quota limits. Changed `SessionToken.user_id` from string to integer foreign key. **Migration required** - see MIGRATION.md for upgrade instructions. New admin endpoints: user CRUD, password reset, session management. Frontend includes UserManager component with full user administration UI.
 
 ## [0.10.0] - 2025-10-31
 

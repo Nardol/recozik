@@ -58,6 +58,46 @@ Le fichier `.env.example` recense toutes les variables consommées par le `docke
 Les valeurs `dev-*`/`demo-key` ne servent qu'au développement local : remplacez-les par des secrets robustes avant toute
 exposition.
 
+### Gestion des utilisateurs
+
+Le tableau de bord web inclut un système complet de gestion des utilisateurs pour les administrateurs :
+
+**Fonctionnalités utilisateur :**
+
+- Comptes utilisateurs avec nom d'utilisateur, e-mail, nom d'affichage et stockage sécurisé des mots de passe (Argon2id)
+- Basculement actif/inactif du statut utilisateur
+- Contrôle d'accès basé sur les rôles (admin, operator, readonly)
+- Permissions de fonctionnalités (identify, rename, traitement par lot, AudD, enrichissement MusicBrainz)
+- Limites de quota par utilisateur pour les opérations API
+
+**Tableau de bord administrateur :**
+
+- **Gestion des utilisateurs** : Créer, éditer et supprimer des utilisateurs avec des opérations CRUD complètes
+- **Gestion des mots de passe** : Réinitialisation des mots de passe initiée par l'administrateur avec exigences de robustesse (12+ caractères, majuscule, minuscule, chiffre, symbole)
+- **Gestion des sessions** : Visualiser et révoquer les sessions actives pour n'importe quel utilisateur (déconnexion forcée)
+- **Gestion des tokens API** : Créer des tokens API liés à des utilisateurs spécifiques pour l'accès CLI/automation
+
+**Accéder au panneau administrateur :**
+
+1. Connectez-vous au tableau de bord avec les identifiants admin (`RECOZIK_WEB_ADMIN_USERNAME` / `RECOZIK_WEB_ADMIN_PASSWORD`)
+2. Naviguez vers la section "Admin" dans le menu de navigation
+3. Gérez les utilisateurs, sessions et tokens API depuis les panneaux dédiés
+
+**Exigences de mot de passe :**
+Tous les mots de passe doivent respecter ces critères :
+
+- Minimum 12 caractères
+- Au moins une lettre majuscule
+- Au moins une lettre minuscule
+- Au moins un chiffre
+- Au moins un symbole
+
+**Schéma de base de données :**
+
+- Les utilisateurs sont stockés dans `auth.db` (SQLite) avec des mots de passe hachés
+- Les sessions suivent les tokens d'accès/rafraîchissement avec TTL configurable (1h accès, 7-30 jours rafraîchissement)
+- Les tokens API référencent les utilisateurs via clé étrangère et héritent des permissions utilisateur
+
 ## Prérequis
 
 - Python 3.10 à 3.13 (librosa >= 0.11 prend en charge 3.13 ; Recozik installe automatiquement les paquets de

@@ -74,6 +74,47 @@ Minimal prod env vars (backend):
 - `RECOZIK_WEB_ADMIN_TOKEN` / `RECOZIK_WEB_READONLY_TOKEN` for CLI/automation
 - `RECOZIK_WEB_PRODUCTION_MODE=true` to enforce secure cookies/HSTS
 
+### User Management
+
+The web dashboard includes a comprehensive user management system for administrators:
+
+**User Features:**
+
+- User accounts with username, email, display name, and secure password storage (Argon2id)
+- Active/inactive user status toggle
+- Role-based access control (admin, operator, readonly)
+- Feature permissions (identify, rename, batch processing, AudD, MusicBrainz enrichment)
+- Per-user quota limits for API operations
+
+**Admin Dashboard:**
+
+- **User Management**: Create, edit, and delete users with full CRUD operations
+- **Password Management**: Admin-initiated password resets with strength requirements
+  (12+ characters, uppercase, lowercase, digit, symbol)
+- **Session Management**: View and revoke active sessions for any user (force logout)
+- **API Token Management**: Create API tokens linked to specific users for CLI/automation access
+
+**Access the Admin Panel:**
+
+1. Log in to the dashboard with admin credentials (`RECOZIK_WEB_ADMIN_USERNAME` / `RECOZIK_WEB_ADMIN_PASSWORD`)
+2. Navigate to the "Admin" section in the navigation menu
+3. Manage users, sessions, and API tokens from the dedicated panels
+
+**Password Requirements:**
+All passwords must meet these criteria:
+
+- Minimum 12 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one digit
+- At least one symbol
+
+**Database Schema:**
+
+- Users are stored in `auth.db` (SQLite) with hashed passwords
+- Sessions track access/refresh tokens with configurable TTL (1h access, 7-30 days refresh)
+- API tokens reference users via foreign key and inherit user permissions
+
 ## Prerequisites
 
 - Python 3.10 through 3.13 (librosa 0.11+ supports 3.13; Recozik bundles the `standard-*`/`audioop-lts` backfill

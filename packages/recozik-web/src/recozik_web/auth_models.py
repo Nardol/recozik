@@ -16,7 +16,10 @@ class User(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True)
+    email: str | None = Field(default=None, unique=True, index=True)
+    display_name: str | None = Field(default=None)
     password_hash: str
+    is_active: bool = Field(default=True)
     roles: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     allowed_features: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     quota_limits: dict[str, int | None] = Field(default_factory=dict, sa_column=Column(JSON))
@@ -149,6 +152,41 @@ class AuthStore:
                 session.delete(row)
             session.commit()
             return count
+
+    def list_users(self, limit: int = 100, offset: int = 0) -> list[User]:
+        """List all users with pagination."""
+        with self._session() as session:
+            stmt = select(User).offset(offset).limit(limit)
+            return list(session.exec(stmt).all())
+
+    def delete_user(self, user_id: int) -> bool:
+        """Delete a user and all their sessions. Return True if deleted."""
+        with self._session() as session:
+            # Verify user exists
+            user = session.get(User, user_id)
+            if not user:
+                return False
+
+            # Delete all sessions for this user
+            sessions = session.exec(
+                select(SessionToken).where(SessionToken.user_id == user_id)
+            ).all()
+            for sess in sessions:
+                session.delete(sess)
+
+            # Delete the user
+            session.delete(user)
+            session.commit()
+            return True
+
+    def get_user_sessions(self, user_id: int) -> list[SessionToken]:
+        """Get all active sessions for a user."""
+        with self._session() as session:
+            now = dt.datetime.now(dt.timezone.utc)
+            stmt = select(SessionToken).where(
+                SessionToken.user_id == user_id, SessionToken.refresh_expires_at > now
+            )
+            return list(session.exec(stmt).all())
 
 
 _STORES: dict[str, AuthStore] = {}

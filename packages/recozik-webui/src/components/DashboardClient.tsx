@@ -5,6 +5,7 @@ import { useToken } from "./TokenProvider";
 import { JobUploader } from "./JobUploader";
 import { JobList } from "./JobList";
 import { AdminTokenManager } from "./AdminTokenManager";
+import { UserManager } from "./UserManager";
 import { ProfileCard } from "./ProfileCard";
 import { NavigationBar } from "./NavigationBar";
 import { JobDetail, fetchJobs } from "../lib/api";
@@ -103,6 +104,7 @@ export function DashboardClient() {
             onUpdate={handleJobUpdate}
           />
         </div>
+        <UserManager sectionId="users-section" />
         <AdminTokenManager sectionId="admin-section" />
       </main>
     </>
