@@ -413,7 +413,7 @@ export function UserManager({ sectionId }: Props) {
                       name="password"
                       required
                       autoComplete="new-password"
-                      pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$"
+                      pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{12,}$"
                       aria-describedby="password-hint"
                     />
                     <div id="password-hint" className="muted">
@@ -582,7 +582,7 @@ export function UserManager({ sectionId }: Props) {
                   required
                   autoComplete="new-password"
                   autoFocus
-                  pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$"
+                  pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{12,}$"
                   aria-describedby="reset-password-hint"
                 />
                 <div id="reset-password-hint" className="muted">

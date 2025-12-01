@@ -9,6 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from recozik_services.security import ServiceUser
+from sqlalchemy.exc import IntegrityError
 
 from .auth_models import User, get_auth_store
 from .auth_service import (
@@ -320,7 +321,14 @@ def register_user(
         allowed_features=payload.allowed_features,
         quota_limits=payload.quota_limits,
     )
-    store.create_user(user)
+    try:
+        store.create_user(user)
+    except IntegrityError as e:
+        # Catch duplicate email or username violations
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username already exists",
+        ) from e
     if limiter:
         limiter.record_successful_auth(request)
     return {"status": "ok"}
@@ -417,7 +425,14 @@ def update_user(
         user.allowed_features = payload.allowed_features
     if payload.quota_limits is not None:
         user.quota_limits = payload.quota_limits
-    store.upsert_user(user)
+    try:
+        store.upsert_user(user)
+    except IntegrityError as e:
+        # Catch duplicate email violations
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already exists",
+        ) from e
     return _user_to_response(user)
 
 

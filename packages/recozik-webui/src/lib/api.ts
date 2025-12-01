@@ -154,7 +154,7 @@ export interface RegisterUserPayload {
 }
 
 export interface UpdateUserPayload {
-  email?: string | null;
+  email?: string;
   display_name?: string | null;
   is_active?: boolean | null;
   roles: string[];
