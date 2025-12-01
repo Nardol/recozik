@@ -1,10 +1,6 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("JobList states (mocked API)", () => {
-  test.use({
-    baseURL: "http://localhost:3000",
-  });
-
   test("shows pending and failed jobs from mocked whoami/jobs", async ({
     page,
     context,
