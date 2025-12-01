@@ -105,7 +105,7 @@ class UserResponse(BaseModel):
 
     id: int
     username: str
-    email: str | None
+    email: str
     display_name: str | None
     is_active: bool
     roles: list[str]
@@ -307,7 +307,9 @@ def register_user(
     _require_admin(current_user)
     store = get_auth_store(settings.auth_database_url_resolved)
     if store.get_user(payload.username):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot create user")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists"
+        )
     hash_password(payload.password)  # ensure consistent timing
     validate_password_strength(payload.password)
     # Validate and normalize email format
