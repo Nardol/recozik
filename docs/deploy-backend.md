@@ -77,6 +77,59 @@ uv run uvicorn recozik_web.app:app \
 Enable CORS or TLS termination at the reverse proxy layer if you plan to access the API from the public Internet or the
 React frontend.
 
+### Multi-worker deployments
+
+The backend seeds admin and readonly users/tokens during application startup (via the FastAPI lifespan handler). When
+running with multiple workers (e.g., `gunicorn -w 4` or `uvicorn --workers 4`), each worker process executes the startup
+seeding independently, which can cause brief SQLite lock contention as workers concurrently attempt to upsert the same
+seed tokens.
+
+**Impact:** This is safe—SQLite's `UNIQUE` constraints and the `upsert` logic prevent data corruption—but you may observe
+transient `SQLITE_BUSY` warnings in logs during startup. The locks resolve automatically within milliseconds.
+
+**Recommended deployment patterns:**
+
+1. **Container orchestration (Kubernetes, Docker Swarm):** Run **one worker per container** and scale horizontally by
+   adding more containers. This is the preferred approach for production:
+
+   ```bash
+   # Each container runs a single uvicorn process
+   uvicorn recozik_web.app:app --host 0.0.0.0 --port 8000
+   ```
+
+   When using Kubernetes, scale replicas instead of workers:
+
+   ```yaml
+   spec:
+     replicas: 4 # Four pods, each with one worker
+   ```
+
+2. **Bare-metal multi-worker:** If you need multiple workers in a single process (e.g., `gunicorn -w 4` on a VM), the
+   startup locks are harmless. Ensure the SQLite database files are on a local filesystem (not NFS) with proper
+   permissions.
+
+3. **Pre-seed at build time (optional):** For deterministic container images, you can seed users/tokens during the Docker
+   build step to eliminate runtime seeding entirely:
+
+   ```dockerfile
+   # In Dockerfile, after installing dependencies
+   RUN python -c "from recozik_web.auth import seed_users_and_tokens_on_startup; \
+                  from recozik_web.config import get_settings; \
+                  seed_users_and_tokens_on_startup(get_settings())"
+   ```
+
+   Note: This approach requires that `RECOZIK_WEB_ADMIN_TOKEN` and related secrets are available at build time, which may
+   not be desirable for security reasons.
+
+**Troubleshooting:** If you see persistent lock errors (lasting > 1 second) during startup, verify that:
+
+- The database files (`auth.db`, `jobs.db`) are on a **local** filesystem, not a network mount
+- The `RECOZIK_WEB_BASE_MEDIA_ROOT` directory has correct ownership/permissions
+- No other process is holding locks on the SQLite files
+
+For high-availability setups with multiple backend instances, use one worker per container and a load balancer
+(e.g., Nginx, Traefik) to distribute requests.
+
 ## 4. Optional: systemd service
 
 ```ini
