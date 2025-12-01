@@ -173,10 +173,11 @@ def _features_for(settings: WebSettings, readonly: bool) -> list[str]:
     return feats
 
 
-def seed_users_on_startup(settings: WebSettings) -> None:
-    """Ensure admin and readonly users exist during application startup.
+def seed_users_and_tokens_on_startup(settings: WebSettings) -> None:
+    """Ensure admin/readonly users and their API tokens exist during application startup.
 
     This should be called once during app initialization, not on every request.
+    Combines user creation and token seeding to avoid repeated DB queries on each auth.
     """
     auth_store = get_auth_store(settings.auth_database_url_resolved)
 
@@ -214,6 +215,20 @@ def seed_users_on_startup(settings: WebSettings) -> None:
                 quota_limits={},
             )
             auth_store.create_user(readonly_user)
+
+    # Seed default API tokens (admin + readonly)
+    # This must happen after users are created
+    repo = get_token_repository(settings.auth_database_url_resolved)
+    seed_tokens = _seed_defaults(settings)
+    ensure_seed_tokens(repo, defaults=seed_tokens)
+    logger.info(
+        "Startup seeding complete: users and tokens initialized (admin + %s)",
+        "readonly" if settings.readonly_token else "no readonly",
+    )
+
+
+# Backward compatibility alias
+seed_users_on_startup = seed_users_and_tokens_on_startup
 
 
 def _seed_defaults(settings: WebSettings) -> list[SeedToken]:
@@ -285,9 +300,11 @@ def _seed_defaults(settings: WebSettings) -> list[SeedToken]:
 def resolve_user_from_token(
     token: str, settings: WebSettings, *, request: Request | None = None
 ) -> ServiceUser:
-    """Return the ServiceUser matching the provided API token."""
+    """Return the ServiceUser matching the provided API token.
+
+    Note: Assumes seed_users_and_tokens_on_startup() has been called during app init.
+    """
     repo = get_token_repository(settings.auth_database_url_resolved)
-    ensure_seed_tokens(repo, defaults=_seed_defaults(settings))
     record = repo.find_by_token_value(token)
 
     if record is None or not compare_token(token, record.token):
