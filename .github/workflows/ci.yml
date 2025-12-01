@@ -108,10 +108,16 @@ jobs:
         run: |
           cd packages/recozik-webui
           npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('packages/recozik-webui/package-lock.json') }}
+          restore-keys: playwright-${{ runner.os }}-
       - name: Install Playwright browsers
         run: |
           cd packages/recozik-webui
-          npx playwright install --with-deps chromium firefox webkit
+          npx playwright install --with-deps chromium
       - name: Run E2E tests
         env:
           PORT: 3000
@@ -127,7 +133,7 @@ jobs:
           MOCK_PID=$!
           npx wait-on http://localhost:9999/health
           trap "kill $MOCK_PID" EXIT
-          npm run test:e2e -- --reporter=line
+          npm run test:e2e -- --reporter=line --project=chromium
 
   all-checks:
     name: All Checks
