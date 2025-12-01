@@ -12,11 +12,14 @@ from .token_utils import compare_token
 
 
 class User(SQLModel, table=True):
-    """User account with hashed password and allowed features/roles."""
+    """User account with hashed password and allowed features/roles.
+
+    Email is required for all users to enable password reset and communication.
+    """
 
     id: int | None = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True)
-    email: str | None = Field(default=None, unique=True, index=True)
+    email: str = Field(unique=True, index=True)
     display_name: str | None = Field(default=None)
     password_hash: str
     is_active: bool = Field(default=True)
