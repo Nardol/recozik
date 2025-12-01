@@ -48,9 +48,9 @@ npm run test:e2e
 
 # e2e without backend (mock API)
 MOCK_API_PORT=9999 \
-NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:9999 \
-RECOZIK_WEB_API_BASE=http://localhost:9999 \
-RECOZIK_INTERNAL_API_BASE=http://localhost:9999 \
+NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:9999/api \
+RECOZIK_WEB_API_BASE=http://localhost:9999/api \
+RECOZIK_INTERNAL_API_BASE=http://localhost:9999/api \
 PORT=3000 BASE_URL=http://localhost:3000 VISUAL_SNAPSHOTS=0 \
 node tests/e2e/mock-api-server.js & MOCK_PID=$! && \
 npx wait-on http://localhost:9999/health && \

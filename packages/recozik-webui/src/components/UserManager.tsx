@@ -253,6 +253,7 @@ export function UserManager({ sectionId }: Props) {
         type="button"
         onClick={() => setModalMode("create")}
         className="btn btn-primary"
+        data-testid="users-create-button"
       >
         {t("users.createButton")}
       </button>
@@ -285,30 +286,32 @@ export function UserManager({ sectionId }: Props) {
               </tr>
             ) : (
               users.map((user) => (
-                <tr key={user.id}>
-                  <td>
+                <tr key={user.id} data-testid={`users-row-${user.id}`}>
+                  <td data-testid={`users-username-${user.id}`}>
                     <strong>{user.display_name || user.username}</strong>
                     {user.display_name && (
                       <div className="muted">{user.username}</div>
                     )}
                   </td>
-                  <td>{user.email}</td>
-                  <td>
+                  <td data-testid={`users-email-${user.id}`}>{user.email}</td>
+                  <td data-testid={`users-roles-${user.id}`}>
                     {user.roles.length
                       ? user.roles.map(translateRole).join(", ")
                       : "—"}
                   </td>
-                  <td>
+                  <td data-testid={`users-features-${user.id}`}>
                     {user.allowed_features.length
                       ? user.allowed_features.map(translateFeature).join(", ")
                       : "—"}
                   </td>
-                  <td>
+                  <td data-testid={`users-status-${user.id}`}>
                     {user.is_active
                       ? t("users.status.active")
                       : t("users.status.inactive")}
                   </td>
-                  <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                  <td data-testid={`users-created-${user.id}`}>
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </td>
                   <td>
                     <button
                       type="button"
@@ -317,6 +320,7 @@ export function UserManager({ sectionId }: Props) {
                         setModalMode("edit");
                       }}
                       className="btn-link"
+                      data-testid={`users-edit-${user.id}`}
                     >
                       {t("users.action.edit")}
                     </button>
@@ -328,6 +332,7 @@ export function UserManager({ sectionId }: Props) {
                         setModalMode("reset-password");
                       }}
                       className="btn-link"
+                      data-testid={`users-reset-password-${user.id}`}
                     >
                       {t("users.action.resetPassword")}
                     </button>
@@ -336,6 +341,7 @@ export function UserManager({ sectionId }: Props) {
                       type="button"
                       onClick={() => handleViewSessions(user)}
                       className="btn-link"
+                      data-testid={`users-sessions-${user.id}`}
                     >
                       {t("users.action.sessions")}
                     </button>
@@ -344,6 +350,7 @@ export function UserManager({ sectionId }: Props) {
                       type="button"
                       onClick={() => handleDeleteUser(user)}
                       className="btn-link btn-danger"
+                      data-testid={`users-delete-${user.id}`}
                     >
                       {t("users.action.delete")}
                     </button>
@@ -366,6 +373,7 @@ export function UserManager({ sectionId }: Props) {
             aria-modal="true"
             aria-labelledby="user-form-title"
             tabIndex={-1}
+            data-testid="user-form-modal"
           >
             <h3 id="user-form-title">
               {modalMode === "create"
@@ -376,6 +384,7 @@ export function UserManager({ sectionId }: Props) {
               onSubmit={
                 modalMode === "create" ? handleCreateUser : handleUpdateUser
               }
+              data-testid="user-form"
             >
               {modalMode === "create" && (
                 <>
@@ -387,6 +396,7 @@ export function UserManager({ sectionId }: Props) {
                       required
                       autoComplete="username"
                       autoFocus
+                      data-testid="user-form-username"
                     />
                   </label>
                   <label>
@@ -396,6 +406,7 @@ export function UserManager({ sectionId }: Props) {
                       name="email"
                       required
                       autoComplete="email"
+                      data-testid="user-form-email"
                     />
                   </label>
                   <label>
@@ -404,6 +415,7 @@ export function UserManager({ sectionId }: Props) {
                       type="text"
                       name="display_name"
                       autoComplete="name"
+                      data-testid="user-form-display-name"
                     />
                   </label>
                   <label>
@@ -415,6 +427,7 @@ export function UserManager({ sectionId }: Props) {
                       autoComplete="new-password"
                       pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{12,}$"
                       aria-describedby="password-hint"
+                      data-testid="user-form-password"
                     />
                     <div id="password-hint" className="muted">
                       {t("users.form.passwordHint")}
@@ -437,6 +450,7 @@ export function UserManager({ sectionId }: Props) {
                       defaultValue={selectedUser?.email ?? ""}
                       autoComplete="email"
                       autoFocus
+                      data-testid="user-form-email"
                     />
                   </label>
                   <label>
@@ -446,6 +460,7 @@ export function UserManager({ sectionId }: Props) {
                       name="display_name"
                       defaultValue={selectedUser?.display_name ?? ""}
                       autoComplete="name"
+                      data-testid="user-form-display-name"
                     />
                   </label>
                   <label>
@@ -453,6 +468,7 @@ export function UserManager({ sectionId }: Props) {
                       type="checkbox"
                       name="is_active"
                       defaultChecked={selectedUser?.is_active ?? true}
+                      data-testid="user-form-is-active"
                     />
                     {t("users.form.active")}
                   </label>
@@ -539,13 +555,18 @@ export function UserManager({ sectionId }: Props) {
               </fieldset>
 
               <div className="modal-actions">
-                <button type="submit" disabled={saving}>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  data-testid="user-form-submit"
+                >
                   {saving ? t("users.form.submitting") : t("users.form.submit")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setModalMode(null)}
                   disabled={saving}
+                  data-testid="user-form-cancel"
                 >
                   {t("users.form.cancel")}
                 </button>

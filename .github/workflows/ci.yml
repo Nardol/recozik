@@ -122,9 +122,9 @@ jobs:
         env:
           PORT: 3000
           BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:9999
-          RECOZIK_WEB_API_BASE: http://localhost:9999
-          RECOZIK_INTERNAL_API_BASE: http://localhost:9999
+          NEXT_PUBLIC_RECOZIK_API_BASE: http://localhost:9999/api
+          RECOZIK_WEB_API_BASE: http://localhost:9999/api
+          RECOZIK_INTERNAL_API_BASE: http://localhost:9999/api
           MOCK_API_PORT: 9999
           VISUAL_SNAPSHOTS: "0"
         run: |

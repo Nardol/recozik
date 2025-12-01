@@ -155,8 +155,11 @@ export function AdminTokenManager({ sectionId }: Props) {
           </thead>
           <tbody>
             {records.map((record) => (
-              <tr key={record.token}>
-                <td>
+              <tr
+                key={record.token}
+                data-testid={`token-row-${record.user_id}`}
+              >
+                <td data-testid={`token-user-${record.user_id}`}>
                   <strong>{record.display_name}</strong>
                   <div className="muted">{record.user_id}</div>
                   <div className="muted">
@@ -166,17 +169,17 @@ export function AdminTokenManager({ sectionId }: Props) {
                       : "—"}
                   </div>
                 </td>
-                <td>
+                <td data-testid={`token-value-${record.user_id}`}>
                   <code>{record.token}</code>
                 </td>
-                <td>
+                <td data-testid={`token-features-${record.user_id}`}>
                   <ul>
                     {record.allowed_features.map((feature) => (
                       <li key={feature}>{translateFeature(feature)}</li>
                     ))}
                   </ul>
                 </td>
-                <td>
+                <td data-testid={`token-quotas-${record.user_id}`}>
                   <ul>
                     {Object.entries(record.quota_limits).map(
                       ([scope, value]) => (
@@ -193,13 +196,13 @@ export function AdminTokenManager({ sectionId }: Props) {
         </table>
       </div>
 
-      <form className="stack" onSubmit={handleSubmit}>
+      <form className="stack" onSubmit={handleSubmit} data-testid="token-form">
         <h3>{t("admin.form.title")}</h3>
         <div className="grid-2">
           <label>
             {t("admin.form.user")}
             <span className="field-hint">{t("admin.form.userHint")}</span>
-            <select name="user_id" required>
+            <select name="user_id" required data-testid="token-form-user">
               <option value="">{t("admin.form.selectUser")}</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
@@ -213,7 +216,12 @@ export function AdminTokenManager({ sectionId }: Props) {
             <span className="field-hint">
               {t("admin.form.displayNameHint")}
             </span>
-            <input name="display_name" type="text" required />
+            <input
+              name="display_name"
+              type="text"
+              required
+              data-testid="token-form-display-name"
+            />
           </label>
         </div>
         <fieldset>
@@ -271,7 +279,12 @@ export function AdminTokenManager({ sectionId }: Props) {
             <input name="token" type="text" autoComplete="off" />
           </label>
         </details>
-        <button type="submit" className="primary" disabled={loading || saving}>
+        <button
+          type="submit"
+          className="primary"
+          disabled={loading || saving}
+          data-testid="token-form-submit"
+        >
           {saving ? t("admin.form.saving") : t("admin.form.save")}
         </button>
       </form>
