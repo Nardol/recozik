@@ -60,6 +60,60 @@ uv run uvicorn recozik_web.app:app \
 Activez CORS ou placez un reverse proxy TLS devant l'application si elle doit être exposée publiquement ou si le tableau
 de bord Next.js y accède.
 
+### Déploiements multi-worker
+
+Le backend crée les utilisateurs/tokens admin et readonly au démarrage de l'application (via le gestionnaire de cycle de
+vie FastAPI). Lors d'une exécution avec plusieurs workers (ex. `gunicorn -w 4` ou `uvicorn --workers 4`), chaque processus
+worker exécute le seeding de démarrage indépendamment, ce qui peut causer une brève contention de verrous SQLite lorsque
+les workers tentent simultanément d'upserter les mêmes tokens.
+
+**Impact :** Ceci est sûr—les contraintes `UNIQUE` de SQLite et la logique `upsert` empêchent la corruption de données—mais
+vous pouvez observer des avertissements transitoires `SQLITE_BUSY` dans les logs au démarrage. Les verrous se résolvent
+automatiquement en quelques millisecondes.
+
+**Schémas de déploiement recommandés :**
+
+1. **Orchestration de conteneurs (Kubernetes, Docker Swarm) :** Exécutez **un worker par conteneur** et scalez
+   horizontalement en ajoutant plus de conteneurs. C'est l'approche préférée en production :
+
+   ```bash
+   # Chaque conteneur exécute un seul processus uvicorn
+   uvicorn recozik_web.app:app --host 0.0.0.0 --port 8000
+   ```
+
+   Avec Kubernetes, scalez les replicas au lieu des workers :
+
+   ```yaml
+   spec:
+     replicas: 4 # Quatre pods, chacun avec un worker
+   ```
+
+2. **Multi-worker bare-metal :** Si vous avez besoin de plusieurs workers dans un seul processus (ex. `gunicorn -w 4` sur
+   une VM), les verrous au démarrage sont inoffensifs. Assurez-vous que les fichiers SQLite sont sur un système de
+   fichiers local (pas NFS) avec les permissions appropriées.
+
+3. **Pre-seed au moment du build (optionnel) :** Pour des images de conteneur déterministes, vous pouvez créer les
+   utilisateurs/tokens durant l'étape de build Docker pour éliminer complètement le seeding au runtime :
+
+   ```dockerfile
+   # Dans le Dockerfile, après l'installation des dépendances
+   RUN python -c "from recozik_web.auth import seed_users_and_tokens_on_startup; \
+                  from recozik_web.config import get_settings; \
+                  seed_users_and_tokens_on_startup(get_settings())"
+   ```
+
+   Note : Cette approche nécessite que `RECOZIK_WEB_ADMIN_TOKEN` et les secrets associés soient disponibles au moment du
+   build, ce qui peut ne pas être souhaitable pour des raisons de sécurité.
+
+**Dépannage :** Si vous observez des erreurs de verrous persistantes (durant > 1 seconde) au démarrage, vérifiez que :
+
+- Les fichiers de base de données (`auth.db`, `jobs.db`) sont sur un système de fichiers **local**, pas un montage réseau
+- Le répertoire `RECOZIK_WEB_BASE_MEDIA_ROOT` a les permissions/propriétaire corrects
+- Aucun autre processus ne détient de verrous sur les fichiers SQLite
+
+Pour les configurations haute-disponibilité avec plusieurs instances backend, utilisez un worker par conteneur et un load
+balancer (ex. Nginx, Traefik) pour distribuer les requêtes.
+
 ## 4. Service systemd (optionnel)
 
 ```ini
