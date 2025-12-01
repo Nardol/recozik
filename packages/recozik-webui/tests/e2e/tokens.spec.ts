@@ -376,8 +376,10 @@ test.describe("Admin Token Management", () => {
       });
 
       // Mock token creation
+      let createRequestBody: string | null = null;
       await context.route("**/api/admin/tokens", async (route) => {
         if (route.request().method() === "POST") {
+          createRequestBody = await route.request().postData();
           await route.fulfill({
             status: 200,
             contentType: "application/json",
@@ -428,8 +430,16 @@ test.describe("Admin Token Management", () => {
         form.requestSubmit();
       });
 
-      // Wait for success
+      // Wait for request
       await page.waitForTimeout(500);
+
+      // Verify payload
+      expect(createRequestBody).toBeTruthy();
+      const parsed = JSON.parse(createRequestBody!);
+      expect(parsed.user_id).toBe(2);
+      expect(parsed.display_name).toBe("Nouveau Token");
+      expect(parsed.roles).toContain("readonly");
+      expect(parsed.allowed_features).toContain("identify");
     });
   });
 });
