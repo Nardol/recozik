@@ -30,9 +30,9 @@
     ```bash
     cd packages/recozik-webui
     export MOCK_API_PORT=9999
-    NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:$MOCK_API_PORT \
-    RECOZIK_WEB_API_BASE=http://localhost:$MOCK_API_PORT \
-    RECOZIK_INTERNAL_API_BASE=http://localhost:$MOCK_API_PORT \
+    NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:$MOCK_API_PORT/api \
+    RECOZIK_WEB_API_BASE=http://localhost:$MOCK_API_PORT/api \
+    RECOZIK_INTERNAL_API_BASE=http://localhost:$MOCK_API_PORT/api \
     PORT=3000 BASE_URL=http://localhost:3000 VISUAL_SNAPSHOTS=0
     node tests/e2e/mock-api-server.js & MOCK_PID=$!
     npx wait-on http://localhost:$MOCK_API_PORT/health
