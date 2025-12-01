@@ -17,6 +17,7 @@ vi.mock("../../lib/api", async () => {
   const actual = await vi.importActual("../../lib/api");
   return {
     ...actual,
+    fetchWhoami: () => Promise.resolve(mockProfile),
     fetchUsers: () => mockFetchUsers(),
     registerUser: (payload: unknown) => mockRegisterUser(payload),
     updateUser: (id: number, payload: unknown) => mockUpdateUser(id, payload),
@@ -41,6 +42,7 @@ vi.mock("../TokenProvider", () => ({
     profile: mockProfile,
     token: "mock-token",
     status: "authenticated",
+    refreshProfile: vi.fn(),
   }),
 }));
 
@@ -132,8 +134,9 @@ describe("UserManager", () => {
     await waitFor(() => expect(mockFetchUsers).toHaveBeenCalled());
 
     // User2 is inactive
-    const rows = screen.getAllByRole("row");
-    const user2Row = rows.find((row) => row.textContent?.includes("user2"));
+    const user2Cell = await screen.findByText("user2");
+    const user2Row = user2Cell.closest("tr");
+    expect(user2Row).not.toBeNull();
     expect(user2Row).toHaveTextContent("Inactive");
   });
 
