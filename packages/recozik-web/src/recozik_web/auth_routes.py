@@ -9,6 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from recozik_services.security import ServiceUser
+from sqlalchemy.exc import IntegrityError
 
 from .auth_models import User, get_auth_store
 from .auth_service import (
@@ -104,7 +105,7 @@ class UserResponse(BaseModel):
 
     id: int
     username: str
-    email: str | None
+    email: str
     display_name: str | None
     is_active: bool
     roles: list[str]
@@ -306,7 +307,9 @@ def register_user(
     _require_admin(current_user)
     store = get_auth_store(settings.auth_database_url_resolved)
     if store.get_user(payload.username):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot create user")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists"
+        )
     hash_password(payload.password)  # ensure consistent timing
     validate_password_strength(payload.password)
     # Validate and normalize email format
@@ -320,7 +323,14 @@ def register_user(
         allowed_features=payload.allowed_features,
         quota_limits=payload.quota_limits,
     )
-    store.create_user(user)
+    try:
+        store.create_user(user)
+    except IntegrityError as e:
+        # Catch duplicate email or username violations
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username already exists",
+        ) from e
     if limiter:
         limiter.record_successful_auth(request)
     return {"status": "ok"}
@@ -417,7 +427,14 @@ def update_user(
         user.allowed_features = payload.allowed_features
     if payload.quota_limits is not None:
         user.quota_limits = payload.quota_limits
-    store.upsert_user(user)
+    try:
+        store.upsert_user(user)
+    except IntegrityError as e:
+        # Catch duplicate email violations
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already exists",
+        ) from e
     return _user_to_response(user)
 
 

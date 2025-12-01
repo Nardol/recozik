@@ -134,7 +134,7 @@ export interface TokenCreatePayload {
 export interface UserResponse {
   id: number;
   username: string;
-  email: string | null;
+  email: string; // Required for all users
   display_name: string | null;
   is_active: boolean;
   roles: string[];
@@ -154,7 +154,7 @@ export interface RegisterUserPayload {
 }
 
 export interface UpdateUserPayload {
-  email?: string | null;
+  email?: string;
   display_name?: string | null;
   is_active?: boolean | null;
   roles: string[];

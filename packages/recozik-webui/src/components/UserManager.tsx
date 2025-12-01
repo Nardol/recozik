@@ -145,7 +145,7 @@ export function UserManager({ sectionId }: Props) {
     ).map((role) => role.key);
 
     const payload: UpdateUserPayload = {
-      email: formData.get("email")?.toString() || null,
+      email: formData.get("email")?.toString() || undefined,
       display_name: formData.get("display_name")?.toString() || null,
       is_active: formData.get("is_active") === "on",
       roles,
@@ -386,6 +386,7 @@ export function UserManager({ sectionId }: Props) {
                       name="username"
                       required
                       autoComplete="username"
+                      autoFocus
                     />
                   </label>
                   <label>
@@ -412,8 +413,12 @@ export function UserManager({ sectionId }: Props) {
                       name="password"
                       required
                       autoComplete="new-password"
+                      pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{12,}$"
+                      aria-describedby="password-hint"
                     />
-                    <div className="muted">{t("users.form.passwordHint")}</div>
+                    <div id="password-hint" className="muted">
+                      {t("users.form.passwordHint")}
+                    </div>
                   </label>
                 </>
               )}
@@ -431,6 +436,7 @@ export function UserManager({ sectionId }: Props) {
                       name="email"
                       defaultValue={selectedUser?.email ?? ""}
                       autoComplete="email"
+                      autoFocus
                     />
                   </label>
                   <label>
@@ -575,8 +581,13 @@ export function UserManager({ sectionId }: Props) {
                   name="new_password"
                   required
                   autoComplete="new-password"
+                  autoFocus
+                  pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#]).{12,}$"
+                  aria-describedby="reset-password-hint"
                 />
-                <div className="muted">{t("users.form.passwordHint")}</div>
+                <div id="reset-password-hint" className="muted">
+                  {t("users.form.passwordHint")}
+                </div>
               </label>
               <div className="modal-actions">
                 <button type="submit" disabled={saving}>
