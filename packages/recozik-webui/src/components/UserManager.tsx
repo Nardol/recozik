@@ -145,7 +145,7 @@ export function UserManager({ sectionId }: Props) {
     ).map((role) => role.key);
 
     const payload: UpdateUserPayload = {
-      email: formData.get("email")?.toString() || null,
+      email: formData.get("email")?.toString() || undefined,
       display_name: formData.get("display_name")?.toString() || null,
       is_active: formData.get("is_active") === "on",
       roles,
