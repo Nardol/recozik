@@ -47,7 +47,12 @@ export default async function LocaleDashboard({ params, searchParams }: Props) {
   const { profile, jobs, tokens, users } = await loadInitialData();
   const loginError =
     typeof qs.login_error === "string"
-      ? decodeURIComponent(qs.login_error)
+      ? {
+          invalid_credentials: translate("login.errorInvalid"),
+          account_disabled: translate("login.errorDisabled"),
+          missing_credentials: translate("login.errorMissing"),
+          generic: translate("login.errorGeneric"),
+        }[decodeURIComponent(qs.login_error)] || translate("login.errorGeneric")
       : null;
   const tokenStatus =
     typeof qs.token_status === "string"

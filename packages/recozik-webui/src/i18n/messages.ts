@@ -22,6 +22,8 @@ const en = {
   "login.loading": "Signing in…",
   "login.errorMissing": "Please provide both username and password.",
   "login.errorInvalid": "Invalid username or password.",
+  "login.errorDisabled": "Your account is disabled. Contact an administrator.",
+  "login.errorGeneric": "Unable to sign in. Try again later.",
   "profile.signedInAs": "Signed in as",
   "profile.roles": "Roles",
   "profile.features": "Features",
@@ -213,6 +215,10 @@ const fr: Record<MessageKey, string> = {
   "login.errorMissing":
     "Veuillez renseigner le nom d'utilisateur et le mot de passe.",
   "login.errorInvalid": "Identifiants invalides.",
+  "login.errorDisabled":
+    "Votre compte est désactivé. Contactez un administrateur.",
+  "login.errorGeneric":
+    "Connexion impossible pour le moment. Réessayez plus tard.",
   "profile.signedInAs": "Connecté en tant que",
   "profile.roles": "Rôles",
   "profile.features": "Fonctionnalités",
