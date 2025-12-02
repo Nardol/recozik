@@ -36,7 +36,10 @@ async function loadInitialData(): Promise<{
   }
 }
 
-function safeDecode(value: string | undefined): string | null {
+function safeDecode(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
   if (typeof value !== "string") return null;
   try {
     return decodeURIComponent(value);
