@@ -17,11 +17,11 @@ export async function createTokenAction(formData: FormData) {
     const userIdStr = formData.get("user_id")?.toString() ?? "";
     const user_id = Number(userIdStr);
     if (!Number.isFinite(user_id)) {
-      redirect(`/${locale}?token_error=invalid_user`);
+      return redirect(`/${locale}?token_error=invalid_user`);
     }
     const display_name = formData.get("display_name")?.toString().trim() ?? "";
     if (!display_name) {
-      redirect(`/${locale}?token_error=missing_display`);
+      return redirect(`/${locale}?token_error=missing_display`);
     }
     const payload = {
       token: formData.get("token")?.toString() || undefined,

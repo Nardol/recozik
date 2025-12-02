@@ -15,13 +15,37 @@ export async function POST(request: NextRequest) {
   const remember = formData.get("remember") === "on";
   const locale = (formData.get("locale") || "en").toString();
 
+  if (!username.trim() || !password) {
+    const origin = request.nextUrl.origin;
+    return NextResponse.redirect(
+      `${origin}/${locale}?login_error=missing_credentials`,
+      {
+        status: 303,
+      },
+    );
+  }
+
   const apiBase = resolveApiBase();
-  const backendResponse = await fetch(`${apiBase}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password, remember }),
-    redirect: "manual",
-  });
+  let backendResponse: Response;
+  try {
+    backendResponse = await fetch(`${apiBase}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, remember }),
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    const origin = request.nextUrl.origin;
+    const errorKey =
+      error instanceof DOMException && error.name === "TimeoutError"
+        ? "generic"
+        : "generic";
+    return NextResponse.redirect(
+      `${origin}/${locale}?login_error=${encodeURIComponent(errorKey)}`,
+      { status: 303 },
+    );
+  }
 
   const origin = request.nextUrl.origin;
   const successUrl = `${origin}/${locale}`;

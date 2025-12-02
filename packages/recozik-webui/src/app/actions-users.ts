@@ -27,8 +27,10 @@ export async function createUserAction(formData: FormData) {
     .map((v) => (typeof v === "string" ? v : ""))
     .filter(Boolean);
 
-  if (!username || !email || !password) {
-    redirect(`/${locale}?user_error=missing_fields`);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!username || !email || !password || !emailRegex.test(email)) {
+    return redirect(`/${locale}?user_error=missing_fields`);
   }
 
   try {
@@ -45,9 +47,12 @@ export async function createUserAction(formData: FormData) {
         quota_limits: {},
       }),
     });
-    redirect(`/${locale}?user_status=created`);
   } catch (error) {
+    if (error && typeof error === "object" && "digest" in error) {
+      throw error;
+    }
     const message = (error as Error).message?.slice(0, 200) || "server_error";
-    redirect(`/${locale}?user_error=${encodeURIComponent(message)}`);
+    return redirect(`/${locale}?user_error=${encodeURIComponent(message)}`);
   }
+  redirect(`/${locale}?user_status=created`);
 }

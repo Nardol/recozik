@@ -36,6 +36,12 @@ export function JobList({
   const [autoRefresh, setAutoRefresh] = useState(allowAutoRefresh);
 
   useEffect(() => {
+    if (!allowAutoRefresh && autoRefresh) {
+      setAutoRefresh(false);
+    }
+  }, [allowAutoRefresh, autoRefresh]);
+
+  useEffect(() => {
     const sockets = socketsRef.current;
     return () => {
       sockets.forEach((socket) => socket.close());
@@ -92,7 +98,7 @@ export function JobList({
       }
     });
 
-    if (!autoRefresh) {
+    if (!allowAutoRefresh || !autoRefresh) {
       return;
     }
 
@@ -110,7 +116,7 @@ export function JobList({
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [jobs, onUpdate, autoRefresh]);
+  }, [jobs, onUpdate, autoRefresh, allowAutoRefresh]);
 
   const statusLabel = (status: string) => {
     const key = STATUS_KEYS[status];
@@ -164,9 +170,11 @@ export function JobList({
               {t("jobs.autoRefresh")}
             </label>
           ) : null}
-          <span className="sr-only" aria-live="polite">
-            {autoRefresh ? t("jobs.autoRefreshOn") : t("jobs.autoRefreshOff")}
-          </span>
+          {allowAutoRefresh ? (
+            <span className="sr-only" aria-live="polite">
+              {autoRefresh ? t("jobs.autoRefreshOn") : t("jobs.autoRefreshOff")}
+            </span>
+          ) : null}
         </div>
       ) : null}
       <div

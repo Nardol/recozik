@@ -128,13 +128,16 @@ export default function UsersPanelPragma({
         <fieldset>
           <legend>{t(locale, "users.form.roles")}</legend>
           <label className="option">
-            <input type="checkbox" name="role" value="admin" /> Admin
+            <input type="checkbox" name="role" value="admin" />{" "}
+            {t(locale, "role.admin")}
           </label>
           <label className="option">
-            <input type="checkbox" name="role" value="operator" /> Operator
+            <input type="checkbox" name="role" value="operator" />{" "}
+            {t(locale, "role.operator")}
           </label>
           <label className="option">
-            <input type="checkbox" name="role" value="readonly" /> Readonly
+            <input type="checkbox" name="role" value="readonly" />{" "}
+            {t(locale, "role.readonly")}
           </label>
         </fieldset>
 
@@ -147,17 +150,19 @@ export default function UsersPanelPragma({
               value="identify"
               defaultChecked
             />
-            Identify
+            {t(locale, "feature.identify")}
           </label>
           <label className="option">
-            <input type="checkbox" name="feature" value="rename" /> Rename
+            <input type="checkbox" name="feature" value="rename" />
+            {t(locale, "feature.rename")}
           </label>
           <label className="option">
-            <input type="checkbox" name="feature" value="audd" /> AudD
+            <input type="checkbox" name="feature" value="audd" />
+            {t(locale, "feature.audd")}
           </label>
           <label className="option">
             <input type="checkbox" name="feature" value="musicbrainz_enrich" />{" "}
-            MusicBrainz
+            {t(locale, "feature.musicbrainz_enrich")}
           </label>
         </fieldset>
 

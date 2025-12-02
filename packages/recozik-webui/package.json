@@ -8,11 +8,10 @@
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "test": "vitest",
-    "test:e2e": "MOCK_API_PORT=10099 NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:10099/api RECOZIK_WEB_API_BASE=http://localhost:10099/api RECOZIK_INTERNAL_API_BASE=http://localhost:10099/api npm run build && MOCK_API_PORT=10099 NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:10099/api RECOZIK_WEB_API_BASE=http://localhost:10099/api RECOZIK_INTERNAL_API_BASE=http://localhost:10099/api playwright test"
+    "test:e2e": "MOCK_API_PORT=10099 NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:10099/api RECOZIK_WEB_API_BASE=http://localhost:10099/api RECOZIK_INTERNAL_API_BASE=http://localhost:10099/api sh -c 'npm run build && playwright test'"
   },
   "dependencies": {
     "next": "16.0.6",
-    "node-fetch": "^3.3.2",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },

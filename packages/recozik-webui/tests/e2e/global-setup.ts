@@ -1,6 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
-import fetch from "node-fetch";
 
 declare global {
   var __MOCK_SERVER__: ChildProcess | null | undefined;
@@ -46,6 +45,9 @@ export default async function globalSetup() {
     env: { ...process.env, MOCK_API_PORT: port },
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
+  });
+  mock.stderr?.on("data", (chunk) => {
+    console.error("[mock-api]", chunk.toString());
   });
   const ready = await waitForHealth(port);
   if (!ready) {

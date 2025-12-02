@@ -189,8 +189,8 @@ const server = http.createServer(async (req, res) => {
     }
     const newUser = {
       id: nextUserId++,
-      username: payload.username || `user${nextUserId}`,
-      email: payload.email || "user@example.com",
+      username: payload.username,
+      email: payload.email,
       display_name: payload.display_name ?? null,
       is_active: true,
       roles: payload.roles || ["readonly"],

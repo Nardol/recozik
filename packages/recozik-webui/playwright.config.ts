@@ -33,6 +33,8 @@ export default defineConfig({
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
     },
+    // Firefox disabled for now due to intermittent browserContext.newPage crashes
+    // Re-enable once stability improves in CI and locally.
   ],
   webServer: {
     command: `npm run start -- --hostname 0.0.0.0 --port ${PORT}`,

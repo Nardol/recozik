@@ -31,7 +31,17 @@ async function loadInitialData(): Promise<{
     }
     return { profile, jobs, tokens, users };
   } catch {
+    console.error("Failed to load initial data during SSR");
     return { profile: null, jobs: [], tokens: [], users: [] };
+  }
+}
+
+function safeDecode(value: string | undefined): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
   }
 }
 
@@ -47,42 +57,31 @@ export default async function LocaleDashboard({ params, searchParams }: Props) {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get("recozik_session")?.value ?? null;
   const { profile, jobs, tokens, users } = await loadInitialData();
-  const loginError =
-    typeof qs.login_error === "string"
-      ? {
-          invalid_credentials: translate("login.errorInvalid"),
-          account_disabled: translate("login.errorDisabled"),
-          missing_credentials: translate("login.errorMissing"),
-          generic: translate("login.errorGeneric"),
-        }[decodeURIComponent(qs.login_error)] || translate("login.errorGeneric")
-      : null;
-  const tokenStatus =
-    typeof qs.token_status === "string"
-      ? decodeURIComponent(qs.token_status)
-      : null;
-  const tokenError =
-    typeof qs.token_error === "string"
-      ? decodeURIComponent(qs.token_error)
-      : null;
-  const userStatus =
-    typeof qs.user_status === "string"
-      ? decodeURIComponent(qs.user_status)
-      : null;
-  const userError =
-    typeof qs.user_error === "string"
-      ? decodeURIComponent(qs.user_error)
-      : null;
+  const loginErrorKey = safeDecode(qs.login_error ?? undefined);
+  const loginError = loginErrorKey
+    ? {
+        invalid_credentials: translate("login.errorInvalid"),
+        account_disabled: translate("login.errorDisabled"),
+        missing_credentials: translate("login.errorMissing"),
+        generic: translate("login.errorGeneric"),
+      }[loginErrorKey] || translate("login.errorGeneric")
+    : null;
+
+  const tokenStatus = safeDecode(qs.token_status ?? undefined);
+  const tokenError = safeDecode(qs.token_error ?? undefined);
+  const userStatus = safeDecode(qs.user_status ?? undefined);
+  const userError = safeDecode(qs.user_error ?? undefined);
 
   const statusMessage =
     tokenStatus === "created" ? translate("admin.status.created") : null;
-  const errorMessage =
-    tokenError === "invalid_user"
-      ? translate("admin.status.invalidUser")
-      : tokenError === "server_error"
-        ? translate("admin.status.error")
-        : tokenError
-          ? `${translate("admin.status.error")} (${tokenError})`
-          : null;
+  const tokenErrorLookup: Record<string, string> = {
+    invalid_user: translate("admin.status.invalidUser"),
+    server_error: translate("admin.status.error"),
+  };
+  const errorMessage = tokenError
+    ? tokenErrorLookup[tokenError] ||
+      `${translate("admin.status.error")} (${tokenError})`
+    : null;
   const fieldErrors: Record<string, string> | undefined =
     tokenError === "invalid_user"
       ? { user_id: translate("admin.status.invalidUser") }
@@ -91,14 +90,14 @@ export default async function LocaleDashboard({ params, searchParams }: Props) {
         : undefined;
   const userStatusMessage =
     userStatus === "created" ? translate("users.status.created") : null;
-  const userErrorMessage =
-    userError === "missing_fields"
-      ? translate("users.status.missing")
-      : userError === "server_error"
-        ? translate("users.status.error")
-        : userError
-          ? `${translate("users.status.error")} (${userError})`
-          : null;
+  const userErrorLookup: Record<string, string> = {
+    missing_fields: translate("users.status.missing"),
+    server_error: translate("users.status.error"),
+  };
+  const userErrorMessage = userError
+    ? userErrorLookup[userError] ||
+      `${translate("users.status.error")} (${userError})`
+    : null;
   const userFieldErrors: Record<string, string> | undefined =
     userError === "missing_fields"
       ? {
