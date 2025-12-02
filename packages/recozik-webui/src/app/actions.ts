@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { serverCreateJob } from "../lib/server/jobs";
 import { serverFetch } from "../lib/server/api";
 import type { LoginState, UploadState } from "./action-types";
@@ -15,7 +16,7 @@ export async function loginAction(
   const remember = formData.get("remember") === "on";
 
   if (!username || !password) {
-    return { status: "error", message: "Missing credentials" };
+    redirect(`/${locale}?login_error=missing_credentials`);
   }
 
   try {
@@ -25,10 +26,11 @@ export async function loginAction(
       body: JSON.stringify({ username, password, remember }),
     });
     revalidatePath(`/${locale}`);
-    return { status: "success", message: "Logged in" };
-  } catch (error) {
-    const detail = (error as Error).message || "Invalid credentials";
-    return { status: "error", message: detail };
+    redirect(`/${locale}?login_status=ok`);
+  } catch (_error) {
+    void _error;
+    const code = "invalid_credentials";
+    redirect(`/${locale}?login_error=${code}`);
   }
 }
 

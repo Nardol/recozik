@@ -183,6 +183,9 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === "/auth/register" && req.method === "POST") {
     const payload = await parseBody(req);
+    if (!payload.username || !payload.email || !payload.password) {
+      return sendJson(req, res, 400, { detail: "missing_fields" });
+    }
     const newUser = {
       id: nextUserId++,
       username: payload.username || `user${nextUserId}`,
@@ -195,6 +198,18 @@ const server = http.createServer(async (req, res) => {
       created_at: new Date().toISOString(),
     };
     users = [...users, newUser];
+    // Also create a token to ensure tables grow
+    tokens = [
+      ...tokens,
+      {
+        token: `user-${newUser.id}-token`,
+        user_id: newUser.id,
+        display_name: `Token for ${newUser.username}`,
+        roles: newUser.roles,
+        allowed_features: newUser.allowed_features,
+        quota_limits: newUser.quota_limits,
+      },
+    ];
     return sendJson(req, res, 200, { status: "ok", user: newUser });
   }
 

@@ -65,3 +65,10 @@ npm run start -- --hostname 0.0.0.0 --port 3000
 Set `NEXT_PUBLIC_RECOZIK_API_BASE` in `.env.local` before building: use `http://localhost:8000` when running the backend
 directly, or `/api` when routing through the Docker/Nginx stack. See `docs/deploy-frontend.md` for deployment
 instructions (bare-metal + container recipe).
+
+## API base URLs (server vs client)
+
+- `RECOZIK_WEB_API_BASE`: server-side calls from Next server actions (auth/login, SSR job list). Point this to the internal
+  FastAPI URL that the Next server can reach directly (e.g., `http://backend:8000` in Docker).
+- `NEXT_PUBLIC_RECOZIK_API_BASE`: browser-visible base used by client-side fetches/WebSocket URLs. Use the public
+  origin exposed to users (e.g., `/api` behind the proxy or `http://localhost:8000` in local dev).
