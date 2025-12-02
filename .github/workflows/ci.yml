@@ -117,7 +117,7 @@ jobs:
       - name: Install Playwright browsers
         run: |
           cd packages/recozik-webui
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
       - name: Run E2E tests
         env:
           PORT: 3000
