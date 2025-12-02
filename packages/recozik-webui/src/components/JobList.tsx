@@ -28,7 +28,7 @@ export function JobList({
   onUpdate,
   sectionId,
   showRefresh = false,
-  allowAutoRefresh = true,
+  allowAutoRefresh = false,
 }: Props) {
   const { t } = useI18n();
   const headingId = sectionId ? `${sectionId}-jobs-title` : "jobs-title";

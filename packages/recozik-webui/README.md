@@ -57,6 +57,8 @@ npx wait-on http://localhost:9999/health && \
 npm run test:e2e -- --reporter=line tests/e2e/joblist.spec.ts && \
 kill $MOCK_PID
 
+Tip: change `MOCK_API_PORT` to avoid conflicts; set the same value in `RECOZIK_WEB_API_BASE`/`NEXT_PUBLIC_RECOZIK_API_BASE` when running Playwright locally.
+
 # production build
 npm run build
 npm run start -- --hostname 0.0.0.0 --port 3000
