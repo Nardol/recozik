@@ -30,11 +30,25 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        // Firefox-specific workarounds for context lifecycle issues
+        launchOptions: {
+          firefoxUserPrefs: {
+            // Disable various Firefox features that can interfere with automation
+            "media.navigator.streams.fake": true,
+            "media.navigator.permission.disabled": true,
+            "permissions.default.microphone": 1,
+            "permissions.default.camera": 1,
+          },
+        },
+      },
+    },
+    {
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
     },
-    // Firefox disabled for now due to intermittent browserContext.newPage crashes
-    // Re-enable once stability improves in CI and locally.
   ],
   webServer: {
     command: `npm run start -- --hostname 0.0.0.0 --port ${PORT}`,
