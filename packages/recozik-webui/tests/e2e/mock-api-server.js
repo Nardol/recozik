@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const http = require("http");
 
-const PORT = process.env.MOCK_API_PORT || 9999;
+const PORT = process.env.MOCK_API_PORT || 10099;
 
 // Whitelist of allowed origins for CORS
 const ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:4000",
+  "http://localhost:10099",
   "http://localhost:9999",
 ];
 

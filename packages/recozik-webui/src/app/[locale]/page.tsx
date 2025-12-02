@@ -42,6 +42,8 @@ export default async function LocaleDashboard({ params, searchParams }: Props) {
     notFound();
   }
   const locale = resolved.locale as Locale;
+  const translate = (key: keyof typeof messages.en) =>
+    messages[locale][key] ?? key;
   const cookieStore = await cookies();
   const sessionId = cookieStore.get("recozik_session")?.value ?? null;
   const { profile, jobs, tokens, users } = await loadInitialData();
@@ -71,8 +73,6 @@ export default async function LocaleDashboard({ params, searchParams }: Props) {
       ? decodeURIComponent(qs.user_error)
       : null;
 
-  const translate = (key: keyof typeof messages.en) =>
-    messages[locale][key] ?? key;
   const statusMessage =
     tokenStatus === "created" ? translate("admin.status.created") : null;
   const errorMessage =

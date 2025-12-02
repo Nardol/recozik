@@ -201,15 +201,16 @@ test.describe("Authentication flow", () => {
       await context.route("**/auth/logout", async (route) => {
         isLoggedOut = true;
         await route.fulfill({
-          status: 303,
+          status: 200,
+          contentType: "application/json",
           headers: {
-            Location: "/en",
             "Set-Cookie": [
               "recozik_session=; Path=/; Max-Age=0",
               "recozik_refresh=; Path=/; Max-Age=0",
               "recozik_csrf=; Path=/; Max-Age=0",
             ].join(", "),
           },
+          body: JSON.stringify({ status: "ok" }),
         });
       });
 
@@ -222,7 +223,8 @@ test.describe("Authentication flow", () => {
       const logoutButton = page.getByRole("button", { name: /log out/i });
       await logoutButton.click();
 
-      // Should redirect and show login prompt (whoami now returns 401)
+      // Manual navigation after mock logout to show login prompt (whoami now returns 401)
+      await page.goto("/en");
       await expect(page.getByTestId("login-prompt")).toBeVisible({
         timeout: 10000,
       });
