@@ -117,7 +117,7 @@ jobs:
       - name: Install Playwright browsers
         run: |
           cd packages/recozik-webui
-          npx playwright install --with-deps chromium webkit
+          npx playwright install --with-deps chromium
       - name: Run E2E tests
         env:
           PORT: 3000
@@ -133,7 +133,8 @@ jobs:
           MOCK_PID=$!
           npx wait-on http://localhost:9999/health
           trap "kill $MOCK_PID" EXIT
-          npm run test:e2e -- --reporter=line --project=chromium
+          npm run build
+          npx playwright test --reporter=line --project=chromium
 
   all-checks:
     name: All Checks
