@@ -47,15 +47,17 @@ npm run test:e2e
 # VISUAL_SNAPSHOTS=1 npm run test:e2e -- tests/e2e/visual.spec.ts --update-snapshots
 
 # e2e without backend (mock API)
-MOCK_API_PORT=9999 \
-NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:9999/api \
-RECOZIK_WEB_API_BASE=http://localhost:9999/api \
-RECOZIK_INTERNAL_API_BASE=http://localhost:9999/api \
+MOCK_API_PORT=10099 \
+NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:10099/api \
+RECOZIK_WEB_API_BASE=http://localhost:10099/api \
+RECOZIK_INTERNAL_API_BASE=http://localhost:10099/api \
 PORT=3000 BASE_URL=http://localhost:3000 VISUAL_SNAPSHOTS=0 \
 node tests/e2e/mock-api-server.js & MOCK_PID=$! && \
-npx wait-on http://localhost:9999/health && \
+npx wait-on http://localhost:10099/health && \
 npm run test:e2e -- --reporter=line tests/e2e/joblist.spec.ts && \
 kill $MOCK_PID
+
+Tip: change `MOCK_API_PORT` to avoid conflicts; set the same value in `RECOZIK_WEB_API_BASE`/`NEXT_PUBLIC_RECOZIK_API_BASE` when running Playwright locally.
 
 # production build
 npm run build
@@ -65,3 +67,10 @@ npm run start -- --hostname 0.0.0.0 --port 3000
 Set `NEXT_PUBLIC_RECOZIK_API_BASE` in `.env.local` before building: use `http://localhost:8000` when running the backend
 directly, or `/api` when routing through the Docker/Nginx stack. See `docs/deploy-frontend.md` for deployment
 instructions (bare-metal + container recipe).
+
+## API base URLs (server vs client)
+
+- `RECOZIK_WEB_API_BASE`: server-side calls from Next server actions (auth/login, SSR job list). Point this to the internal
+  FastAPI URL that the Next server can reach directly (e.g., `http://backend:8000` in Docker).
+- `NEXT_PUBLIC_RECOZIK_API_BASE`: browser-visible base used by client-side fetches/WebSocket URLs. Use the public
+  origin exposed to users (e.g., `/api` behind the proxy or `http://localhost:8000` in local dev).

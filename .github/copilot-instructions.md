@@ -96,6 +96,8 @@
 - When adding new commands, create a dedicated module under `src/recozik/commands/`, surface any required backward-compatible aliases via `cli.py`, and extend this doc/README as needed.
 - Always sanity-check execution costs: keep lazy imports intact, avoid unnecessary `Path.resolve()` churn in hot paths, and document trade-offs if a feature must slow things down.
 - Keep frontend localisation healthy: UI copy lives under `packages/recozik-webui/src/i18n`, so every new label/helptext needs translations for all supported locales plus any accessibility notes (aria labels, live regions). Run `npm run lint` after changing text or locale files.
+- Web UI must stay usable without JavaScript (“Pragma” mode). Prefer Server Actions and SSR for login, upload, job listing, and token admin; any client-side enhancements must degrade gracefully to plain HTML forms and server-rendered tables.
+- User management is primary; API tokens are secondary and tied to users. Keep user CRUD accessible (including no-JS paths) before adding token-related UX.
 
 ---
 

@@ -12,13 +12,23 @@ import { JobDetail, fetchJobs } from "../lib/api";
 import { useI18n } from "../i18n/I18nProvider";
 import { LoginForm } from "./LoginForm";
 
-export function DashboardClient() {
+interface Props {
+  initialJobs?: JobDetail[];
+  loginError?: string | null;
+}
+
+export function DashboardClient({
+  initialJobs = [],
+  loginError = null,
+}: Props) {
   const { token, profile } = useToken();
   const { t } = useI18n();
-  const [jobs, setJobs] = useState<JobDetail[]>([]);
+  const [jobs, setJobs] = useState<JobDetail[]>(initialJobs);
 
   useEffect(() => {
-    setJobs([]);
+    setJobs(initialJobs);
+    // initialJobs is intentionally only applied on auth change to avoid clobbering live updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, profile]);
 
   useEffect(() => {
@@ -78,7 +88,7 @@ export function DashboardClient() {
         <div className="panel">
           <h2>{t("login.title")}</h2>
           <p className="muted">{t("login.description")}</p>
-          <LoginForm />
+          <LoginForm initialError={loginError} />
         </div>
       </main>
     );
@@ -102,10 +112,13 @@ export function DashboardClient() {
             sectionId="jobs-section"
             jobs={sortedJobs}
             onUpdate={handleJobUpdate}
+            showRefresh
           />
         </div>
-        <UserManager sectionId="users-section" />
-        <AdminTokenManager sectionId="admin-section" />
+        <div className="js-only">
+          <UserManager sectionId="users-section" />
+          <AdminTokenManager sectionId="admin-section" />
+        </div>
       </main>
     </>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { JobDetail, fetchJobDetail } from "../lib/api";
 import { MessageKey, useI18n } from "../i18n/I18nProvider";
@@ -10,6 +10,8 @@ interface Props {
   jobs: JobDetail[];
   onUpdate: (job: JobDetail) => void;
   sectionId?: string;
+  showRefresh?: boolean;
+  allowAutoRefresh?: boolean;
 }
 
 const STATUS_KEYS: Record<string, MessageKey> = {
@@ -21,10 +23,23 @@ const STATUS_KEYS: Record<string, MessageKey> = {
 
 const COMPLETED_STATUSES = new Set(["completed", "failed"]);
 
-export function JobList({ jobs, onUpdate, sectionId }: Props) {
+export function JobList({
+  jobs,
+  onUpdate,
+  sectionId,
+  showRefresh = false,
+  allowAutoRefresh = false,
+}: Props) {
   const { t } = useI18n();
   const headingId = sectionId ? `${sectionId}-jobs-title` : "jobs-title";
   const socketsRef = useRef<Map<string, WebSocket>>(new Map());
+  const [autoRefresh, setAutoRefresh] = useState(allowAutoRefresh);
+
+  useEffect(() => {
+    if (!allowAutoRefresh && autoRefresh) {
+      setAutoRefresh(false);
+    }
+  }, [allowAutoRefresh, autoRefresh]);
 
   useEffect(() => {
     const sockets = socketsRef.current;
@@ -83,6 +98,10 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
       }
     });
 
+    if (!allowAutoRefresh || !autoRefresh) {
+      return;
+    }
+
     const interval = setInterval(async () => {
       await Promise.all(
         inFlight.map(async (job) => {
@@ -94,10 +113,10 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
           }
         }),
       );
-    }, 4000);
+    }, 8000);
 
     return () => clearInterval(interval);
-  }, [jobs, onUpdate]);
+  }, [jobs, onUpdate, autoRefresh, allowAutoRefresh]);
 
   const statusLabel = (status: string) => {
     const key = STATUS_KEYS[status];
@@ -118,6 +137,46 @@ export function JobList({ jobs, onUpdate, sectionId }: Props) {
       <h2 id={headingId} data-testid="jobs-title">
         {t("jobs.title")}
       </h2>
+      {showRefresh ? (
+        <div className="refresh-row">
+          <button
+            type="button"
+            className="secondary small"
+            aria-label={t("jobs.refreshLabel")}
+            onClick={async () => {
+              await Promise.all(
+                jobs.map(async (job) => {
+                  if (!COMPLETED_STATUSES.has(job.status)) {
+                    try {
+                      const detail = await fetchJobDetail(job.job_id);
+                      onUpdate(detail);
+                    } catch (error) {
+                      console.warn("Unable to refresh job", job.job_id, error);
+                    }
+                  }
+                }),
+              );
+            }}
+          >
+            {t("jobs.refresh")}
+          </button>
+          {allowAutoRefresh ? (
+            <label className="option">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+              />{" "}
+              {t("jobs.autoRefresh")}
+            </label>
+          ) : null}
+          {allowAutoRefresh ? (
+            <span className="sr-only" aria-live="polite">
+              {autoRefresh ? t("jobs.autoRefreshOn") : t("jobs.autoRefreshOff")}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div
         className="table-wrapper"
         role="region"

@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const http = require("http");
 
-const PORT = process.env.MOCK_API_PORT || 9999;
+const PORT = process.env.MOCK_API_PORT || 10099;
 
 // Whitelist of allowed origins for CORS
 const ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:4000",
+  "http://localhost:10099",
   "http://localhost:9999",
 ];
 
@@ -183,10 +184,13 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === "/auth/register" && req.method === "POST") {
     const payload = await parseBody(req);
+    if (!payload.username || !payload.email || !payload.password) {
+      return sendJson(req, res, 400, { detail: "missing_fields" });
+    }
     const newUser = {
       id: nextUserId++,
-      username: payload.username || `user${nextUserId}`,
-      email: payload.email || "user@example.com",
+      username: payload.username,
+      email: payload.email,
       display_name: payload.display_name ?? null,
       is_active: true,
       roles: payload.roles || ["readonly"],
@@ -195,6 +199,18 @@ const server = http.createServer(async (req, res) => {
       created_at: new Date().toISOString(),
     };
     users = [...users, newUser];
+    // Also create a token to ensure tables grow
+    tokens = [
+      ...tokens,
+      {
+        token: `user-${newUser.id}-token`,
+        user_id: newUser.id,
+        display_name: `Token for ${newUser.username}`,
+        roles: newUser.roles,
+        allowed_features: newUser.allowed_features,
+        quota_limits: newUser.quota_limits,
+      },
+    ];
     return sendJson(req, res, 200, { status: "ok", user: newUser });
   }
 

@@ -6,12 +6,16 @@ import { useI18n } from "../i18n/I18nProvider";
 import { getApiBase } from "../lib/api";
 import { useToken } from "./TokenProvider";
 
-export function LoginForm() {
+interface Props {
+  initialError?: string | null;
+}
+
+export function LoginForm({ initialError = null }: Props) {
   const { t, locale } = useI18n();
   const { refreshProfile } = useToken();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -55,6 +59,8 @@ export function LoginForm() {
       onSubmit={handleSubmit}
       data-testid="login-form"
       noValidate
+      method="post"
+      action={`/api/login?locale=${locale}`}
     >
       <label>
         {t("login.username")}
@@ -79,6 +85,7 @@ export function LoginForm() {
         <input name="remember" type="checkbox" data-testid="login-remember" />{" "}
         {t("login.remember")}
       </label>
+      <input type="hidden" name="locale" value={locale} />
       <button
         type="submit"
         className="primary"
@@ -94,6 +101,9 @@ export function LoginForm() {
           </p>
         ) : null}
       </div>
+      <noscript>
+        <p className="muted">{t("login.description")}</p>
+      </noscript>
     </form>
   );
 }
