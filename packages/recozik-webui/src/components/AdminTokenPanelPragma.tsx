@@ -199,7 +199,11 @@ export default function AdminTokenPanelPragma({
           <input name="token" type="text" autoComplete="off" />
         </label>
 
-        <button type="submit" className="primary">
+        <button
+          type="submit"
+          className="primary"
+          data-testid="token-form-submit-noscript"
+        >
           {t(locale, "admin.form.save")}
         </button>
       </form>

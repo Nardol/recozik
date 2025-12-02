@@ -166,7 +166,11 @@ export default function UsersPanelPragma({
           </label>
         </fieldset>
 
-        <button type="submit" className="primary">
+        <button
+          type="submit"
+          className="primary"
+          data-testid="user-form-submit-noscript"
+        >
           {t(locale, "users.form.submit")}
         </button>
       </form>

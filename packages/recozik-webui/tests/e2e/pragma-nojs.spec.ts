@@ -86,7 +86,7 @@ test("no-JS flow: SSR jobs + admin tokens still visible", async ({
   const tokenForm = page.getByTestId("token-form");
   await Promise.all([
     page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-    tokenForm.locator('button[type="submit"]').click(),
+    tokenForm.getByTestId("token-form-submit-noscript").click(),
   ]);
   await delay(300);
   const after = await table.locator("tbody tr").count();
@@ -102,7 +102,7 @@ test("no-JS flow: SSR jobs + admin tokens still visible", async ({
   const userForm = page.getByTestId("user-form");
   await Promise.all([
     page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-    userForm.locator('button[type="submit"]').click(),
+    userForm.getByTestId("user-form-submit-noscript").click(),
   ]);
   await delay(300);
   await page.reload({ waitUntil: "domcontentloaded" });
