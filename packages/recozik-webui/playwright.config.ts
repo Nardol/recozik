@@ -44,6 +44,8 @@ export default defineConfig({
           },
         },
       },
+      // Force sequential execution for Firefox to avoid context lifecycle issues
+      fullyParallel: false,
     },
     {
       name: "webkit",
