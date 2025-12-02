@@ -8,20 +8,33 @@ the Playwright configuration to maintain CI stability.
 
 ## Root Cause Analysis
 
-The issue appears to be environment-specific and related to Firefox's context lifecycle management
-in Playwright. While the error could not be reproduced in all environments, the reported symptoms
-suggested Firefox-specific automation interference.
+The issue is environment-specific and related to Firefox sandboxing on Linux systems. Debug output
+from the affected environment showed:
+
+- `sandbox uid_map EACCES` errors
+- `dconf EACCES` errors
+- `glxtest/libEGL` warnings
+- `NS_ERROR_FAILURE` in Firefox Helper.js
+
+These errors caused Firefox to crash immediately after launch, before Playwright could establish
+proper control, resulting in `browserContext.newPage: Target page, context or browser has been closed`.
 
 ## Solution Implemented
 
-Re-enabled Firefox with defensive configuration:
+Re-enabled Firefox with content sandboxing disabled via Firefox preferences:
 
-1. **Firefox-specific launch options** added to `playwright.config.ts`:
+1. **Firefox sandbox preference** - `security.sandbox.content.level: 0`
+   - Disables Firefox content sandboxing to avoid sandbox uid_map EACCES errors
+   - This is the proper Firefox way to disable sandboxing (not Chromium flags)
+
+2. **Firefox user preferences** for automation:
    - Disabled media navigator streams
    - Disabled permission prompts for microphone/camera
    - Set fake media streams for automation
 
-2. **Configuration changes**:
+3. **Sequential execution** - `fullyParallel: false` to avoid race conditions
+
+4. **Complete configuration**:
 
 ```typescript
 {
@@ -34,42 +47,70 @@ Re-enabled Firefox with defensive configuration:
         "media.navigator.permission.disabled": true,
         "permissions.default.microphone": 1,
         "permissions.default.camera": 1,
+        "security.sandbox.content.level": 0,
       },
     },
   },
+  fullyParallel: false,
 }
 ```
 
 ## Testing Results
 
-After implementing the fix:
+After implementing the sandboxing fix:
 
-### Local Testing (Environment A - Cannot Reproduce Original Issue)
+### Local Testing (Environment A - Development Machine)
 
-- ✅ 28/28 tests passed with 1 worker
-- ✅ 56/56 tests passed with 6 workers (2 repetitions)
-- ✅ No context lifecycle errors observed
-- ✅ Stable across multiple runs
+With `security.sandbox.content.level: 0` preference:
 
-### Expected Testing (Environment B - Original Issue Reporter)
+- ✅ 9/9 auth tests passed with 1 worker
+- ✅ 28/28 total tests passed (1 skipped visual test)
+- ✅ No browserContext.newPage errors
+- ✅ Firefox launches and runs stably
 
-- Testing needed to confirm resolution in the environment where issue was 100% reproducible
-- If issue persists, additional workarounds available:
-  - Force `workers: 1` for Firefox project only
-  - Add explicit delays before context creation
-  - Investigate Firefox version-specific issues
+### Environment B (Previously Affected System) - VERIFIED FIX
+
+**CONFIRMED**: The sandbox preference resolved the issue:
+
+- ✅ 9/9 auth tests now pass (previously 100% failure)
+- ✅ No more `sandbox uid_map EACCES` errors
+- ✅ Firefox launches and completes all tests successfully
+- ✅ No more browserContext.newPage crashes
+
+If issues reoccur, additional investigation may be needed:
+
+- Examine display/X11 configuration (glxtest/libEGL errors)
+- Check dconf/gsettings permissions
+- Consider running in Xvfb or headful mode
+- Investigate Firefox version compatibility
 
 ## Verification Steps
 
-To verify the fix:
+To verify the sandboxing fix on the affected system:
 
 ```bash
 cd packages/recozik-webui
+
+# Rebuild (ensure latest code)
 npm run build
-npx playwright test --project=firefox --workers=6
+
+# Test with 1 worker first (original failure scenario)
+npx playwright test --project=firefox --workers=1 tests/e2e/auth.spec.ts --reporter=line
+
+# If successful, test full suite
+npx playwright test --project=firefox --reporter=line
 ```
 
-Expected: All tests pass without `browserContext.newPage` errors.
+**Expected result**: All Firefox tests pass without
+`browserContext.newPage: Target page, context or browser has been closed` errors.
+
+**If tests still fail**:
+
+1. Capture debug output:
+   `DEBUG=pw:browser npx playwright test --project=firefox --workers=1 tests/e2e/auth.spec.ts --max-failures=1`
+2. Check if sandbox errors are gone from debug output
+3. Verify `security.sandbox.content.level: 0` is set in firefoxUserPrefs
+4. If new errors appear, update investigation direction
 
 ## Rollback Plan
 

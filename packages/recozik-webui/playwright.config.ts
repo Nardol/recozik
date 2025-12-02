@@ -41,6 +41,8 @@ export default defineConfig({
             "media.navigator.permission.disabled": true,
             "permissions.default.microphone": 1,
             "permissions.default.camera": 1,
+            // Disable sandboxing-related features that can cause crashes
+            "security.sandbox.content.level": 0,
           },
         },
       },
