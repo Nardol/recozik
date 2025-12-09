@@ -20,12 +20,12 @@ jobs:
         with:
           enable-cache: true
           python-version:
-            "3.13"
+            "3.14"
             # Avoid post-job cache pruning failures on self-hosted runners
             # Keep pruning on GitHub-hosted runners
           prune-cache: ${{ runner.environment == 'github-hosted' }}
-      - name: Install Python 3.13 with uv
-        run: uv python install 3.13
+      - name: Install Python 3.14 with uv
+        run: uv python install 3.14
       - run: uv sync --group dev --frozen
       - name: Cache pre-commit
         if: ${{ runner.environment == 'github-hosted' }}
@@ -46,7 +46,7 @@ jobs:
     needs: [lint]
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
