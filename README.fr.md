@@ -100,8 +100,8 @@ Tous les mots de passe doivent respecter ces critères :
 
 ## Prérequis
 
-- Python 3.10 à 3.13 (librosa >= 0.11 prend en charge 3.13 ; Recozik installe automatiquement les paquets de
-  remplacement `standard-*`/`audioop-lts`).
+- Python 3.10 à 3.14 (librosa 0.11 + numba 0.63 prennent en charge 3.14 ; Recozik installe automatiquement les paquets
+  de remplacement `standard-*`/`audioop-lts`).
 - [Chromaprint](https://acoustid.org/chromaprint) et son binaire `fpcalc` présents dans le `PATH`.
   - Linux : paquet `chromaprint` / `libchromaprint-tools` selon la distribution.
   - Windows : télécharger l'archive Chromaprint, extraire, ajouter le dossier contenant `fpcalc.exe` au `PATH`.

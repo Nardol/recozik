@@ -117,8 +117,8 @@ All passwords must meet these criteria:
 
 ## Prerequisites
 
-- Python 3.10 through 3.13 (librosa 0.11+ supports 3.13; Recozik bundles the `standard-*`/`audioop-lts` backfill
-  packages automatically).
+- Python 3.10 through 3.14 (librosa 0.11 + numba 0.63 support 3.14; Recozik bundles the `standard-*`/`audioop-lts`
+  backfill packages automatically).
 - [Chromaprint](https://acoustid.org/chromaprint) binaries; the CLI relies on the `fpcalc` executable.
   - Linux: install the `chromaprint`/`libchromaprint-tools` package from your distribution.
   - Windows: download the Chromaprint zip, extract it, and add the folder with `fpcalc.exe` to `PATH`.
