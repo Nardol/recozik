@@ -15,13 +15,13 @@ from recozik_services.cli_support.completion import (
 )
 from recozik_services.cli_support.deps import get_fingerprint_symbols, get_lookup_cache_cls
 from recozik_services.cli_support.metadata import extract_audio_metadata
+from typer import completion as _typer_completion
 from typer.completion import (
     get_completion_script as _typer_generate_completion_script,
 )
 from typer.completion import (
     install as _typer_install_completion,
 )
-from typer import completion as _typer_completion
 
 from .commands.completion import (
     completion_install as completion_install_command,
