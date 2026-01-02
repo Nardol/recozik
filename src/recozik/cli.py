@@ -15,14 +15,12 @@ from recozik_services.cli_support.completion import (
 )
 from recozik_services.cli_support.deps import get_fingerprint_symbols, get_lookup_cache_cls
 from recozik_services.cli_support.metadata import extract_audio_metadata
+from typer import completion as _typer_completion
 from typer.completion import (
     get_completion_script as _typer_generate_completion_script,
 )
 from typer.completion import (
     install as _typer_install_completion,
-)
-from typer.completion import (
-    shellingham as completion_shellingham,
 )
 
 from .commands.completion import (
@@ -87,6 +85,7 @@ completion_app = typer.Typer(
 app.add_typer(config_app, name="config")
 app.add_typer(completion_app, name="completion")
 
+completion_shellingham = getattr(_typer_completion, "shellingham", None)
 configure_shellingham_helper(completion_shellingham)
 
 _UNINITIALIZED = object()
