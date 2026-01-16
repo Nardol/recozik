@@ -29,7 +29,7 @@ jobs:
       - run: uv sync --group dev --frozen
       - name: Cache pre-commit
         if: ${{ runner.environment == 'github-hosted' }}
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
         with:
           path: ~/.cache/pre-commit
           key: >-
@@ -115,7 +115,7 @@ jobs:
           cd packages/recozik-webui
           npm ci --include=optional
       - name: Cache Playwright browsers
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('packages/recozik-webui/package-lock.json') }}
