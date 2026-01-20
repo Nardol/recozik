@@ -11,7 +11,7 @@
     "test:e2e": "MOCK_API_PORT=10099 NEXT_PUBLIC_RECOZIK_API_BASE=http://localhost:10099/api RECOZIK_WEB_API_BASE=http://localhost:10099/api RECOZIK_INTERNAL_API_BASE=http://localhost:10099/api sh -c 'npm run build && playwright test'"
   },
   "dependencies": {
-    "next": "16.1.3",
+    "next": "16.1.4",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -24,7 +24,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.3",
+    "eslint-config-next": "16.1.4",
     "jsdom": "^27.0.0",
     "typescript": "^5",
     "vitest": "^4.0.0"
