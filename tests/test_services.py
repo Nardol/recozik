@@ -371,9 +371,9 @@ def test_batch_service_best_only_and_metadata(tmp_path):
         metadata_fallback=True,
         limit=2,
         best_only=True,
-        metadata_extractor=lambda path: {"artist": "Meta", "title": "Fallback"}
-        if path.name == "meta.wav"
-        else None,
+        metadata_extractor=lambda path: (
+            {"artist": "Meta", "title": "Fallback"} if path.name == "meta.wav" else None
+        ),
     )
 
     log_entries = []
