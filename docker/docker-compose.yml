@@ -56,7 +56,7 @@ services:
   # Start nginx via `docker compose --profile reverse-proxy up`
   nginx:
     hostname: nginx
-    image: docker.io/library/nginx:1.29
+    image: docker.io/library/nginx:1.30
     profiles: ["reverse-proxy"]
     depends_on:
       - backend
