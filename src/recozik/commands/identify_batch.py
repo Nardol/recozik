@@ -11,6 +11,7 @@ import typer
 from recozik_services.batch import BatchRequest, run_batch_identify
 from recozik_services.cli_support.audd_helpers import (
     get_audd_support,
+    normalize_audd_mode,
     parse_bool_env,
     parse_float_env,
     parse_int_env,
@@ -374,10 +375,7 @@ def identify_batch(
         config.audd_mode,
         env_value=env_mode_value,
     )
-    if isinstance(raw_mode_setting, AudDMode):
-        mode_text = raw_mode_setting.value
-    else:
-        mode_text = str(raw_mode_setting).strip().lower()
+    mode_text = normalize_audd_mode(raw_mode_setting, config.audd_mode or "standard")
     try:
         audd_mode_value = AudDMode(mode_text)
     except ValueError as exc:  # pragma: no cover - defensive

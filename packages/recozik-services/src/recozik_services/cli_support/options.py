@@ -23,7 +23,8 @@ def resolve_option(
 ) -> U:
     """Return the effective option value honoring configuration defaults."""
     source = ctx.get_parameter_source(param_name)
-    if source is ParameterSource.DEFAULT:
+    source_name = getattr(source, "name", None)
+    if source is None or source_name == ParameterSource.DEFAULT.name or cli_value is None:
         if env_value is not None:
             if transform is not None:
                 return transform(env_value)

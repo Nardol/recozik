@@ -8,6 +8,12 @@ import pytest
 from recozik.cli_support import audd_helpers
 
 
+def test_normalize_audd_mode_handles_typer_none_sentinel() -> None:
+    assert audd_helpers.normalize_audd_mode(None, "standard") == "standard"
+    assert audd_helpers.normalize_audd_mode("none", "standard") == "standard"
+    assert audd_helpers.normalize_audd_mode(" AUTO ", "standard") == "auto"
+
+
 def test_parse_bool_env_accepts_common_aliases() -> None:
     assert audd_helpers.parse_bool_env("TEST", "1") is True
     assert audd_helpers.parse_bool_env("TEST", "false") is False

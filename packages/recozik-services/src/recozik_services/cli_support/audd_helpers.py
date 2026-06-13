@@ -113,11 +113,23 @@ def get_audd_support() -> AudDSupport:
 __all__ = [
     "AudDSupport",
     "get_audd_support",
+    "normalize_audd_mode",
     "parse_bool_env",
     "parse_float_env",
     "parse_int_env",
     "parse_int_list_env",
 ]
+
+
+def normalize_audd_mode(value: object, default: str = "standard") -> str:
+    """Return a normalized AudD mode string from CLI, env, or config values."""
+    raw_value = getattr(value, "value", value)
+    if raw_value is None:
+        return default
+    mode_text = str(raw_value).strip().lower()
+    if mode_text in {"", "none"}:
+        return default
+    return mode_text
 
 
 def parse_bool_env(name: str, value: str | None) -> bool | None:
