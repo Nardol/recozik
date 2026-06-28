@@ -16,7 +16,7 @@
     "react-dom": "19.2.7"
   },
   "overrides": {
-    "postcss": "8.5.15"
+    "postcss": "8.5.16"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.0",
